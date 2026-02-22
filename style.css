@@ -1,0 +1,89 @@
+*{
+  margin: 0px;
+  padding: 0px;
+}
+
+body{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+canvas{
+  position: fixed;
+  top: 0;
+  left: 0;
+}
+
+.test{
+  color: #f4000076;
+}
+
+.path-selector-hero-div{
+  width: 100%;
+  height: 100%;
+  background: rgba(149, 72, 72, 0.434);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.path-selector-container{
+  width: 200px;
+  height: 200px;
+  background: rgba(0, 0, 255, 0.433);
+  border-radius: 100%;
+  transition: 0.5s;
+}
+
+.path-selector-container:hover{
+  width: 400px;
+  height: 400px;
+}
+
+.path-selector{
+  margin: 100px;
+  font: 3rem;
+  /* background: rgb(107, 107, 129); */
+  text-shadow: 5px 5px 50px blue;
+}
+
+#click-btn{
+  position: absolute;
+  z-index: 10;
+  cursor: pointer;
+}
+
+#select-path-hover-div{
+  position: absolute;
+  z-index: 9;
+  width: 325px;
+  height: 325px;
+  background: rgba(170, 36, 36, 0);
+  border-radius: 50%;
+  margin-top: 28px;
+  cursor: pointer;
+}
+
+#projects-hover-div{
+  position: absolute;
+  z-index: 9;
+  width: 30vw;
+  height: 70vh;
+  background: rgba(36, 170, 49, 0);
+  /* border-radius: 50%; */
+  left: 5%;
+  cursor: pointer;
+}
+
+#about-hover-div{
+  position: absolute;
+  z-index: 9;
+  width: 30vw;
+  height: 70vh;
+  background: rgba(36, 170, 49, 0);
+  /* border-radius: 50%; */
+  right: 5%;
+  cursor: pointer;
+}

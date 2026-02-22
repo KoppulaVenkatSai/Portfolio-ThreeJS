@@ -1,0 +1,155 @@
+FirstPersonControls
+LoadingPage
+CSS 2d Renderer
+dat.gui
+GTA 5 Weapon select
+//npm run dev
+point material for models
+
+Camera movement on click video:
+https://youtu.be/U-ZiSLwicK8
+
+
+CSS2DRendere Fail:
+
+
+aboutHoverDiv.addEventListener("click", ()=>{
+  aboutPageRocketTimeline1.to(modelGroup.position, {
+    duration: 1,
+    ease: "none"
+  })
+  .to(modelGroup.position, {
+    x: -100,
+    y: 200,
+    z: 100,
+    duration: 1,
+    ease: "none"
+  })
+  .to(modelGroup.position, {
+    x: 300,
+    y: 10,
+    z: -10,
+    duration: 0.1,
+    ease: "none"
+  })
+  aboutPageRocketTimeline2.to(modelGroup.rotation, {
+    duration: 1.1,
+    ease: "none"
+  })
+  .to(modelGroup.rotation, {
+    x: -4.10152,
+    y: 0,
+    z: Math.PI,
+    duration: 1.8,
+    ease: "none"
+  })
+  aboutPageTimeline1.to(camera.position, {
+    x: 10,
+    y: 15,
+    z: 0,
+    duration: 1,
+    ease: "none"
+  })
+  .to(camera.position, {
+    x: 10,
+    y: 15,
+    z: 0,
+    duration: 0.3,
+    ease: "none"
+  })
+  .to(camera.position, {
+    x: -400,
+    y: 300,
+    z: 100,
+    duration: 0.5,
+    ease: "none"
+  })
+  .to(camera.position, {
+    x: 300,
+    y: 10,
+    z: 100,
+    duration: 2,
+    ease: "none"
+  })
+  .to(camera.position, {
+    x: 300,
+    y: 10,
+    z: 0,
+    duration: 2,
+    ease: "none"
+  })
+  aboutPageTimeline2.to(camera.rotation, {
+    x: Math.PI / 7,
+    duration: 1,
+    ease: "none"
+  })
+  .to(camera.rotation, {
+    x: Math.PI / 4,
+    y: Math.PI - Math.PI / 7,
+    duration: 0.3, 
+    ease: "none"
+  })
+  .to(camera.rotation, {
+    // x: Math.PI / 4,
+    x: 2 * Math.PI,
+    y: Math.PI - Math.PI / 7,
+    duration: 0.5, 
+    ease: "none"
+  })
+  .to(camera.rotation, {
+    x: 0,
+    y: -Math.PI + Math.PI / 2,
+    z: 0,
+    duration: 0, 
+    ease: "none"
+  })
+  .to(camera.rotation, {
+    x: 0,
+    y: -Math.PI + Math.PI / 2,
+    z: -8*Math.PI,
+    duration: 2, 
+    ease: "none"
+  })
+  .to(camera.rotation, {
+    x: 0,
+    y: 0,
+    z: 0,
+    duration: 0,
+    ease: "none"
+  })
+  .to(camera.rotation, {
+    x: 0,
+    y: 0,
+    z: -2*Math.PI,
+    duration: 1,
+  })
+  projectsHoverDiv.style.display = "none";
+  aboutHoverDiv.style.display = "none";
+})
+
+  // .to(camera.rotation, {
+  //   // x: Math.PI / 4,
+  //   x: -2 * Math.PI,
+  //   y: Math.PI - Math.PI / 7,
+  //   duration: 0.6, 
+  //   ease: "none"
+  // })
+  // .to(camera.rotation, {
+  //   x: 0,
+  //   y: -Math.PI + Math.PI / 2,
+  //   duration: 0, 
+  //   ease: "none"
+  // })
+  // .to(camera.rotation, {
+  //   y: -Math.PI + Math.PI / 2,
+  //   z: -5*Math.PI,
+  //   duration: 2, 
+  //   ease: "none"
+  // })
+  // .to(camera.rotation, {
+  //   x: 0,
+  //   y: 0,
+  //   z: -1*Math.PI,
+  //   duration: 0,
+  //   ease: "none"
+  // })

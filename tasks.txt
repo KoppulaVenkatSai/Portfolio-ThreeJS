@@ -1,0 +1,18 @@
+1. Optimize Star Background (THREE.Points)
+- Replace THREE.SphereGeometry loop with a single THREE.BufferGeometry and THREE.PointsMaterial.
+- Render the stars using THREE.Points.
+
+2. Structural Refactoring
+- Break down `main.js` into modular files to avoid dumping all functionality into one place.
+- Create an `animations` folder which holds animation logic and timelines for specific scenes.
+- Update variables and hardcoded values (like coordinates, durations, colors) by extracting them into configuration objects or reusable functions, making the code production-ready, readable, and understandable.
+
+3. Animation Updates
+- Update the starting button click intro animation.
+- Update the "PROJECTS" takeoff animation.
+
+4. 3D Model Updates
+- Update and replace the existing 3D models with any new assets.
+
+5. Future Enhancements
+- Expand and add more content/interaction inside the 'About Me' and 'Projects' sections (TBD later).
