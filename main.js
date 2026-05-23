@@ -49,7 +49,7 @@ directionalLight.shadow.camera.bottom = -100;
 directionalLight.shadow.mapSize.width = 1024;
 directionalLight.shadow.mapSize.height = 1024;
 const directionalLightHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
-scene.add(directionalLightHelper);
+// scene.add(directionalLightHelper);
 scene.add(new THREE.AmbientLight(0xffffff, 1));
 
 const modelDirectionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -60,7 +60,7 @@ scene.add(modelDirectionalLightTarget);
 modelDirectionalLight.target = modelDirectionalLightTarget;
 modelDirectionalLight.position.set(8, 4, 10);
 const modelDirectionalLightHelper = new THREE.DirectionalLightHelper(modelDirectionalLight, 2);
-scene.add(modelDirectionalLightHelper);
+// scene.add(modelDirectionalLightHelper);
 
 
 // const coneGeometry = new THREE.ConeGeometry(5, 30, 100);
@@ -209,7 +209,7 @@ pathDirectionalLight.shadow.camera.bottom = -100;
 pathDirectionalLight.shadow.mapSize.width = 1024;
 pathDirectionalLight.shadow.mapSize.height = 1024;
 const pathDirectionalLightHelper = new THREE.DirectionalLightHelper(pathDirectionalLight, 0.5);
-scene.add(pathDirectionalLightHelper);
+// scene.add(pathDirectionalLightHelper);
 
 const projectsHoverDiv = document.createElement('div');
 projectsHoverDiv.id = "projects-hover-div";
@@ -267,7 +267,7 @@ pathDirectionalLightHover.shadow.camera.bottom = -100;
 pathDirectionalLightHover.shadow.mapSize.width = 1024;
 pathDirectionalLightHover.shadow.mapSize.height = 1024;
 const pathDirectionalLightHoverHelper = new THREE.DirectionalLightHelper(pathDirectionalLightHover, 0.5);
-scene.add(pathDirectionalLightHoverHelper);
+// scene.add(pathDirectionalLightHoverHelper);
 
 selectPathHoverDiv.addEventListener("mouseenter", ()=>{
   gsap.to(pathDirectionalLight, { intensity: 0.8, duration:0.2 })
@@ -293,7 +293,7 @@ projectsDirectionalLightHover.shadow.camera.bottom = -100;
 projectsDirectionalLightHover.shadow.mapSize.width = 1024;
 projectsDirectionalLightHover.shadow.mapSize.height = 1024;
 const projectsDirectionalLightHoverHelper = new THREE.DirectionalLightHelper(projectsDirectionalLightHover, 0.5);
-scene.add(projectsDirectionalLightHoverHelper);
+// scene.add(projectsDirectionalLightHoverHelper);
 
 projectsHoverDiv.addEventListener("mouseenter", ()=>{
   gsap.to(projectsDirectionalLightHover, { intensity: 5, duration:0.2, })
@@ -319,7 +319,7 @@ aboutDirectionalLightHover.shadow.camera.bottom = -100;
 aboutDirectionalLightHover.shadow.mapSize.width = 1024;
 aboutDirectionalLightHover.shadow.mapSize.height = 1024;
 const aboutDirectionalLightHoverHelper = new THREE.DirectionalLightHelper(aboutDirectionalLightHover, 0.5);
-scene.add(aboutDirectionalLightHoverHelper);
+// scene.add(aboutDirectionalLightHoverHelper);
 
 aboutHoverDiv.addEventListener("mouseenter", ()=>{
   gsap.to(aboutDirectionalLightHover, { intensity: 5, duration:0.2, })
@@ -428,7 +428,7 @@ earthModelDirectionalLightTarget.position.set(300, 10, 0);
 scene.add(earthModelDirectionalLightTarget);
 earthModelDirectionalLight.target = earthModelDirectionalLightTarget;
 const earthModelDirectionalLightHelper = new THREE.DirectionalLightHelper(earthModelDirectionalLight, 2);
-scene.add(earthModelDirectionalLightHelper);
+// scene.add(earthModelDirectionalLightHelper);
 
 
 function addStar() {
