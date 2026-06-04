@@ -1,0 +1,47 @@
+[project]
+name = "hunyuan3d-mlx"
+version = "0.1.0"
+description = "Run Hunyuan3D on Apple Silicon"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+  "accelerate",
+  "diffusers",
+  "einops",
+  "numpy",
+  "omegaconf",
+  "onnxruntime",
+  "opencv-python",
+  "pillow",
+  "pybind11",
+  "pygltflib",
+  "pymeshlab",
+  "rembg",
+  "torch",
+  "torchvision",
+  "tqdm>=4.66.3",
+  "transformers>=4.48.0",
+  "trimesh",
+  "xatlas",
+  "ninja",
+  "mlx; platform_system == 'Darwin' and platform_machine == 'arm64'",
+  "mtldiffrast",
+  "mtlbvh",
+  "cumesh",
+  "flex-gemm",
+]
+
+[tool.uv.sources]
+mtldiffrast = { path = "libraries/mtldiffrast" }
+mtlbvh = { path = "libraries/mtlbvh" }
+cumesh = { path = "libraries/mtlmesh" }
+"flex-gemm" = { path = "libraries/mtlgemm" }
+
+[tool.uv.extra-build-dependencies]
+mtldiffrast = ["torch", "ninja", "setuptools"]
+mtlbvh = ["torch", "ninja", "setuptools"]
+cumesh = ["torch", "ninja", "setuptools"]
+"flex-gemm" = ["torch", "ninja", "setuptools"]
+
+[tool.uv]
+package = false
