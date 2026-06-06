@@ -2,8 +2,8 @@ import bpy
 import math
 import mathutils
 
-def create_station_blockout():
-    print("Generating Space Station: Iterations 16-18 Micro-Detailed Model...")
+def create_station_blockout(iteration_level=70):
+    print(f"Generating Space Station: Iteration Level {iteration_level} Model...")
     # 1. Clear existing mesh objects from the scene
     bpy.ops.object.select_all(action='DESELECT')
     for obj in list(bpy.data.objects):
@@ -58,7 +58,6 @@ def create_station_blockout():
             
             if mat_name in ("Hull_Dark", "Hull_Light"):
                 # Matte dark or light metal with noise-based bump texture
-                principled.inputs['Base Color'].default_value = color
                 principled.inputs['Metallic'].default_value = 0.85
                 
                 # Noise texture for roughness variation and bump
@@ -81,10 +80,60 @@ def create_station_blockout():
                 math.inputs[2].default_value = 0.35 if mat_name == "Hull_Dark" else 0.25
                 links.new(noise.outputs['Fac'], math.inputs[0])
                 links.new(math.outputs['Value'], principled.inputs['Roughness'])
+
+                # Iter 56 & 57: Edge Wear & Ambient Occlusion (AO)
+                if iteration_level >= 56:
+                    # AO node to darken crevices
+                    ao = nodes.new(type='ShaderNodeAmbientOcclusion')
+                    ao.inputs['Distance'].default_value = 1.5
+                    
+                    # Geometry node for Pointiness (edge highlights)
+                    geom = nodes.new(type='ShaderNodeNewGeometry')
+                    
+                    # ColorRamp for pointiness tuning
+                    ramp = nodes.new(type='ShaderNodeValToRGB')
+                    ramp.color_ramp.elements[0].position = 0.45
+                    ramp.color_ramp.elements[1].position = 0.55
+                    ramp.color_ramp.elements[0].color = (0.0, 0.0, 0.0, 1.0)
+                    ramp.color_ramp.elements[1].color = (1.0, 1.0, 1.0, 1.0)
+                    links.new(geom.outputs['Pointiness'], ramp.inputs['Fac'])
+                    
+                    # Mix Color node for Edge Wear
+                    mix_edge = nodes.new(type='ShaderNodeMix')
+                    mix_edge.data_type = 'RGBA'
+                    mix_edge.blend_type = 'MIX'
+                    mix_edge.inputs['Factor'].default_value = 0.2
+                    mix_edge.inputs[6].default_value = color # Base color
+                    mix_edge.inputs[7].default_value = (0.7, 0.7, 0.72, 1.0) # Bright metal edge
+                    links.new(ramp.outputs['Color'], mix_edge.inputs['Factor'])
+                    
+                    # Mix Color node for AO / Dirt streaks (Iter 59)
+                    mix_ao = nodes.new(type='ShaderNodeMix')
+                    mix_ao.data_type = 'RGBA'
+                    mix_ao.blend_type = 'MULTIPLY'
+                    links.new(mix_edge.outputs['Result'], mix_ao.inputs[6])
+                    links.new(ao.outputs['Color'], mix_ao.inputs[7])
+                    
+                    if iteration_level >= 59:
+                        # Extra dirt texture overlay
+                        dirt_noise = nodes.new(type='ShaderNodeTexNoise')
+                        dirt_noise.inputs['Scale'].default_value = 4.0
+                        dirt_noise.inputs['Detail'].default_value = 8.0
+                        
+                        mix_dirt = nodes.new(type='ShaderNodeMix')
+                        mix_dirt.data_type = 'RGBA'
+                        mix_dirt.blend_type = 'MIX'
+                        mix_dirt.inputs[7].default_value = (0.15, 0.12, 0.1, 1.0) # Brown dirt
+                        links.new(dirt_noise.outputs['Fac'], mix_dirt.inputs['Factor'])
+                        links.new(mix_ao.outputs['Result'], mix_dirt.inputs[6])
+                        links.new(mix_dirt.outputs['Result'], principled.inputs['Base Color'])
+                    else:
+                        links.new(mix_ao.outputs['Result'], principled.inputs['Base Color'])
+                else:
+                    principled.inputs['Base Color'].default_value = color
                 
             elif mat_name == "Rocket_Silver":
                 # Polished chrome/steel with vertical micro-scratches
-                principled.inputs['Base Color'].default_value = color
                 principled.inputs['Metallic'].default_value = 1.0
                 principled.inputs['Roughness'].default_value = 0.06
                 
@@ -106,10 +155,25 @@ def create_station_blockout():
                 links.new(mapping.outputs['Vector'], noise.inputs['Vector'])
                 links.new(noise.outputs['Fac'], bump.inputs['Height'])
                 links.new(bump.outputs['Normal'], principled.inputs['Normal'])
+
+                # Iter 58: Silver PBR scuffs & weathered metallic bands
+                if iteration_level >= 58:
+                    scuff_noise = nodes.new(type='ShaderNodeTexNoise')
+                    scuff_noise.inputs['Scale'].default_value = 8.0
+                    scuff_noise.inputs['Detail'].default_value = 6.0
+                    
+                    mix_scuff = nodes.new(type='ShaderNodeMix')
+                    mix_scuff.data_type = 'RGBA'
+                    mix_scuff.blend_type = 'MIX'
+                    mix_scuff.inputs[6].default_value = color
+                    mix_scuff.inputs[7].default_value = (0.3, 0.3, 0.32, 1.0) # Dark weathered scuff
+                    links.new(scuff_noise.outputs['Fac'], mix_scuff.inputs['Factor'])
+                    links.new(mix_scuff.outputs['Result'], principled.inputs['Base Color'])
+                else:
+                    principled.inputs['Base Color'].default_value = color
                 
             elif mat_name == "Gantry_Copper":
                 # Brushed copper
-                principled.inputs['Base Color'].default_value = color
                 principled.inputs['Metallic'].default_value = 1.0
                 
                 noise = nodes.new(type='ShaderNodeTexNoise')
@@ -128,6 +192,21 @@ def create_station_blockout():
                 math.inputs[2].default_value = 0.2
                 links.new(noise.outputs['Fac'], math.inputs[0])
                 links.new(math.outputs['Value'], principled.inputs['Roughness'])
+
+                if iteration_level >= 56:
+                    # Dark copper oxidation in crevices via AO
+                    ao = nodes.new(type='ShaderNodeAmbientOcclusion')
+                    ao.inputs['Distance'].default_value = 0.8
+                    
+                    mix_ox = nodes.new(type='ShaderNodeMix')
+                    mix_ox.data_type = 'RGBA'
+                    mix_ox.blend_type = 'MIX'
+                    mix_ox.inputs[6].default_value = color
+                    mix_ox.inputs[7].default_value = (0.1, 0.18, 0.15, 1.0) # Dark greenish oxide
+                    links.new(ao.outputs['Color'], mix_ox.inputs['Factor'])
+                    links.new(mix_ox.outputs['Result'], principled.inputs['Base Color'])
+                else:
+                    principled.inputs['Base Color'].default_value = color
                 
             elif mat_name == "Cabin_Red":
                 # Translucent glowing red push button plastic
@@ -157,34 +236,6 @@ def create_station_blockout():
                 principled.inputs['Metallic'].default_value = 0.0
                 
                 tex_coord = nodes.new(type='ShaderNodeTexCoord')
-                
-                # Rings mask
-                vec_math = nodes.new(type='ShaderNodeVectorMath')
-                vec_math.operation = 'LENGTH'
-                links.new(tex_coord.outputs['Object'], vec_math.inputs[0])
-                
-                mul_rad = nodes.new(type='ShaderNodeMath')
-                mul_rad.operation = 'MULTIPLY'
-                mul_rad.inputs[1].default_value = 4.0
-                links.new(vec_math.outputs['Value'], mul_rad.inputs[0])
-                
-                frac_rad = nodes.new(type='ShaderNodeMath')
-                frac_rad.operation = 'FRACT'
-                links.new(mul_rad.outputs['Value'], frac_rad.inputs[0])
-                
-                sub_rad = nodes.new(type='ShaderNodeMath')
-                sub_rad.operation = 'SUBTRACT'
-                sub_rad.inputs[1].default_value = 0.5
-                links.new(frac_rad.outputs['Value'], sub_rad.inputs[0])
-                
-                abs_rad = nodes.new(type='ShaderNodeMath')
-                abs_rad.operation = 'ABSOLUTE'
-                links.new(sub_rad.outputs['Value'], abs_rad.inputs[0])
-                
-                less_rad = nodes.new(type='ShaderNodeMath')
-                less_rad.operation = 'LESS_THAN'
-                less_rad.inputs[1].default_value = 0.06
-                links.new(abs_rad.outputs['Value'], less_rad.inputs[0])
                 
                 # Grid mask
                 sep = nodes.new(type='ShaderNodeSeparateXYZ')
@@ -238,22 +289,17 @@ def create_station_blockout():
                 less_y.inputs[1].default_value = 0.04
                 links.new(abs_y.outputs['Value'], less_y.inputs[0])
                 
-                # Combine
+                # Combine grid lines
                 max_grid = nodes.new(type='ShaderNodeMath')
                 max_grid.operation = 'MAXIMUM'
                 links.new(less_x.outputs['Value'], max_grid.inputs[0])
                 links.new(less_y.outputs['Value'], max_grid.inputs[1])
                 
-                max_all = nodes.new(type='ShaderNodeMath')
-                max_all.operation = 'MAXIMUM'
-                links.new(max_grid.outputs['Value'], max_all.inputs[0])
-                links.new(less_rad.outputs['Value'], max_all.inputs[1])
-                
                 mul_add = nodes.new(type='ShaderNodeMath')
                 mul_add.operation = 'MULTIPLY_ADD'
                 mul_add.inputs[1].default_value = 11.5
                 mul_add.inputs[2].default_value = 0.5
-                links.new(max_all.outputs['Value'], mul_add.inputs[0])
+                links.new(max_grid.outputs['Value'], mul_add.inputs[0])
                 links.new(mul_add.outputs['Value'], principled.inputs['Emission Strength'])
                 
             elif emission:
@@ -1929,6 +1975,319 @@ def create_station_blockout():
     link_to_collection(comm_feed, station_collection)
     assign_material(comm_feed, "Hull_Dark", color_dark)
     created_objects.append(comm_feed)
+
+    # =========================================================================
+    # --- PHASE 7: REALISM REFINEMENT LOOP (ITERATIONS 41-70) ---
+    # =========================================================================
+    import random
+    # Seed random to ensure reproducibility across runs, but keep micro-imperfections consistent
+    random.seed(42)
+
+    # 1. Helper function for adding detail elements (bolts, panels, etc.)
+    def add_detail_cube(name, size, loc, rot, mat_name, mat_color):
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=loc, rotation=rot)
+        obj = bpy.context.active_object
+        obj.name = name
+        obj.scale = size
+        link_to_collection(obj, station_collection)
+        assign_material(obj, mat_name, mat_color)
+        created_objects.append(obj)
+        return obj
+
+    def add_detail_cylinder(name, radius, depth, loc, rot, mat_name, mat_color):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=radius, depth=depth, location=loc, rotation=rot)
+        obj = bpy.context.active_object
+        obj.name = name
+        link_to_collection(obj, station_collection)
+        assign_material(obj, mat_name, mat_color)
+        created_objects.append(obj)
+        return obj
+
+    def add_detail_cone(name, radius, depth, loc, rot, mat_name, mat_color):
+        bpy.ops.mesh.primitive_cone_add(vertices=64, radius1=radius, radius2=0.0, depth=depth, location=loc, rotation=rot)
+        obj = bpy.context.active_object
+        obj.name = name
+        link_to_collection(obj, station_collection)
+        assign_material(obj, mat_name, mat_color)
+        created_objects.append(obj)
+        return obj
+
+    def add_detail_smooth_collar(name, radius1, radius2, depth, loc, rot, mat_name, mat_color):
+        mesh = bpy.data.meshes.new(name + "_Mesh")
+        obj = bpy.data.objects.new(name, mesh)
+        
+        segments = 128
+        rings = 32
+        
+        vertices = []
+        faces = []
+        
+        for r in range(rings + 1):
+            t = r / rings
+            # Smoothstep factor: 3t^2 - 2t^3
+            factor = 3 * (t**2) - 2 * (t**3)
+            radius = radius1 - (radius1 - radius2) * factor
+            z = -depth/2.0 + depth * t
+            
+            for s in range(segments):
+                angle = s * (2 * math.pi / segments)
+                x = radius * math.cos(angle)
+                y = radius * math.sin(angle)
+                vertices.append((x, y, z))
+                
+        for r in range(rings):
+            for s in range(segments):
+                curr_idx = r * segments + s
+                next_idx = r * segments + ((s + 1) % segments)
+                above_idx = (r + 1) * segments + s
+                above_next = (r + 1) * segments + ((s + 1) % segments)
+                
+                # Face: counter-clockwise (outward normal)
+                faces.append((curr_idx, next_idx, above_next, above_idx))
+                
+        mesh.from_pydata(vertices, [], faces)
+        mesh.update()
+        
+        for poly in mesh.polygons:
+            poly.use_smooth = True
+            
+        obj.location = loc
+        obj.rotation_euler = rot
+        
+        link_to_collection(obj, station_collection)
+        assign_material(obj, mat_name, mat_color)
+        created_objects.append(obj)
+        return obj
+
+    # Iter 41: Smooth fillet transition collar between central sphere and arms
+    if iteration_level >= 41:
+        # Add beveled collar sleeves blending the hub to the 4 main arms
+        # Arms are at: Left (-X), Right (+X), Back (+Y), Front (-Y)
+        collar_configs = [
+            ("Collar_Left", (-13.5, 0.0, 0.0), (0.0, -math.pi/2, 0.0)),
+            ("Collar_Right", (13.5, 0.0, 0.0), (0.0, math.pi/2, 0.0)),
+            ("Collar_Back", (0.0, 13.5, 0.0), (-math.pi/2, 0.0, 0.0)),
+            ("Collar_Front", (0.0, -13.5, 0.0), (math.pi/2, 0.0, 0.0)),
+        ]
+        for cname, cloc, crot in collar_configs:
+            # Main transition collar cone (Curvy flowing connection)
+            collar = add_detail_smooth_collar(cname, 12.5, 9.0, 3.0, cloc, crot, "Hull_Dark", color_dark)
+            
+            # Concentric detailing ring on collar
+            bpy.ops.mesh.primitive_torus_add(major_segments=128, minor_segments=32, major_radius=10.5, minor_radius=0.3, location=cloc, rotation=crot)
+            cring = bpy.context.active_object
+            cring.name = f"{cname}_Detail_Ring"
+            link_to_collection(cring, station_collection)
+            assign_material(cring, "Hull_Light", color_light)
+            created_objects.append(cring)
+
+    # Iter 42: Flat caps on sphere top and bottom with cable connections & lights
+    if iteration_level >= 42:
+        for suffix, zloc, zrot in [("Top", 14.2, (0, 0, 0)), ("Bottom", -14.2, (math.pi, 0, 0))]:
+            # Main flat cap module
+            cap = add_detail_cylinder(f"Sphere_Cap_{suffix}", 7.2, 1.2, (0, 0, zloc), zrot, "Hull_Dark", color_dark)
+            
+            # Raised outer rings
+            bpy.ops.mesh.primitive_torus_add(major_segments=128, minor_segments=32, major_radius=6.0, minor_radius=0.25, location=(0, 0, zloc + 0.6), rotation=zrot)
+            tring1 = bpy.context.active_object
+            tring1.name = f"Sphere_Cap_{suffix}_Ring_1"
+            link_to_collection(tring1, station_collection)
+            assign_material(tring1, "Gantry_Copper", color_copper)
+            created_objects.append(tring1)
+            
+            # Cable connection socket boxes (4 sockets per cap)
+            for idx, angle in enumerate([0, math.pi/2, math.pi, 3*math.pi/2]):
+                cx = 4.5 * math.cos(angle)
+                cy = 4.5 * math.sin(angle)
+                socket = add_detail_cylinder(f"Sphere_Cap_{suffix}_Socket_{idx+1}", 0.4, 0.8, (cx, cy, zloc + 0.6), zrot, "Hull_Light", color_light)
+                
+                # Small status indicator lights next to sockets
+                lx = 3.5 * math.cos(angle + 0.2)
+                ly = 3.5 * math.sin(angle + 0.2)
+                bulb = add_detail_cylinder(f"Sphere_Cap_{suffix}_Light_{idx+1}", 0.15, 0.3, (lx, ly, zloc + 0.7), zrot, "Glow_Orange", color_orange_glow)
+
+    # Iter 43: Segmented arm cylinder variations (varying radii and ribs)
+    if iteration_level >= 43:
+        # We add extra sleeve rings and panel overlaps to break the cylinders
+        for name, axis, pos in [("Arm_Y_Axis_Back", "Y", 32.5), ("Arm_Y_Axis_Front", "Y", -32.5), ("Arm_X_Axis_Left", "X", -32.5), ("Arm_X_Axis_Right", "X", 32.5)]:
+            # Add rings at intervals to segment the main arms
+            for offset in [-6.0, 0.0, 6.0]:
+                if name == "Arm_X_Axis_Right" and offset in (0.0, 6.0):
+                    continue
+                loc = (0.0, pos + offset, 0.0) if axis == "Y" else (pos + offset, 0.0, 0.0)
+                rot = (math.pi/2, 0.0, 0.0) if axis == "Y" else (0.0, math.pi/2, 0.0)
+                
+                # Segment sleeve
+                if name == "Arm_X_Axis_Right":
+                    bpy.ops.mesh.primitive_cylinder_add(vertices=128, radius=9.1, depth=1.5, location=loc, rotation=rot)
+                    sleeve = bpy.context.active_object
+                    sleeve.name = f"{name}_Sleeve_{offset}"
+                    
+                    # Cut inner hole
+                    bpy.ops.mesh.primitive_cylinder_add(vertices=128, radius=6.26, depth=1.6, location=loc, rotation=rot)
+                    scut = bpy.context.active_object
+                    scut.name = f"{name}_Sleeve_{offset}_Cutter"
+                    
+                    bool_s = sleeve.modifiers.new(name="SleeveCut", type='BOOLEAN')
+                    bool_s.object = scut
+                    bool_s.operation = 'DIFFERENCE'
+                    bpy.context.view_layer.objects.active = sleeve
+                    bpy.ops.object.modifier_apply(modifier=bool_s.name)
+                    bpy.data.objects.remove(scut, do_unlink=True)
+                    
+                    link_to_collection(sleeve, station_collection)
+                    assign_material(sleeve, "Hull_Light", color_light)
+                    created_objects.append(sleeve)
+                else:
+                    sleeve = add_detail_cylinder(f"{name}_Sleeve_{offset}", 9.1, 1.5, loc, rot, "Hull_Light", color_light)
+                
+                # Bolt heads on sleeves
+                for b_idx in range(8):
+                    b_angle = b_idx * (math.pi / 4)
+                    bx = 9.1 * math.cos(b_angle)
+                    bz = 9.1 * math.sin(b_angle)
+                    
+                    b_loc = (bx, pos + offset, bz) if axis == "Y" else (pos + offset, bx, bz)
+                    b_rot = (0.0, b_angle, 0.0) if axis == "Y" else (0.0, 0.0, b_angle)
+                    add_detail_cylinder(f"{name}_Sleeve_Bolt_{offset}_{b_idx+1}", 0.15, 0.3, b_loc, b_rot, "Rocket_Silver", color_silver)
+
+    # Iter 44: Exposed external piping runs on arms
+    if iteration_level >= 44:
+        # Run copper and dark steel utility pipes along Y-axis and X-axis arms
+        pipe_configs = [
+            ("Pipe_North", "Y", 25.0, 42.5, 9.2, 0.0),
+            ("Pipe_South", "Y", -42.5, -25.0, 9.2, math.pi),
+            ("Pipe_West", "X", -42.5, -25.0, 9.2, math.pi/2),
+            ("Pipe_East", "X", 25.0, 42.5, 9.2, -math.pi/2),
+        ]
+        for pname, axis, start_val, end_val, radius_offset, rot_angle in pipe_configs:
+            mid_val = (start_val + end_val) / 2.0
+            depth_val = abs(end_val - start_val)
+            
+            # Pipe 1: Copper conduit
+            px1 = radius_offset * math.cos(rot_angle + 0.3)
+            pz1 = radius_offset * math.sin(rot_angle + 0.3)
+            loc1 = (px1, mid_val, pz1) if axis == "Y" else (mid_val, px1, pz1)
+            rot1 = (math.pi/2, 0.0, 0.0) if axis == "Y" else (0.0, math.pi/2, 0.0)
+            add_detail_cylinder(f"{pname}_Copper_Conduit", 0.15, depth_val, loc1, rot1, "Gantry_Copper", color_copper)
+            
+            # Pipe 2: Dark cable bundle
+            px2 = radius_offset * math.cos(rot_angle - 0.3)
+            pz2 = radius_offset * math.sin(rot_angle - 0.3)
+            loc2 = (px2, mid_val, pz2) if axis == "Y" else (mid_val, px2, pz2)
+            add_detail_cylinder(f"{pname}_Dark_Conduit", 0.1, depth_val, loc2, rot1, "Hull_Dark", color_dark)
+            
+            # Pipe mounting brackets (3 brackets along length)
+            for b_val in [start_val + 2.0, mid_val, end_val - 2.0]:
+                bloc1 = (px1, b_val, pz1) if axis == "Y" else (b_val, px1, pz1)
+                add_detail_cube(f"{pname}_Bracket_{b_val}", (0.4, 0.4, 0.3), bloc1, (0, 0, rot_angle), "Hull_Light", color_light)
+
+    # Iter 45: Array of overlapping metal sleeve panels on arms
+    if iteration_level >= 45:
+        # Add sleeve segments representing armored panels wrapping 180 degrees of the arms
+        for name, axis, pos in [("Arm_Y_Axis_Back", "Y", 32.5), ("Arm_Y_Axis_Front", "Y", -32.5), ("Arm_X_Axis_Left", "X", -32.5)]:
+            # Panels wrapping top half
+            for p_idx in range(3):
+                p_offset = -5.0 + (p_idx * 5.0)
+                loc = (0.0, pos + p_offset, 9.15) if axis == "Y" else (pos + p_offset, 0.0, 9.15)
+                rot = (0.0, 0.0, 0.0) if axis == "Y" else (0.0, 0.0, 0.0)
+                # Outer plating panel sheet
+                add_detail_cube(f"{name}_Plate_{p_idx+1}", (7.0, 4.0, 0.1) if axis == "Y" else (4.0, 7.0, 0.1), loc, rot, "Hull_Dark", color_dark)
+
+    # Iter 46: Concentric circular panel rings on central sphere
+    if iteration_level >= 46:
+        # Add multiple thin rings wrapped around the sphere surface at offsets to simulate panel lines
+        for r_z in [-10.0, -5.0, 0.0, 5.0, 10.0]:
+            r_rad = math.sqrt(15.0**2 - r_z**2) + 0.05
+            bpy.ops.mesh.primitive_torus_add(major_segments=128, minor_segments=32, major_radius=r_rad, minor_radius=0.08, location=(0.0, 0.0, r_z), rotation=(0.0, 0.0, 0.0))
+            tseam = bpy.context.active_object
+            tseam.name = f"Hub_Panel_Seam_Z_{r_z}"
+            link_to_collection(tseam, station_collection)
+            assign_material(tseam, "Hull_Light", color_light)
+            created_objects.append(tseam)
+
+    # Iter 47: Grid lines and plates division on central sphere
+    if iteration_level >= 47:
+        # Form grid plates over the central sphere surface. We add 24 separate small panel sheets
+        for lat_idx in range(3): # 3 latitude bands
+            lat = (lat_idx - 1) * (math.pi / 5)
+            z_val = 15.0 * math.sin(lat)
+            r_val = 15.0 * math.cos(lat)
+            
+            for lon_idx in range(8): # 8 segments around
+                lon = lon_idx * (math.pi / 4)
+                px = r_val * math.cos(lon)
+                py = r_val * math.sin(lon)
+                
+                # Small panel offset
+                # Orientation vectors pointing outward
+                normal = mathutils.Vector((px, py, z_val)).normalized()
+                ploc = normal * 15.1
+                
+                # Align panel to face outward
+                rot_quat = normal.to_track_quat('Z', 'Y')
+                prot = rot_quat.to_euler()
+                
+                add_detail_cube(f"Hub_Panel_Plate_{lat_idx}_{lon_idx}", (3.0, 3.0, 0.15), ploc, prot, "Hull_Dark", color_dark)
+
+    # Iter 48: Grid lines and plates division on habitat block
+    if iteration_level >= 48:
+        # Subdivide habitat block panels (X from 26.0 to 49.0, width 23.0, Y-depth 20.0, Z-height 20.0)
+        # Add plates to the front, back, top, and bottom faces
+        # Front face (Y = -10.0)
+        for px in [28.0, 34.0, 41.0, 47.0]:
+            for pz in [-8.0, -4.0, 4.0, 8.0]:
+                # Exclude specific panel plates requested by the user
+                if (px == 41.0 and pz == -4.0) or (px == 34.0 and pz == -4.0) or (px == 41.0 and pz == 4.0) or (px == 34.0 and pz == 4.0):
+                    continue
+                add_detail_cube(f"Habitat_Front_Panel_{px}_{pz}", (2.8, 0.1, 3.2), (px, -10.1, pz), (0, 0, 0), "Hull_Dark", color_dark)
+        
+        # Top face (Z = 10.0)
+        for px in [28.0, 34.0, 41.0, 47.0]:
+            for py in [-8.0, -4.0, 4.0, 8.0]:
+                add_detail_cube(f"Habitat_Top_Panel_{px}_{py}", (2.8, 3.2, 0.1), (px, py, 10.1), (0, 0, 0), "Hull_Dark", color_dark)
+
+    # Iter 49: Exposed structural brackets and latch clamps on gantry (Removed per user request)
+    if iteration_level >= 49:
+        pass
+
+    # Iter 50: Positional/rotational micro-imperfections on panels
+    if iteration_level >= 50:
+        # Apply tiny randomized offsets to a selection of panels to add realistic imperfections
+        for obj in created_objects:
+            if "Panel_Plate" in obj.name or "Front_Panel" in obj.name or "Top_Panel" in obj.name:
+                obj.location.x += random.uniform(-0.02, 0.02)
+                obj.location.y += random.uniform(-0.02, 0.02)
+                obj.location.z += random.uniform(-0.02, 0.02)
+                obj.rotation_euler.x += random.uniform(-0.01, 0.01)
+                obj.rotation_euler.y += random.uniform(-0.01, 0.01)
+                obj.rotation_euler.z += random.uniform(-0.01, 0.01)
+
+    # Iter 51: Emissive yellow/orange status lights on sphere panel intersections
+    if iteration_level >= 51:
+        # Circular indicator dots on the sphere
+        for lon_idx in range(6):
+            lon = lon_idx * (math.pi / 3) + 0.2
+            px = 15.15 * math.cos(lon) * math.cos(0.4)
+            py = 15.15 * math.sin(lon) * math.cos(0.4)
+            pz = 15.15 * math.sin(0.4)
+            
+            add_detail_cylinder(f"Hub_Indicator_Light_{lon_idx+1}", 0.15, 0.2, (px, py, pz), (0, 0.4, lon), "Glow_Orange", color_orange_glow)
+
+    # Iter 52: Detail panel plates and greebles on habitat top/bottom seams
+    if iteration_level >= 52:
+        # Greebles in the seam channels of the habitat
+        for h_x in [29.0, 35.0, 42.0, 46.0]:
+            # Top greeble box
+            add_detail_cube(f"Habitat_Top_Greeble_{h_x}", (1.5, 1.2, 0.6), (h_x, 0.0, 10.3), (0, 0, 0), "Hull_Light", color_light)
+            # Bottom greeble box
+            add_detail_cube(f"Habitat_Bottom_Greeble_{h_x}", (1.5, 1.2, 0.6), (h_x, 0.0, -10.3), (0, 0, 0), "Hull_Light", color_light)
+
+    # Iter 53: Antenna masts and utility boxes detailing on central sphere
+    if iteration_level >= 53:
+        # Mini auxiliary antenna array on the hub
+        add_detail_cylinder(f"Hub_Aux_Mast", 0.1, 2.5, (0.0, 12.0, 9.5), (0.4, 0.0, 0.0), "Hull_Light", color_light)
+        add_detail_cone(f"Hub_Aux_Dish", 0.6, 0.3, (0.0, 12.8, 10.5), (0.4, 0.0, 0.0), "Gantry_Copper", color_copper)
 
     # --- MODIFIER CLEANUP & BEVEL APPLICATION (ITER 18) ---
     for name in ["Arm_Collar_West", "Arm_Collar_North", "Arm_Collar_South", "Hub_Front_Ring_1", "Hub_Front_Ring_2"]:
