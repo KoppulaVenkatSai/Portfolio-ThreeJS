@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Earth Descent & Monolith Landing: POC V3</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <script>
+    window.addEventListener('error', function(e) {
+      var div = document.createElement('div');
+      div.className = 'runtime-error-popup';
+      div.innerHTML = '<h3>System Malfunction</h3>' + e.message + '<br><small>' + e.filename + ':' + e.lineno + '</small>';
+      document.body.appendChild(div);
+    });
+  </script>
+  <script type="module" crossorigin src="/assets/index-Bj5S9nes.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CSWJPAsj.css">
+</head>
+<body>
+  <!-- Cinematic Loader -->
+  <div id="loader-screen">
+    <div class="loader-matrix">
+      <div class="loader-title">POC_V3 // SYSTEM INITIALIZATION</div>
+      <div class="loader-bar-bg">
+        <div id="loader-bar"></div>
+      </div>
+      <div id="loader-status">Preloading WebGL and assets...</div>
+    </div>
+  </div>
+
+  <!-- WebGL Render Canvas -->
+  <div id="viewport-container">
+    <canvas id="webgl-canvas"></canvas>
+  </div>
+
+  <!-- Storm lightning overlay -->
+  <div id="storm-overlay"></div>
+
+  <!-- Sci-Fi HUD HUD Telemetry Overlay -->
+  <div id="hud-container">
+    <div class="hud-header">
+      <div class="hud-title">V3_DESCENT_SYSTEM</div>
+      <div id="hud-telemetry" class="hud-status">STANDBY // READY FOR IGNITION</div>
+    </div>
+
+    <div class="hud-footer">
+      <button id="ignition-trigger" class="hud-btn" disabled>INITIATE DESCENT</button>
+    </div>
+  </div>
+
+  <!-- Entry Script Module -->
+</body>
+</html>

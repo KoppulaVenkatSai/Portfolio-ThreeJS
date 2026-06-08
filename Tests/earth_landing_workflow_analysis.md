@@ -198,3 +198,32 @@ void main() {
 * **Loading Time**: Under 300ms, as all noise generation functions are offloaded directly to GPU shaders instead of pre-generating large canvas images on the CPU thread.
 * **Reflective Chrome Hull**: The liquid chrome material reflects the custom Equirectangular environment maps and scrolls re-entry fire emissive textures with zero impact on frame rate.
 * **Touchdown Precision**: Rocket lands at exactly $y = 0.425$ on the platform surface, transitioning control back to OrbitControls seamlessly.
+
+---
+
+## 6. Advanced Realism Upgrades (5 Additional Actor-Critic Iterations)
+
+To fulfill the requirements of high-fidelity aesthetics, we executed 5 additional realism iterations focusing on the atmospheric transition, volumetric clouds, and stormy landing fog.
+
+### Iteration 1: Space Orbit & Rayleigh Scattering Atmosphere
+- **Terrain Shader**: Replaced the low-resolution canvas texture with a 5-octave simplex FBM noise terrain shader computed entirely on the GPU, yielding crisp continents, deserts, mountains, and ice caps.
+- **Rayleigh & Mie Scattering**: Constructed an exosphere shader shell calculating rayleigh scattering limb-glow, rendering atmospheric twilight colors (sunset orange to indigo) along the planetary terminator.
+
+### Iteration 2: Stratospheric Transition & Wispy High-Altitude Clouds
+- **Altitude Haze**: Linked exosphere fog density to camera altitude, interpolating background clear colors from space black through violet, crimson red, and storm grey.
+- **High-Altitude Cirrus**: Stacked rotating, wispy noise planes below the rocket to ease the transition from space vacuum to high-altitude stratosphere.
+
+### Iteration 3: Photorealistic, Physically Lit 3D Volumetric Storm Clouds
+- **Beer's Law Absorption**: Volumetric cloud sheets use a custom fragment shader implementing Beer's Law ($T = e^{-\sigma \cdot d}$) to compute light absorption, giving cloud centers density and cloud edges wispiness.
+- **Henyey-Greenstein Scattering**: Integrated anisotropic forward scattering phase functions to simulate realistic sunlight highlights on cloud boundaries.
+- **Lightning Scatter**: When cyan or purple lightning bolts strike, the position is fed to the cloud shader to compute scattering gradients inside the clouds, lighting up the mist internally.
+
+### Iteration 4: Ocean Surface Transition & Low-Altitude Storm Fog
+- **Low-lying Drift-Fog**: Spawned 40 overlapping rotated horizontal sheets near the ocean surface scrolling procedural storm mist.
+- **Slanted Rain Particles**: Built a GPU-calculated slanted rain system of 4,000 particles falling at high speed to simulate storm winds.
+- **Ocean Specular Glints**: Integrated detail normal maps scrolling at high frequency to catch twilight specular trails.
+
+### Iteration 5: Retro-Thruster Sea-Mist Illumination & Touchdown Impact
+- **Shock-Diamond Plume**: Rebuilt the thruster flame to render alternating compression nodes (`sin(uv.y * 32.0 - time * 28.0)`) and a glowing white core.
+- **Volumetric Light Cone**: Casts retro-thruster light through the stormy fog using a volumetric light cone shader.
+- **Steam Evaporation**: Spawns rising steam particles from the water surface directly beneath the engine as the rocket decelerates to touchdown.

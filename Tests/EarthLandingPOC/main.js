@@ -35,7 +35,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.25;
+renderer.toneMappingExposure = 1.35;
 
 // Groups for coordinate/environment isolation
 const spaceGroup = new THREE.Group();
@@ -49,188 +49,57 @@ oceanGroup.visible = false;
 const shaderUniforms = {
   time: { value: 0 },
   plasmaIntensity: { value: 0 },
+  warpProgress: { value: 0.0 },
   monolithPulse: { value: 1.0 },
   oceanLightPos: { value: new THREE.Vector3(0, 35, -150) }, // Positioned directly behind the Monolith
   thrusterLightPos: { value: new THREE.Vector3(0, 42, -45) },
   thrusterIntensity: { value: 0.0 },
   lightningIntensity: { value: 0.0 },
-  lightningColor: { value: new THREE.Color(0x88ffff) }
+  lightningColor: { value: new THREE.Color(0x88ffff) },
+  lightningPos: { value: new THREE.Vector3(0, 0, 0) },
+  cameraHeight: { value: 120.0 } // Used for dynamic exosphere density scaling
 };
 
-let cameraMode = "orbit";
+let cameraMode = "warp";
+let warpCylinder = null;
+let warpCylinderMaterial = null;
 const cameraRig = {
-  targetPos: new THREE.Vector3(0, 38, 120),
-  targetLook: new THREE.Vector3(0, 20, 60),
+  targetPos: new THREE.Vector3(1.8, 46, 202.2),
+  targetLook: new THREE.Vector3(-0.5, 58, 199.5),
   shakeIntensity: 0.0,
   lerpSpeed: 0.03
 };
-const actualLookAtTarget = new THREE.Vector3(0, 20, 60);
-
+const actualLookAtTarget = new THREE.Vector3(-0.5, 58, 199.5);
 
 // ==========================================
-// FAST PERFORMANCE NOISE & PROCEDURAL TEXTURES
+// PROCEDURAL ENVIRONMENT TEXTURES
 // ==========================================
-
-// Highly optimized 2D value noise for instant generation
-function hash2D(x, y) {
-  let h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453123;
-  return h - Math.floor(h);
-}
-
-function noise2D(x, y) {
-  let ix = Math.floor(x);
-  let iy = Math.floor(y);
-  let fx = x - ix;
-  let fy = y - iy;
-  
-  let ux = fx * fx * (3.0 - 2.0 * fx);
-  let uy = fy * fy * (3.0 - 2.0 * fy);
-  
-  return mix(
-    mix(hash2D(ix, iy), hash2D(ix + 1, iy), ux),
-    mix(hash2D(ix, iy + 1), hash2D(ix + 1, iy + 1), ux),
-    uy
-  );
-}
-
-function fbm2D(x, y, octaves = 3) {
-  let val = 0.0;
-  let amp = 0.5;
-  let freq = 1.0;
-  for (let i = 0; i < octaves; i++) {
-    val += amp * noise2D(x * freq, y * freq);
-    freq *= 2.0;
-    amp *= 0.5;
-  }
-  return val;
-}
-
-function mix(a, b, t) {
-  return a * (1.0 - t) + b * t;
-}
-
-function smoothstep(edge0, edge1, x) {
-  const t = Math.max(0.0, Math.min(1.0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3.0 - 2.0 * t);
-}
-
-
-// Optimized Earth Texture: Resolution reduced to 256x128 (loads in < 2ms!)
-function createProceduralEarthTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d");
-  const imgData = ctx.createImageData(256, 128);
-  const data = imgData.data;
-
-  for (let y = 0; y < 128; y++) {
-    let phi = (y / 128) * Math.PI;
-    let ny = Math.cos(phi);
-    
-    for (let x = 0; x < 256; x++) {
-      let theta = (x / 256) * Math.PI * 2;
-      let nx = Math.sin(phi) * Math.cos(theta);
-      let nz = Math.sin(phi) * Math.sin(theta);
-      
-      // Map noise spherically
-      let val = fbm2D(nx * 3.0 + 10.0, ny * 3.0 + nz * 3.0, 3);
-      let idx = (y * 256 + x) * 4;
-      
-      let isIce = (y < 12 || y > 116 || (y < 20 && val > 0.46) || (y > 108 && val > 0.46));
-      
-      if (isIce) {
-        data[idx] = 245;
-        data[idx + 1] = 248;
-        data[idx + 2] = 255;
-      } else if (val > 0.44) {
-        let veg = fbm2D(nx * 6.0, ny * 6.0 + nz * 6.0, 2);
-        if (veg > 0.48) {
-          data[idx] = 25 + Math.floor(veg * 20);
-          data[idx + 1] = 95 + Math.floor(veg * 30);
-          data[idx + 2] = 30 + Math.floor(veg * 15);
-        } else {
-          data[idx] = 145 + Math.floor(veg * 40);
-          data[idx + 1] = 120 + Math.floor(veg * 30);
-          data[idx + 2] = 85 + Math.floor(veg * 20);
-        }
-      } else {
-        let depth = val / 0.44;
-        data[idx] = 4 + Math.floor(depth * 10);
-        data[idx + 1] = 18 + Math.floor(depth * 45);
-        data[idx + 2] = 55 + Math.floor(depth * 115);
-      }
-      data[idx + 3] = 255;
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-// Optimized Cloud Texture: 256x128
-function createProceduralCloudTexture() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext("2d");
-  const imgData = ctx.createImageData(256, 128);
-  const data = imgData.data;
-
-  for (let y = 0; y < 128; y++) {
-    let phi = (y / 128) * Math.PI;
-    let ny = Math.cos(phi);
-    
-    for (let x = 0; x < 256; x++) {
-      let theta = (x / 256) * Math.PI * 2;
-      let nx = Math.sin(phi) * Math.cos(theta);
-      let nz = Math.sin(phi) * Math.sin(theta);
-      
-      let val = fbm2D(nx * 4.0 + 50.0, ny * 4.0 + nz * 4.0, 3);
-      let idx = (y * 256 + x) * 4;
-      
-      let density = smoothstep(0.40, 0.65, val);
-      
-      data[idx] = 255;
-      data[idx + 1] = 255;
-      data[idx + 2] = 255;
-      data[idx + 3] = Math.floor(density * 220);
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
-  const tex = new THREE.CanvasTexture(canvas);
-  return tex;
-}
 
 // Generate procedural twilight/sunset environment reflection map
 function createProceduralSkyTexture() {
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 256;
+  canvas.width = 1024;
+  canvas.height = 512;
   const ctx = canvas.getContext("2d");
   
-  // Sunset Twilight sky gradient
-  const grad = ctx.createLinearGradient(0, 0, 0, 256);
-  grad.addColorStop(0.0, "#010105");   // top: deep space black
-  grad.addColorStop(0.35, "#0a071a"); // upper: dark violet
-  grad.addColorStop(0.60, "#3e0d29"); // middle: magenta nebula
-  grad.addColorStop(0.74, "#8a2422"); // lower: deep crimson
-  grad.addColorStop(0.85, "#df602a"); // horizon: warm sunset orange
-  grad.addColorStop(0.92, "#fca448"); // sunset yellow glow
-  grad.addColorStop(1.0, "#08060c");   // bottom: dark sea reflection base
+  // Dark stormy sky gradient (dark slate grey, charcoal, and dark blue-grey)
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0.0, "#020305");   // top: pitch black storm sky
+  grad.addColorStop(0.50, "#080b11"); // upper: dark charcoal storm
+  grad.addColorStop(0.85, "#101622"); // lower: deep storm blue-grey
+  grad.addColorStop(1.0, "#06080c");   // bottom: dark slate grey ocean sky
   
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 256);
+  ctx.fillRect(0, 0, 1024, 512);
   
-  // Paint some soft reddish nebulae clouds
-  for (let i = 0; i < 6; i++) {
-    const cx = Math.random() * 512;
-    const cy = 100 + Math.random() * 80;
-    const r = 60 + Math.random() * 90;
+  // Paint faint stormy cloud layers
+  for (let i = 0; i < 12; i++) {
+    const cx = Math.random() * 1024;
+    const cy = 100 + Math.random() * 250;
+    const r = 150 + Math.random() * 200;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, "rgba(240, 75, 140, 0.14)");
-    g.addColorStop(0.5, "rgba(110, 25, 190, 0.06)");
+    g.addColorStop(0, "rgba(25, 30, 42, 0.15)");
+    g.addColorStop(0.5, "rgba(12, 15, 20, 0.08)");
     g.addColorStop(1, "rgba(0, 0, 0, 0)");
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -239,34 +108,32 @@ function createProceduralSkyTexture() {
   }
   
   const tex = new THREE.CanvasTexture(canvas);
-  tex.mapping = THREE.EquirectangularReflectionMapping;
   return tex;
 }
 
-// Generate a simple environment reflection map (Liquid Chrome mirror effect)
+// Generate environment reflection map for Liquid Chrome
 function createProceduralEnvMap() {
   const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 128;
+  canvas.width = 512;
+  canvas.height = 256;
   const ctx = canvas.getContext("2d");
   
-  const grad = ctx.createLinearGradient(0, 0, 0, 128);
-  grad.addColorStop(0, "#060612");
-  grad.addColorStop(0.4, "#180d28");
-  grad.addColorStop(0.65, "#601c2c");
-  grad.addColorStop(0.78, "#c24c28");
-  grad.addColorStop(0.85, "#f0b060");
-  grad.addColorStop(1.0, "#08060c");
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, "#010204");
+  grad.addColorStop(0.45, "#04060b");
+  grad.addColorStop(0.70, "#080c14");
+  grad.addColorStop(0.88, "#101622");
+  grad.addColorStop(1.0, "#010103");
   
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 256, 128);
+  ctx.fillRect(0, 0, 512, 256);
   
   ctx.fillStyle = "#ffffff";
-  for (let i = 0; i < 30; i++) {
-    let x = Math.random() * 256;
-    let y = Math.random() * 64;
+  for (let i = 0; i < 40; i++) {
+    let x = Math.random() * 512;
+    let y = Math.random() * 100;
     ctx.beginPath();
-    ctx.arc(x, y, Math.random() * 0.7 + 0.3, 0, Math.PI * 2);
+    ctx.arc(x, y, Math.random() * 0.9 + 0.3, 0, Math.PI * 2);
     ctx.fill();
   }
   
@@ -281,31 +148,21 @@ function createFireNoiseTexture() {
   canvas.width = 128;
   canvas.height = 256;
   const ctx = canvas.getContext("2d");
-  const imgData = ctx.createImageData(128, 256);
-  const data = imgData.data;
   
-  for (let y = 0; y < 256; y++) {
-    for (let x = 0; x < 128; x++) {
-      let nx = x / 128;
-      let ny = y / 256;
-      let val = fbm2D(nx * 4.0, ny * 3.0, 3);
-      let idx = (y * 128 + x) * 4;
-      
-      let intensity = smoothstep(0.32, 0.72, val);
-      data[idx] = Math.floor(intensity * 255);       // Red
-      data[idx + 1] = Math.floor(intensity * 135);   // Green
-      data[idx + 2] = Math.floor(intensity * 12);    // Blue
-      data[idx + 3] = 255;
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
+  // Create gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, "#ff0000");
+  grad.addColorStop(0.5, "#ff7700");
+  grad.addColorStop(1.0, "#ffdd00");
+  
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 256);
+  
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
   return tex;
 }
-
-
 
 // ==========================================
 // SHADERS SPECIFICATIONS (GPU NOISE INTERNALLY)
@@ -316,7 +173,9 @@ const Shaders = {
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec3 vPosition;
+      varying vec2 vUv;
       void main() {
+        vUv = uv;
         vNormal = normalize(normalMatrix * normal);
         vPosition = position;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
@@ -329,67 +188,149 @@ const Shaders = {
       varying vec3 vNormal;
       varying vec3 vViewPosition;
       varying vec3 vPosition;
+      varying vec2 vUv;
       
-      float hash(vec3 p) {
-        p = fract(p * vec3(443.8975, 397.2973, 491.1871));
-        p += dot(p.xyz, p.yzx + 19.19);
-        return fract(p.x * p.y * p.z);
+      // Simplex-like 3D Noise generator for rich continental details
+      vec4 permute(vec4 x){return mod(((x*34.0)+1.0)*x, 289.0);}
+      vec4 taylorInvSqrt(vec4 r){return 1.79284291400159 - 0.85373472095314 * r;}
+      
+      float snoise(vec3 v){
+        const vec2  C = vec2(1.0/6.0, 1.0/3.0) ;
+        const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+        
+        vec3 i  = floor(v + dot(v, C.yyy) );
+        vec3 x0 =   v - i + dot(i, C.xxx) ;
+        
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min( g.xyz, l.zxy );
+        vec3 i2 = max( g.xyz, l.zxy );
+        
+        vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+        vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+        vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+        
+        i = mod(i, 289.0 );
+        vec4 p = permute( permute( permute(
+                   i.z + vec4(0.0, i1.z, i2.z, 1.0) )
+                 + i.y + vec4(0.0, i1.y, i2.y, 1.0) )
+                 + i.x + vec4(0.0, i1.x, i2.x, 1.0) );
+                 
+        float n_ = 0.142857142857;
+        vec3  ns = n_ * D.wyz - D.xzx;
+        
+        vec4 j = p - 49.0 * floor(p * ns.z);
+        
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_ );
+        
+        vec4 x = x_ *ns.x + ns.yyyy;
+        vec4 y = y_ *ns.x + ns.yyyy;
+        vec4 h = 1.0 - abs(x) - abs(y);
+        
+        vec4 b0 = vec4( x.xy, y.xy );
+        vec4 b1 = vec4( x.zw, y.zw );
+        
+        vec4 s0 = floor(b0)*2.0 + 1.0;
+        vec4 s1 = floor(b1)*2.0 + 1.0;
+        vec4 sh = -step(h, vec4(0.0));
+        
+        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+        
+        vec3 p0 = vec3(a0.xy,h.x);
+        vec3 p1 = vec3(a0.zw,h.y);
+        vec3 p2 = vec3(a1.xy,h.z);
+        vec3 p3 = vec3(a1.zw,h.w);
+        
+        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+        p0 *= norm.x;
+        p1 *= norm.y;
+        p2 *= norm.z;
+        p3 *= norm.w;
+        
+        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1),
+                                      dot(p2,x2), dot(p3,x3) ) );
       }
-      float noise3D(vec3 p) {
-        vec3 i = floor(p);
-        vec3 f = fract(p);
-        vec3 u = f*f*(3.0-2.0*f);
-        return mix(
-          mix(mix(hash(i + vec3(0.0,0.0,0.0)), hash(i + vec3(1.0,0.0,0.0)), u.x),
-              mix(hash(i + vec3(0.0,1.0,0.0)), hash(i + vec3(1.0,1.0,0.0)), u.x), u.y),
-          mix(mix(hash(i + vec3(0.0,0.0,1.0)), hash(i + vec3(1.0,0.0,1.0)), u.x),
-              mix(hash(i + vec3(0.0,1.0,1.0)), hash(i + vec3(1.0,1.0,1.0)), u.x), u.y),
-          u.z
-        );
-      }
+      
       float fbm(vec3 p) {
         float val = 0.0;
         float amp = 0.5;
-        float freq = 1.0;
-        for (int i = 0; i < 4; i++) {
-          val += amp * noise3D(p * freq);
-          freq *= 2.0;
-          amp *= 0.5;
+        vec3 temp = p;
+        for (int i = 0; i < 5; i++) {
+          val += amp * snoise(temp);
+          temp *= 2.04;
+          amp *= 0.48;
         }
         return val;
       }
+      
       void main() {
-        float angle = time * 0.015;
+        float angle = time * 0.008;
         float cosA = cos(angle);
         float sinA = sin(angle);
         vec3 rotatedPos = vPosition;
         rotatedPos.xz = mat2(cosA, -sinA, sinA, cosA) * rotatedPos.xz;
         
-        vec3 p = rotatedPos * 0.045;
-        float val = fbm(p * 2.8 + vec3(10.0));
+        // Multi-layered fractal noise map
+        vec3 pCoord = rotatedPos * 0.023 + vec3(12.0);
+        float val = fbm(pCoord);
         
+        // Detailed heightmap interpretation
         float lat = vPosition.y / 120.0;
-        bool isIce = (abs(lat) > 0.82) || (abs(lat) > 0.72 && val > 0.45);
+        bool isIce = (abs(lat) > 0.76) || (abs(lat) > 0.65 && val > 0.15);
         
-        vec3 col;
+        vec3 terrainColor;
+        float specularStrength = 0.0;
+        
         if (isIce) {
-          col = vec3(0.96, 0.97, 1.0);
-        } else if (val > 0.44) {
-          float veg = noise3D(p * 15.0);
-          vec3 landCol = mix(vec3(0.48, 0.42, 0.3), vec3(0.1, 0.35, 0.12), smoothstep(0.38, 0.62, veg));
-          col = landCol;
+          terrainColor = vec3(0.95, 0.96, 0.99); // Crisp polar icecaps
+          specularStrength = 0.2;
+        } else if (val > 0.03) {
+          // Land details
+          float veg = snoise(pCoord * 6.0 + vec3(3.5));
+          vec3 forest = vec3(0.06, 0.26, 0.10);
+          vec3 desert = vec3(0.72, 0.62, 0.45);
+          vec3 mountain = vec3(0.32, 0.28, 0.25);
+          
+          vec3 baseLand = mix(desert, forest, smoothstep(-0.2, 0.4, veg));
+          terrainColor = mix(baseLand, mountain, smoothstep(0.18, 0.5, val));
+          specularStrength = 0.02; // Matte land
         } else {
-          float depth = val / 0.44;
-          col = mix(vec3(0.02, 0.06, 0.18), vec3(0.05, 0.22, 0.5), depth);
+          // Ocean depth mapping
+          float depth = smoothstep(-0.6, 0.03, val);
+          vec3 deepOcean = vec3(0.01, 0.04, 0.14);
+          vec3 shallowOcean = vec3(0.04, 0.22, 0.44);
+          terrainColor = mix(deepOcean, shallowOcean, depth);
+          specularStrength = 0.85; // High specular reflection on water
         }
         
-        vec3 lightDir = normalize(vec3(-300.0, 200.0, 300.0) - vPosition);
-        float diff = max(dot(normalize(vNormal), lightDir), 0.05);
+        // Rayleigh Scattering Atmosphere influence on limb
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+        float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+        float atmosphereGlow = pow(rim, 4.5);
+        vec3 atmColor = vec3(0.12, 0.65, 0.95) * 1.5;
         
-        gl_FragColor = vec4(col * diff, 1.0);
+        // Sun lighting
+        vec3 sunDir = normalize(vec3(-300.0, 200.0, 300.0) - vPosition);
+        float diff = max(dot(normal, sunDir), 0.02);
+        
+        // Specular glint
+        vec3 halfDir = normalize(sunDir + viewDir);
+        float spec = pow(max(dot(normal, halfDir), 0.0), 32.0) * specularStrength;
+        vec3 specularColor = vec3(0.95, 0.90, 0.82) * spec * 2.0;
+        
+        vec3 finalColor = terrainColor * diff + specularColor;
+        finalColor = mix(finalColor, atmColor, atmosphereGlow * 0.7);
+        
+        gl_FragColor = vec4(finalColor, 1.0);
       }
     `
   },
+  
   earthClouds: {
     vertex: `
       varying vec3 vNormal;
@@ -409,56 +350,92 @@ const Shaders = {
       varying vec3 vViewPosition;
       varying vec3 vPosition;
       
-      float hash(vec3 p) {
-        p = fract(p * vec3(443.8975, 397.2973, 491.1871));
-        p += dot(p.xyz, p.yzx + 19.19);
-        return fract(p.x * p.y * p.z);
+      // Simplex Noise
+      vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+      vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+      
+      float snoise(vec3 v) {
+        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+        vec3 i  = floor(v + dot(v, C.yyy));
+        vec3 x0 = v - i + dot(i, C.xxx);
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min(g.xyz, l.zxy);
+        vec3 i2 = max(g.xyz, l.zxy);
+        vec3 x1 = x0 - i1 + C.xxx;
+        vec3 x2 = x0 - i2 + C.yyy;
+        vec3 x3 = x0 - D.yyy;
+        i = mod289(i);
+        vec4 p = permute(permute(permute(
+                   i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                 + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                 + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+        float n_ = 0.142857142857;
+        vec3 ns = n_ * D.wyz - D.xzx;
+        vec4 j = p - 49.0 * floor(p * ns.z);
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_);
+        vec4 x = x_ *ns.x + ns.yyyy;
+        vec4 y = y_ *ns.x + ns.yyyy;
+        vec4 h = 1.0 - abs(x) - abs(y);
+        vec4 b0 = vec4(x.xy, y.xy);
+        vec4 b1 = vec4(x.zw, y.zw);
+        vec4 s0 = floor(b0)*2.0 + 1.0;
+        vec4 s1 = floor(b1)*2.0 + 1.0;
+        vec4 sh = -step(h, vec4(0.0));
+        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+        vec3 p0 = vec3(a0.xy, h.x);
+        vec3 p1 = vec3(a0.zw, h.y);
+        vec3 p2 = vec3(a1.xy, h.z);
+        vec3 p3 = vec3(a1.zw, h.w);
+        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+        p0 *= norm.x;
+        p1 *= norm.y;
+        p2 *= norm.z;
+        p3 *= norm.w;
+        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
       }
-      float noise3D(vec3 p) {
-        vec3 i = floor(p);
-        vec3 f = fract(p);
-        vec3 u = f*f*(3.0-2.0*f);
-        return mix(
-          mix(mix(hash(i + vec3(0.0,0.0,0.0)), hash(i + vec3(1.0,0.0,0.0)), u.x),
-              mix(hash(i + vec3(0.0,1.0,0.0)), hash(i + vec3(1.0,1.0,0.0)), u.x), u.y),
-          mix(mix(hash(i + vec3(0.0,0.0,1.0)), hash(i + vec3(1.0,0.0,1.0)), u.x),
-              mix(hash(i + vec3(0.0,1.0,1.0)), hash(i + vec3(1.0,1.0,1.0)), u.x), u.y),
-          u.z
-        );
-      }
+      
       float fbm(vec3 p) {
         float val = 0.0;
         float amp = 0.5;
-        float freq = 1.0;
+        vec3 temp = p;
         for (int i = 0; i < 4; i++) {
-          val += amp * noise3D(p * freq);
-          freq *= 2.0;
+          val += amp * snoise(temp);
+          temp *= 2.1;
           amp *= 0.5;
         }
         return val;
       }
+      
       void main() {
-        float angle = time * 0.025;
+        float angle = time * 0.012;
         float cosA = cos(angle);
         float sinA = sin(angle);
         vec3 rotatedPos = vPosition;
         rotatedPos.xz = mat2(cosA, -sinA, sinA, cosA) * rotatedPos.xz;
         
-        vec3 p = rotatedPos * 0.05 + vec3(time * 0.005, 0.0, time * 0.002);
-        float val = fbm(p * 3.5 + vec3(50.0));
-        float density = smoothstep(0.42, 0.68, val);
+        vec3 p = rotatedPos * 0.035 + vec3(time * 0.005, 0.0, time * 0.003);
+        float val = fbm(p);
+        float density = smoothstep(0.08, 0.55, val);
         
         float lat = vPosition.y / 120.0;
-        density *= (1.0 - pow(abs(lat), 6.0));
+        density *= (1.0 - pow(abs(lat), 5.0)); // Fade out at extreme poles
         
-        vec3 col = vec3(1.0, 1.0, 1.0);
         vec3 lightDir = normalize(vec3(-300.0, 200.0, 300.0) - vPosition);
-        float diff = max(dot(normalize(vNormal), lightDir), 0.1);
+        float diff = max(dot(normalize(vNormal), lightDir), 0.0);
         
-        gl_FragColor = vec4(col * (0.6 + 0.4 * diff), density * 0.85);
+        gl_FragColor = vec4(vec3(1.0), density * 0.82 * (0.55 + 0.45 * diff));
       }
     `
   },
+  
   plasma: {
     vertex: `
       varying vec2 vUv;
@@ -502,9 +479,9 @@ const Shaders = {
         float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
         
         vec3 fireColor = mix(vec3(1.0, 0.18, 0.0), vec3(1.0, 0.82, 0.05), n);
-        float alpha = fresnel * plasmaIntensity * (0.15 + 0.85 * n);
+        float alpha = fresnel * plasmaIntensity * (0.05 + 0.95 * n) * 0.4; // Dialed back re-entry flame intensity
         
-        gl_FragColor = vec4(fireColor * 2.0, alpha);
+        gl_FragColor = vec4(fireColor * 1.5, alpha);
       }
     `
   },
@@ -513,24 +490,214 @@ const Shaders = {
     vertex: `
       varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec3 vWorldPosition;
       void main() {
         vNormal = normalize(normalMatrix * normal);
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         vViewPosition = -mvPosition.xyz;
+        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
     fragment: `
+      uniform float cameraHeight;
       varying vec3 vNormal;
       varying vec3 vViewPosition;
+      varying vec3 vWorldPosition;
       void main() {
         vec3 normal = normalize(vNormal);
         vec3 viewDir = normalize(vViewPosition);
         
-        float intensity = pow(0.62 - dot(normal, viewDir), 2.2);
-        vec3 glowColor = mix(vec3(0.0, 0.8, 1.0), vec3(0.5, 0.1, 0.9), intensity);
+        // Physically based Rayleigh scattering approximation
+        float rim = max(0.0, dot(normal, viewDir));
+        float intensity = pow(0.78 - rim, 3.2);
         
-        gl_FragColor = vec4(glowColor * 1.8 * intensity, intensity);
+        // Multi-color transition (Aurora sky blue to sunset violet/orange at terminator)
+        vec3 spaceSunPos = normalize(vec3(-300.0, 200.0, 300.0));
+        float sunsetFactor = dot(normal, spaceSunPos);
+        
+        vec3 outerColor = vec3(0.08, 0.52, 0.98); // Indigo/cyan exosphere
+        vec3 sunsetGlow = vec3(0.95, 0.38, 0.12); // Sunset orange haze
+        
+        vec3 glowColor = mix(sunsetGlow, outerColor, smoothstep(-0.3, 0.35, sunsetFactor));
+        
+        // Dynamic density based on altitude descent
+        float heightScale = smoothstep(60.0, 140.0, cameraHeight);
+        float density = mix(1.8, 0.7, heightScale);
+        
+        gl_FragColor = vec4(glowColor * density * intensity, intensity * (0.2 + 0.8 * heightScale));
+      }
+    `
+  },
+  
+  // PHOTOREALISTIC DENSE CLOUD SHADER (Beer's Law & Henyey-Greenstein Scattering)
+  volumetricCloudSheet: {
+    vertex: `
+      varying vec3 vWorldPosition;
+      void main() {
+        vec4 worldPos = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPos.xyz;
+        gl_Position = projectionMatrix * viewMatrix * worldPos;
+      }
+    `,
+    fragment: `
+      uniform float time;
+      uniform float opacity;
+      uniform float lightningIntensity;
+      uniform vec3 lightningColor;
+      uniform vec3 lightningPos;
+      
+      varying vec3 vWorldPosition;
+      
+      // 3D Value Noise for volumetric density
+      float hash3D(vec3 p) {
+        p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+        p += dot(p.xyz, p.yzx + vec3(19.19));
+        return fract(p.x * p.y * p.z);
+      }
+      
+      float noise3D(vec3 p) {
+        vec3 i = floor(p);
+        vec3 f = fract(p);
+        vec3 u = f*f*(3.0-2.0*f);
+        return mix(
+          mix(mix(hash3D(i + vec3(0.0,0.0,0.0)), hash3D(i + vec3(1.0,0.0,0.0)), u.x),
+              mix(hash3D(i + vec3(0.0,1.0,0.0)), hash3D(i + vec3(1.0,1.0,0.0)), u.x), u.y),
+          mix(mix(hash3D(i + vec3(0.0,0.0,1.0)), hash3D(i + vec3(1.0,0.0,1.0)), u.x),
+              mix(hash3D(i + vec3(0.0,1.0,1.0)), hash3D(i + vec3(1.0,1.0,1.0)), u.x), u.y),
+          u.z
+        );
+      }
+      
+      float fbm3D(vec3 p) {
+        float val = 0.0;
+        float amp = 0.5;
+        vec3 temp = p;
+        for (int i = 0; i < 4; i++) {
+          val += amp * noise3D(temp);
+          temp *= 2.05;
+          amp *= 0.5;
+        }
+        return val;
+      }
+      
+      // 3D Cellular/Worley Noise for bubbling foam-like chunks
+      vec3 cellHash3D(vec3 p) {
+        p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+        p += dot(p.xyz, p.yzx + vec3(19.19));
+        return fract(sin(p.xyz * 43758.5453) * 0.5 + 0.5);
+      }
+      
+      float cellular3D(vec3 p) {
+        vec3 ip = floor(p);
+        vec3 fp = fract(p);
+        float minDist = 1.0;
+        for (int z = -1; z <= 1; z++) {
+          for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+              vec3 cell = vec3(float(x), float(y), float(z));
+              vec3 cellPos = cell + cellHash3D(ip + cell);
+              float d = distance(fp, cellPos);
+              minDist = min(minDist, d);
+            }
+          }
+        }
+        return minDist;
+      }
+      
+      // Ray-box intersection to isolate cloud volume bounds
+      bool rayBoxIntersect(vec3 ro, vec3 rd, vec3 boxMin, vec3 boxMax, out float t0, out float t1) {
+        vec3 invR = 1.0 / (rd + 1e-6);
+        vec3 tbot = invR * (boxMin - ro);
+        vec3 ttop = invR * (boxMax - ro);
+        vec3 tmin = min(tbot, ttop);
+        vec3 tmax = max(tbot, ttop);
+        float near = max(max(tmin.x, tmin.y), tmin.z);
+        float far = min(min(tmax.x, tmax.y), tmax.z);
+        t0 = near;
+        t1 = far;
+        return near < far && far > 0.0;
+      }
+      
+      float sampleDensity(vec3 pos) {
+        vec3 cellPosCoord = pos * 0.022 + vec3(time * 0.012, 0.0, time * 0.006);
+        float cNoise = 1.0 - cellular3D(cellPosCoord);
+        float baseFBM = fbm3D(pos * 0.038 + vec3(time * 0.015, time * 0.003, time * 0.007));
+        return cNoise * 0.80 + baseFBM * 0.20;
+      }
+      
+      void main() {
+        vec3 ro = cameraPosition;
+        vec3 rd = normalize(vWorldPosition - cameraPosition);
+        
+        vec3 boxMin = vec3(-240.0, -220.0, -240.0);
+        vec3 boxMax = vec3(240.0, -40.0, 240.0);
+        
+        float t0, t1;
+        if (!rayBoxIntersect(ro, rd, boxMin, boxMax, t0, t1)) {
+          discard;
+        }
+        
+        float startT = max(0.0, t0);
+        float endT = t1;
+        float pathLength = endT - startT;
+        pathLength = min(pathLength, 250.0);
+        
+        int numSteps = 45;
+        float stepSize = pathLength / float(numSteps);
+        float dither = hash3D(ro + rd * startT) * 0.3;
+        
+        bool hit = false;
+        vec3 hitPos = vec3(0.0);
+        vec3 hitNormal = vec3(0.0);
+        
+        for (int i = 0; i < 45; i++) {
+          float t = startT + (float(i) + dither) * stepSize;
+          if (t > endT) break;
+          vec3 pos = ro + rd * t;
+          float d = sampleDensity(pos);
+          
+          float edgeFeather = smoothstep(-220.0, -180.0, pos.y) * smoothstep(-40.0, -75.0, pos.y);
+          d *= edgeFeather;
+          
+          if (d > 0.58) {
+            hit = true;
+            hitPos = pos;
+            
+            // Calculate normal via central difference
+            vec3 eps = vec3(0.8, 0.0, 0.0);
+            hitNormal = normalize(vec3(
+              sampleDensity(pos + eps.xyy) - sampleDensity(pos - eps.xyy),
+              sampleDensity(pos + eps.yxy) - sampleDensity(pos - eps.yxy),
+              sampleDensity(pos + eps.yyx) - sampleDensity(pos - eps.yyx)
+            ));
+            break;
+          }
+        }
+        
+        if (!hit) {
+          discard;
+        }
+        
+        // Solid Lambertian shading for 3D bubble look
+        vec3 sunDir = normalize(vec3(-0.4, 0.6, 0.7));
+        float diff = max(dot(hitNormal, sunDir), 0.0);
+        float rim = pow(1.0 - max(dot(hitNormal, -rd), 0.0), 3.5);
+        
+        vec3 cloudBaseCol = vec3(0.12, 0.14, 0.20);
+        vec3 cloudHighlightCol = vec3(0.85, 0.88, 0.95);
+        
+        vec3 finalColor = mix(cloudBaseCol, cloudHighlightCol, diff);
+        finalColor += rim * vec3(0.35, 0.55, 0.8) * 0.45;
+        
+        // Add dynamic lightning scattering inside bubble surfaces
+        if (lightningIntensity > 0.01) {
+          float lDist = distance(hitPos, lightningPos);
+          float lAtten = exp(-0.012 * lDist);
+          finalColor += lightningColor * lightningIntensity * lAtten * 4.0;
+        }
+        
+        gl_FragColor = vec4(finalColor, opacity);
       }
     `
   },
@@ -559,27 +726,28 @@ const Shaders = {
         vUv = uv;
         vec3 pos = position;
         
-        vec3 w1 = getGerstnerWave(position, 150.0, 3.8, 0.6, vec2(1.0, 0.15), 0.25);
-        vec3 w2 = getGerstnerWave(position, 75.0, 1.8, 1.1, vec2(0.4, 0.9), 0.22);
-        vec3 w3 = getGerstnerWave(position, 35.0, 0.75, 1.8, vec2(-0.3, 0.95), 0.18);
-        vec3 w4 = getGerstnerWave(position, 15.0, 0.3, 2.5, vec2(0.8, -0.6), 0.15);
+        // 4 gerstner waves for turbulent storm sea profile
+        vec3 w1 = getGerstnerWave(position, 140.0, 4.2, 0.7, vec2(1.0, 0.1), 0.28);
+        vec3 w2 = getGerstnerWave(position, 70.0, 2.0, 1.2, vec2(0.3, 0.9), 0.24);
+        vec3 w3 = getGerstnerWave(position, 30.0, 0.85, 2.0, vec2(-0.4, 0.9), 0.2);
+        vec3 w4 = getGerstnerWave(position, 12.0, 0.35, 2.8, vec2(0.9, -0.5), 0.16);
         pos += w1 + w2 + w3 + w4;
         
         vec4 worldPos = modelMatrix * vec4(pos, 1.0);
         vWorldPosition = worldPos.xyz;
         
-        vec3 eps = vec3(0.3, 0.0, 0.0);
+        vec3 eps = vec3(0.2, 0.0, 0.0);
         vec3 pX = position + eps;
-        pX += getGerstnerWave(pX, 150.0, 3.8, 0.6, vec2(1.0, 0.15), 0.25) +
-              getGerstnerWave(pX, 75.0, 1.8, 1.1, vec2(0.4, 0.9), 0.22) +
-              getGerstnerWave(pX, 35.0, 0.75, 1.8, vec2(-0.3, 0.95), 0.18) +
-              getGerstnerWave(pX, 15.0, 0.3, 2.5, vec2(0.8, -0.6), 0.15);
+        pX += getGerstnerWave(pX, 140.0, 4.2, 0.7, vec2(1.0, 0.1), 0.28) +
+              getGerstnerWave(pX, 70.0, 2.0, 1.2, vec2(0.3, 0.9), 0.24) +
+              getGerstnerWave(pX, 30.0, 0.85, 2.0, vec2(-0.4, 0.9), 0.2) +
+              getGerstnerWave(pX, 12.0, 0.35, 2.8, vec2(0.9, -0.5), 0.16);
               
         vec3 pZ = position + eps.zyx;
-        pZ += getGerstnerWave(pZ, 150.0, 3.8, 0.6, vec2(1.0, 0.15), 0.25) +
-              getGerstnerWave(pZ, 75.0, 1.8, 1.1, vec2(0.4, 0.9), 0.22) +
-              getGerstnerWave(pZ, 35.0, 0.75, 1.8, vec2(-0.3, 0.95), 0.18) +
-              getGerstnerWave(pZ, 15.0, 0.3, 2.5, vec2(0.8, -0.6), 0.15);
+        pZ += getGerstnerWave(pZ, 140.0, 4.2, 0.7, vec2(1.0, 0.1), 0.28) +
+              getGerstnerWave(pZ, 70.0, 2.0, 1.2, vec2(0.3, 0.9), 0.24) +
+              getGerstnerWave(pZ, 30.0, 0.85, 2.0, vec2(-0.4, 0.9), 0.2) +
+              getGerstnerWave(pZ, 12.0, 0.35, 2.8, vec2(0.9, -0.5), 0.16);
               
         vec3 tangent = normalize(pX - pos);
         vec3 bitangent = normalize(pZ - pos);
@@ -600,6 +768,7 @@ const Shaders = {
       
       uniform float lightningIntensity;
       uniform vec3 lightningColor;
+      uniform vec3 lightningPos;
       
       varying vec3 vWorldPosition;
       varying vec3 vWorldNormal;
@@ -619,12 +788,12 @@ const Shaders = {
       void main() {
         vec3 normal = normalize(vWorldNormal);
         
-        // High-frequency turbulent ripples using 3 scrolled noise octaves
-        vec2 uv1 = vUv * 450.0 + vec2(time * 0.08, time * 0.04);
-        vec2 uv2 = vUv * 900.0 - vec2(time * 0.05, time * 0.08);
-        vec2 uv3 = vUv * 1800.0 + vec2(time * 0.12, -time * 0.14);
+        // Scrolled normal detail maps for high-frequency water turbulence
+        vec2 uv1 = vUv * 500.0 + vec2(time * 0.09, time * 0.04);
+        vec2 uv2 = vUv * 1000.0 - vec2(time * 0.06, time * 0.09);
+        vec2 uv3 = vUv * 2000.0 + vec2(time * 0.13, -time * 0.16);
         
-        float eps = 0.05;
+        float eps = 0.04;
         float hL1 = gpuNoise(uv1 - vec2(eps, 0.0));
         float hR1 = gpuNoise(uv1 + vec2(eps, 0.0));
         float hD1 = gpuNoise(uv1 - vec2(0.0, eps));
@@ -644,7 +813,7 @@ const Shaders = {
           (hL1 - hR1) + (hL2 - hR2) * 0.5 + (hL3 - hR3) * 0.25, 
           (hD1 - hU1) + (hD2 - hU2) * 0.5 + (hD3 - hU3) * 0.25, 
           0.0
-        ) * 0.22;
+        ) * 0.25;
         vec3 blendNormal = normalize(normal + perturb);
         
         vec3 viewDir = normalize(cameraPosition - vWorldPosition);
@@ -652,91 +821,228 @@ const Shaders = {
         
         float diff = max(dot(blendNormal, lightDir), 0.0);
         
-        // Double-specular sunset trail (broad glow + sharp glittering highlights)
+        // Double specular reflections (broad twilight paths + glittering ripples)
         vec3 halfDir = normalize(lightDir + viewDir);
-        float spec1 = pow(max(dot(blendNormal, halfDir), 0.0), 16.0);
-        float spec2 = pow(max(dot(blendNormal, halfDir), 0.0), 160.0);
-        float spec = spec1 * 0.55 + spec2 * 0.75;
+        float spec1 = pow(max(dot(blendNormal, halfDir), 0.0), 32.0);
+        float spec2 = pow(max(dot(blendNormal, halfDir), 0.0), 380.0); // Extremely sharp glistening glints
+        float spec = spec1 * 0.4 + spec2 * 0.95;
         
-        // Dynamic Thruster Wash Reflection
+        // Dynamic Thruster Wash Lighting and reflection on sea
         vec3 thrusterLightDir = normalize(thrusterLightPos - vWorldPosition);
         float thrusterDist = length(thrusterLightPos - vWorldPosition);
-        float thrusterAttenuation = 1.0 / (1.0 + 0.03 * thrusterDist + 0.001 * thrusterDist * thrusterDist);
+        float thrusterAttenuation = 1.0 / (1.0 + 0.04 * thrusterDist + 0.001 * thrusterDist * thrusterDist);
         float thrusterDiff = max(dot(blendNormal, thrusterLightDir), 0.0);
         
         vec3 thrusterHalfDir = normalize(thrusterLightDir + viewDir);
-        float thrusterSpec = pow(max(dot(blendNormal, thrusterHalfDir), 0.0), 40.0);
-        vec3 thrusterReflectColor = vec3(1.0, 0.45, 0.1) * thrusterIntensity * thrusterAttenuation;
+        float thrusterSpec = pow(max(dot(blendNormal, thrusterHalfDir), 0.0), 50.0);
+        vec3 thrusterColor = vec3(1.0, 0.48, 0.08) * thrusterIntensity * thrusterAttenuation;
         
-        // Lightning flash reflection
-        vec3 lightningLightDir = normalize(vec3(0.0, 150.0, -45.0) - vWorldPosition);
+        // Lightning flash reflection (volumetric diffuse reflection)
+        vec3 lightningLightDir = normalize(lightningPos - vWorldPosition);
+        float lightningDist = distance(lightningPos, vWorldPosition);
+        float lightningAtten = 1.0 / (1.0 + 0.005 * lightningDist);
         float lightningDiff = max(dot(blendNormal, lightningLightDir), 0.0);
         vec3 lightningHalfDir = normalize(lightningLightDir + viewDir);
-        float lightningSpec = pow(max(dot(blendNormal, lightningHalfDir), 0.0), 80.0);
-        vec3 lightningReflectColor = lightningColor * lightningIntensity * (lightningDiff * 0.4 + lightningSpec * 2.0);
+        float lightningSpec = pow(max(dot(blendNormal, lightningHalfDir), 0.0), 90.0);
+        vec3 lightningReflectColor = lightningColor * lightningIntensity * lightningAtten * (lightningDiff * 0.55 + lightningSpec * 2.5);
         
         float fresnel = pow(1.0 - max(dot(blendNormal, viewDir), 0.0), 5.0);
         
-        // Equirectangular Sky environment reflection mapping
+        // Environment mapping
         vec3 reflectDir = reflect(-viewDir, blendNormal);
         float phi = acos(clamp(reflectDir.y, -1.0, 1.0));
         float theta = atan(reflectDir.z, reflectDir.x) + 3.14159265;
         vec2 envUv = vec2(theta / (2.0 * 3.14159265), phi / 3.14159265);
         vec3 skyReflectColor = texture2D(skyEnvMap, envUv).rgb;
         
-        vec3 waterBase = mix(darkWaterColor, skyReflectColor, 0.12 + 0.38 * fresnel);
-        waterBase += twilightColor * diff * 0.12;
+        vec3 waterBase = mix(darkWaterColor, skyReflectColor, 0.15 + 0.4 * fresnel);
+        waterBase += twilightColor * diff * 0.15;
         
-        vec3 finalColor = waterBase + vec3(1.0, 0.62, 0.42) * spec * 1.8;
+        vec3 finalColor = waterBase + vec3(1.0, 0.65, 0.45) * spec * 2.0;
         
         // Add dynamic thruster wash reflection
-        finalColor += thrusterReflectColor * (thrusterDiff * 0.35 + thrusterSpec * 2.8);
+        finalColor += thrusterColor * (thrusterDiff * 0.4 + thrusterSpec * 3.0);
         
         // Add lightning flash reflection
         finalColor += lightningReflectColor;
         
-        // Wave foam on crests
-        float foam = smoothstep(1.5, 3.8, vWorldPosition.y);
-        finalColor = mix(finalColor, vec3(0.88, 0.92, 0.98), foam * 0.45);
+        // Enhanced foam on wave crests based on wave slope/steepness (Arkham Knight style)
+        float steepness = 1.0 - normal.y;
+        float foamNoise = gpuNoise(vUv * 800.0 + vec2(time * 0.25));
+        // Foam forms on steep crests at higher elevations
+        float foamPattern = smoothstep(0.28, 0.65, steepness * 0.75 + foamNoise * 0.25) * smoothstep(1.2, 3.8, vWorldPosition.y);
+        finalColor = mix(finalColor, vec3(0.96, 0.98, 1.0), foamPattern * 0.85);
         
         gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `
+  },
+  warp: {
+    vertex: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragment: `
+      uniform float time;
+      uniform float opacity;
+      varying vec2 vUv;
+      
+      float hash2D(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+      float noise2D(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash2D(i + vec2(0.0,0.0)), hash2D(i + vec2(1.0,0.0)), u.x),
+                   mix(hash2D(i + vec2(0.0,1.0)), hash2D(i + vec2(1.0,1.0)), u.x), u.y);
+      }
+      
+      void main() {
+        float angle = vUv.x * 6.283185;
+        float zLength = vUv.y * 8.0;
+        float scroll = time * 20.0;
+        
+        vec2 coord = vec2(angle * 2.5 + sin(zLength - scroll * 0.1) * 1.5, zLength - scroll);
+        float n1 = noise2D(coord * 0.4);
+        float n2 = noise2D(coord * 1.1 + vec2(time * 1.5, -time * 4.0));
+        float streaks = smoothstep(0.42, 0.88, n1 * 0.65 + n2 * 0.35);
+        
+        vec3 colorViolet = vec3(0.32, 0.04, 0.72);
+        vec3 colorBlue = vec3(0.04, 0.22, 0.90);
+        vec3 colorCyan = vec3(0.0, 0.90, 1.0);
+        
+        vec3 finalColor = mix(colorViolet, colorBlue, sin(angle + time) * 0.5 + 0.5);
+        finalColor = mix(finalColor, colorCyan, streaks);
+        finalColor += streaks * vec3(0.4, 0.75, 1.0) * 1.8;
+        
+        float fade = smoothstep(0.0, 0.12, vUv.y) * smoothstep(1.0, 0.88, vUv.y);
+        gl_FragColor = vec4(finalColor, fade * opacity);
+      }
+    `
+  },
+  warpStars: {
+    vertex: `
+      uniform float uWarpProgress;
+      uniform float uTime;
+      attribute float aEndpoint;
+      attribute float aStartOffset;
+      varying float vEndpoint;
+      varying vec3 vColor;
+      
+      void main() {
+        vEndpoint = aEndpoint;
+        
+        // Star starting position relative to the camera space
+        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+        
+        // Calculate radial direction in view space (pointing towards screen center 0,0)
+        vec2 radial = normalize(mvPosition.xy);
+        
+        // Determine individual star's warp stretch progress
+        float starProgress = max(0.0, uWarpProgress - aStartOffset) / (1.0 - aStartOffset + 1e-5);
+        
+        // Stretch length
+        float stretchLength = pow(starProgress, 2.5) * 55.0; // max length 55 units in view space
+        
+        // Displace along radial direction (stretching inward)
+        mvPosition.xy -= radial * (aEndpoint * stretchLength);
+        
+        // Spiral/twist around the screen center in view space (logarithmic vortex)
+        float dist = length(mvPosition.xy);
+        float spiral = 2.5 * starProgress * exp(-0.004 * dist);
+        float cosS = cos(spiral);
+        float sinS = sin(spiral);
+        mvPosition.xy = mat2(cosS, -sinS, sinS, cosS) * mvPosition.xy;
+        
+        // Color shifts from white to electric cyan/blue as star accelerates
+        vColor = mix(vec3(1.0, 1.0, 1.0), vec3(0.0, 0.82, 1.0), starProgress);
+        
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragment: `
+      varying float vEndpoint;
+      varying vec3 vColor;
+      void main() {
+        // Fade out towards the tail of the streak
+        float fade = mix(0.15, 1.0, vEndpoint);
+        gl_FragColor = vec4(vColor, fade);
       }
     `
   }
 };
 
-
 // ==========================================
 // 1. SCENE A SETUP: SPACE & PROCEDURAL EARTH
 // ==========================================
 
-const spaceAmbient = new THREE.AmbientLight(0x0e0f1e, 0.7);
+const spaceAmbient = new THREE.AmbientLight(0x0e0f1e, 0.8);
 spaceGroup.add(spaceAmbient);
 
-const spaceSunLight = new THREE.DirectionalLight(0xfff5e6, 2.8);
+const spaceSunLight = new THREE.DirectionalLight(0xfff5e6, 3.2);
 spaceSunLight.position.set(-300, 200, 300);
 spaceGroup.add(spaceSunLight);
 
-// Stars points
+// Dynamic Warp Starfield System (stretches and twists procedurally)
+const starCount = 450;
 const starGeometry = new THREE.BufferGeometry();
-const starCount = 7000;
-const starPositions = new Float32Array(starCount * 3);
-for (let i = 0; i < starCount * 3; i += 3) {
+
+// To draw stretched starlines, each star is represented by a line segment (2 vertices).
+// Vertex 0: start point (Endpoint parameter = 0)
+// Vertex 1: end point (Endpoint parameter = 1)
+const starPositions = new Float32Array(starCount * 2 * 3);
+const starEndpoints = new Float32Array(starCount * 2);
+const starStartOffsets = new Float32Array(starCount * 2);
+
+for (let i = 0; i < starCount; i++) {
+  // Generate random positions in a sphere ahead of the camera view
   const theta = THREE.MathUtils.randFloat(0, Math.PI * 2);
-  const phi = THREE.MathUtils.randFloat(0, Math.PI);
-  const dist = THREE.MathUtils.randFloat(700, 1000);
-  starPositions[i] = dist * Math.sin(phi) * Math.cos(theta);
-  starPositions[i + 1] = dist * Math.sin(phi) * Math.sin(theta);
-  starPositions[i + 2] = dist * Math.cos(phi);
+  const phi = THREE.MathUtils.randFloat(0.15, Math.PI - 0.15);
+  const dist = THREE.MathUtils.randFloat(180, 550);
+  
+  const x = dist * Math.sin(phi) * Math.cos(theta);
+  const y = 50 + dist * Math.sin(phi) * Math.sin(theta);
+  const z = 200 - dist * Math.cos(phi); // centered around rocket's Z position (200)
+  
+  // Vertex 0: Start of line
+  starPositions[i * 6] = x;
+  starPositions[i * 6 + 1] = y;
+  starPositions[i * 6 + 2] = z;
+  starEndpoints[i * 2] = 0.0;
+  
+  // Vertex 1: End of line (initially at the same position, stretches via vertex shader)
+  starPositions[i * 6 + 3] = x;
+  starPositions[i * 6 + 4] = y;
+  starPositions[i * 6 + 5] = z;
+  starEndpoints[i * 2 + 1] = 1.0;
+  
+  // Stagger star acceleration timings so stars warp progressively
+  const offset = Math.random() * 0.35; // start offset between 0 and 0.35
+  starStartOffsets[i * 2] = offset;
+  starStartOffsets[i * 2 + 1] = offset;
 }
+
 starGeometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
-const starMaterial = new THREE.PointsMaterial({
-  color: 0xffffff,
-  size: 1.1,
+starGeometry.setAttribute("aEndpoint", new THREE.BufferAttribute(starEndpoints, 1));
+starGeometry.setAttribute("aStartOffset", new THREE.BufferAttribute(starStartOffsets, 1));
+
+const starMaterial = new THREE.ShaderMaterial({
+  vertexShader: Shaders.warpStars.vertex,
+  fragmentShader: Shaders.warpStars.fragment,
+  uniforms: {
+    uWarpProgress: shaderUniforms.warpProgress,
+    uTime: shaderUniforms.time
+  },
   transparent: true,
-  opacity: 0.85
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
 });
-const starfield = new THREE.Points(starGeometry, starMaterial);
+
+const starfield = new THREE.LineSegments(starGeometry, starMaterial);
 spaceGroup.add(starfield);
 
 // High-Fidelity Procedural Earth System
@@ -759,8 +1065,8 @@ const nebulaMaterial = new THREE.ShaderMaterial({
     varying vec3 vWorldPosition;
     
     float hash(vec3 p) {
-      p = fract(p * vec3(443.8975, 397.2973, 491.1871));
-      p += dot(p.xyz, p.yzx + 19.19);
+      p = fract(p * fract(p * vec3(443.8975, 397.2973, 491.1871))); // Avoid precision issues
+      p += dot(p.xyz, p.yzx + vec3(19.19));
       return fract(p.x * p.y * p.z);
     }
     float noise3D(vec3 p) {
@@ -790,8 +1096,8 @@ const nebulaMaterial = new THREE.ShaderMaterial({
       vec3 dir = normalize(vWorldPosition);
       vec3 p = dir * 2.8 + vec3(time * 0.008, time * 0.004, 0.0);
       float n = fbm(p);
-      vec3 col1 = vec3(0.005, 0.002, 0.015);
-      vec3 col2 = vec3(0.08, 0.02, 0.14);
+      vec3 col1 = vec3(0.004, 0.001, 0.012);
+      vec3 col2 = vec3(0.07, 0.015, 0.12);
       vec3 finalCol = mix(col1, col2, smoothstep(0.35, 0.72, n));
       gl_FragColor = vec4(finalCol, 1.0);
     }
@@ -805,9 +1111,8 @@ const nebulaMaterial = new THREE.ShaderMaterial({
 const nebulaSphere = new THREE.Mesh(new THREE.SphereGeometry(1400, 32, 32), nebulaMaterial);
 spaceGroup.add(nebulaSphere);
 
-// Earth surface textures
+// Earth Surface Mesh
 loaderStatus.innerText = "Initializing Earth shader system...";
-const cloudTexture = createProceduralCloudTexture();
 const earthMaterial = new THREE.ShaderMaterial({
   vertexShader: Shaders.earth.vertex,
   fragmentShader: Shaders.earth.fragment,
@@ -832,21 +1137,13 @@ const cloudMaterial = new THREE.ShaderMaterial({
 const cloudSphere = new THREE.Mesh(new THREE.SphereGeometry(earthRadius * 1.012, 64, 64), cloudMaterial);
 earthGroup.add(cloudSphere);
 
-
 // Earth exosphere glowing atmosphere
 const atmosphereMaterial = new THREE.ShaderMaterial({
   vertexShader: Shaders.atmosphere.vertex,
-  fragmentShader: `
-    varying vec3 vNormal;
-    varying vec3 vViewPosition;
-    void main() {
-      vec3 normal = normalize(vNormal);
-      vec3 viewDir = normalize(vViewPosition);
-      float intensity = pow(0.65 - max(dot(normal, viewDir), 0.0), 2.5);
-      vec3 glowColor = mix(vec3(0.0, 0.72, 1.0), vec3(0.35, 0.08, 0.95), intensity);
-      gl_FragColor = vec4(glowColor * 2.2 * intensity, intensity);
-    }
-  `,
+  fragmentShader: Shaders.atmosphere.fragment,
+  uniforms: {
+    cameraHeight: shaderUniforms.cameraHeight
+  },
   blending: THREE.AdditiveBlending,
   side: THREE.BackSide,
   transparent: true
@@ -854,83 +1151,63 @@ const atmosphereMaterial = new THREE.ShaderMaterial({
 const atmosphereSphere = new THREE.Mesh(new THREE.SphereGeometry(earthRadius * 1.035, 64, 64), atmosphereMaterial);
 earthGroup.add(atmosphereSphere);
 
-
-
-// Volumetric cloud crossing sheets stacked above atmosphere
+// Volumetric cloud bounding box for raymarching
 const volumetricClouds = new THREE.Group();
 spaceGroup.add(volumetricClouds);
 
 const cloudSheetMaterial = new THREE.ShaderMaterial({
-  vertexShader: `
-    varying vec2 vUv;
-    varying vec3 vWorldPosition;
-    void main() {
-      vUv = uv;
-      vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  fragmentShader: `
-    uniform float time;
-    uniform float opacity;
-    uniform float lightningIntensity;
-    uniform vec3 lightningColor;
-    varying vec2 vUv;
-    varying vec3 vWorldPosition;
-    
-    float hash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-    }
-    float noise(vec2 p) {
-      vec2 i = floor(p);
-      vec2 f = fract(p);
-      vec2 u = f*f*(3.0-2.0*f);
-      return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
-                 mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
-    }
-    
-    void main() {
-      float dist = length(vUv - vec2(0.5));
-      float edgeAlpha = smoothstep(0.5, 0.2, dist);
-      
-      vec2 uvNoise = vUv * 4.0 + vec2(time * 0.05, time * 0.02);
-      float n = noise(uvNoise) * 0.6 + noise(uvNoise * 2.0) * 0.4;
-      
-      vec3 cloudBaseColor = vec3(0.08, 0.09, 0.11);
-      
-      // Scatter light inside clouds during lightning strikes
-      vec3 finalColor = mix(cloudBaseColor, lightningColor * 1.5, lightningIntensity * n * 0.85);
-      
-      float finalAlpha = opacity * edgeAlpha * (0.15 + 0.85 * n);
-      
-      gl_FragColor = vec4(finalColor, finalAlpha);
-    }
-  `,
+  vertexShader: Shaders.volumetricCloudSheet.vertex,
+  fragmentShader: Shaders.volumetricCloudSheet.fragment,
   uniforms: {
     time: shaderUniforms.time,
     opacity: { value: 0.0 },
     lightningIntensity: shaderUniforms.lightningIntensity,
-    lightningColor: shaderUniforms.lightningColor
+    lightningColor: shaderUniforms.lightningColor,
+    lightningPos: shaderUniforms.lightningPos
   },
   transparent: true,
   depthWrite: false,
   side: THREE.DoubleSide
 });
 
-for (let i = 0; i < 80; i++) {
-  const geom = new THREE.PlaneGeometry(200, 200);
-  const mesh = new THREE.Mesh(geom, cloudSheetMaterial);
-  mesh.position.set(
-    THREE.MathUtils.randFloatSpread(250),
-    -60 - (i * 2.5),
-    THREE.MathUtils.randFloatSpread(250)
+// A single large bounding box spanning the cloud layer height (-40 to -220)
+const cloudBoxGeom = new THREE.BoxGeometry(480, 180, 480);
+const cloudBoxMesh = new THREE.Mesh(cloudBoxGeom, cloudSheetMaterial);
+// Center the box at y = -130
+cloudBoxMesh.position.set(0, -130, 0);
+volumetricClouds.add(cloudBoxMesh);
+
+// Add physical 3D cartoon bubble clouds to the space descent path
+for (let i = 0; i < 25; i++) {
+  const cloud = createCartoonBubbleCloud(0xbbbcce);
+  cloud.position.set(
+    THREE.MathUtils.randFloatSpread(350),
+    -60 - THREE.MathUtils.randFloat(0, 140), // Spans the cloud deck altitude
+    THREE.MathUtils.randFloatSpread(350)
   );
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.rotation.z = THREE.MathUtils.randFloat(0, Math.PI * 2);
-  const scale = THREE.MathUtils.randFloat(0.8, 1.8);
-  mesh.scale.set(scale, scale, scale);
-  volumetricClouds.add(mesh);
+  const s = THREE.MathUtils.randFloat(0.5, 1.3);
+  cloud.scale.set(s, s, s);
+  volumetricClouds.add(cloud);
 }
+
+// Warp Cylinder setup
+warpCylinderMaterial = new THREE.ShaderMaterial({
+  vertexShader: Shaders.warp.vertex,
+  fragmentShader: Shaders.warp.fragment,
+  uniforms: {
+    time: shaderUniforms.time,
+    opacity: { value: 1.0 }
+  },
+  transparent: true,
+  depthWrite: false,
+  side: THREE.BackSide
+});
+warpCylinder = new THREE.Mesh(new THREE.CylinderGeometry(15, 15, 400, 32, 1, true), warpCylinderMaterial);
+warpCylinder.rotation.x = Math.PI / 2; // Point cylinder along Z-axis (motion direction)
+warpCylinder.position.set(0, 50, 200);
+warpCylinder.visible = false;
+warpCylinderMaterial.uniforms.opacity.value = 0.0;
+spaceGroup.add(warpCylinder);
 
 // 3D Branching Lightning Bolt Generator
 const lightningGeometry = new THREE.BufferGeometry();
@@ -943,7 +1220,7 @@ const lightningMaterial = new THREE.LineBasicMaterial({
 const lightningSegments = new THREE.LineSegments(lightningGeometry, lightningMaterial);
 spaceGroup.add(lightningSegments);
 
-const lightningLight = new THREE.DirectionalLight(0x44ffff, 0);
+const lightningLight = new THREE.DirectionalLight(0x55ffff, 0);
 lightningLight.position.set(0, 100, 0);
 spaceGroup.add(lightningLight);
 
@@ -972,29 +1249,32 @@ function triggerLightningStrike() {
   const rz = rocketModel.position.z;
   
   const start = new THREE.Vector3(
-    rx + THREE.MathUtils.randFloatSpread(60),
-    ry + 80,
-    rz + THREE.MathUtils.randFloatSpread(60) - 40
+    rx + THREE.MathUtils.randFloatSpread(80),
+    ry + 90,
+    rz + THREE.MathUtils.randFloatSpread(80) - 40
   );
   const end = new THREE.Vector3(
-    rx + THREE.MathUtils.randFloatSpread(40),
-    ry - 50,
-    rz + THREE.MathUtils.randFloatSpread(40)
+    rx + THREE.MathUtils.randFloatSpread(50),
+    ry - 60,
+    rz + THREE.MathUtils.randFloatSpread(50)
   );
   
-  const pathPoints = generateLightningPaths(start, end, 16, 30);
+  // Update uniforms with lightning 3D position
+  shaderUniforms.lightningPos.value.copy(start);
+  
+  const pathPoints = generateLightningPaths(start, end, 16, 35);
   
   // Create branches
   const totalCorePoints = pathPoints.length;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const branchStartIdx = Math.floor(Math.random() * (totalCorePoints - 2));
     const bStart = pathPoints[branchStartIdx];
     const bEnd = new THREE.Vector3(
-      bStart.x + THREE.MathUtils.randFloatSpread(50),
-      bStart.y - 25 - Math.random() * 15,
-      bStart.z + THREE.MathUtils.randFloatSpread(50)
+      bStart.x + THREE.MathUtils.randFloatSpread(60),
+      bStart.y - 30 - Math.random() * 20,
+      bStart.z + THREE.MathUtils.randFloatSpread(60)
     );
-    pathPoints.push(...generateLightningPaths(bStart, bEnd, 8, 12));
+    pathPoints.push(...generateLightningPaths(bStart, bEnd, 8, 15));
   }
   
   const positions = [];
@@ -1010,10 +1290,17 @@ function triggerLightningStrike() {
   lightningGeometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
   lightningGeometry.attributes.position.needsUpdate = true;
   
+  // Randomize lightning colors between cyan and purple
+  const lightColors = [0x88ffff, 0xd088ff];
+  const chosenColor = new THREE.Color(lightColors[Math.floor(Math.random() * lightColors.length)]);
+  shaderUniforms.lightningColor.value.copy(chosenColor);
+  lightningMaterial.color.copy(chosenColor);
+  lightningLight.color.copy(chosenColor);
+  
   // Flash sequence
   const flashTl = gsap.timeline();
   flashTl.to(lightningMaterial, { opacity: 1.0, duration: 0.05 });
-  flashTl.to(lightningLight, { intensity: 8.0, duration: 0.05 }, 0);
+  flashTl.to(lightningLight, { intensity: 10.0, duration: 0.05 }, 0);
   flashTl.to(shaderUniforms.lightningIntensity, { value: 1.0, duration: 0.05 }, 0);
   
   flashTl.to(lightningMaterial, { opacity: 0.0, duration: 0.06 });
@@ -1021,7 +1308,7 @@ function triggerLightningStrike() {
   flashTl.to(shaderUniforms.lightningIntensity, { value: 0.0, duration: 0.06 }, 0.05);
   
   flashTl.to(lightningMaterial, { opacity: 0.8, duration: 0.04 }, 0.12);
-  flashTl.to(lightningLight, { intensity: 5.0, duration: 0.04 }, 0.12);
+  flashTl.to(lightningLight, { intensity: 6.0, duration: 0.04 }, 0.12);
   flashTl.to(shaderUniforms.lightningIntensity, { value: 0.6, duration: 0.04 }, 0.12);
   
   flashTl.to(lightningMaterial, { opacity: 0.0, duration: 0.10 }, 0.16);
@@ -1029,17 +1316,15 @@ function triggerLightningStrike() {
   flashTl.to(shaderUniforms.lightningIntensity, { value: 0.0, duration: 0.10 }, 0.16);
 }
 
-
-
 // ==========================================
 // 2. SCENE B SETUP: OCEAN & LANDING SCENE
 // ==========================================
 
-const oceanAmbient = new THREE.AmbientLight(0x0e1428, 1.3);
+const oceanAmbient = new THREE.AmbientLight(0x0a1020, 1.4);
 oceanGroup.add(oceanAmbient);
 
 // Sunlight source behind subject to frame silhouette and reflection trail
-const twilightLight = new THREE.DirectionalLight(0xff5533, 2.5);
+const twilightLight = new THREE.DirectionalLight(0xff5522, 2.8);
 twilightLight.position.copy(shaderUniforms.oceanLightPos.value);
 twilightLight.castShadow = true;
 twilightLight.shadow.mapSize.width = 2048;
@@ -1047,37 +1332,40 @@ twilightLight.shadow.mapSize.height = 2048;
 twilightLight.shadow.bias = -0.0004;
 oceanGroup.add(twilightLight);
 
-// Fill Light from camera angle to avoid pitch black shadows on subject fronts
-const fillLight = new THREE.DirectionalLight(0x4466aa, 1.0);
+// Fill Light from camera angle
+const fillLight = new THREE.DirectionalLight(0x4466aa, 1.2);
 fillLight.position.set(0, 50, 60);
 oceanGroup.add(fillLight);
 
-// Generate procedural textures for the sky dome
+// Generate procedural sky textures
 const skyTexture = createProceduralSkyTexture();
+const skyEnvMap = skyTexture.clone();
+skyEnvMap.mapping = THREE.EquirectangularReflectionMapping;
 
 const skyDomeGeom = new THREE.SphereGeometry(1000, 32, 15);
 const skyDomeMat = new THREE.MeshBasicMaterial({
   side: THREE.BackSide,
-  map: skyTexture // Map our gorgeous twilight sky gradient to sky dome!
+  map: skyTexture
 });
 const skyDome = new THREE.Mesh(skyDomeGeom, skyDomeMat);
 oceanGroup.add(skyDome);
 
 // Procedural wave ocean using advanced reflection/ripple shaders
-const oceanGeom = new THREE.PlaneGeometry(1600, 1600, 180, 180);
+const oceanGeom = new THREE.PlaneGeometry(1600, 1600, 200, 200);
 const oceanMat = new THREE.ShaderMaterial({
   vertexShader: Shaders.ocean.vertex,
   fragmentShader: Shaders.ocean.fragment,
   uniforms: {
     time: shaderUniforms.time,
     oceanLightPos: shaderUniforms.oceanLightPos,
-    twilightColor: { value: new THREE.Color(0xff5533) },
-    darkWaterColor: { value: new THREE.Color(0x000c14) },
-    skyEnvMap: { value: skyTexture },
+    twilightColor: { value: new THREE.Color(0x0a101d) },
+    darkWaterColor: { value: new THREE.Color(0x010204) },
+    skyEnvMap: { value: skyEnvMap },
     thrusterLightPos: shaderUniforms.thrusterLightPos,
     thrusterIntensity: shaderUniforms.thrusterIntensity,
     lightningIntensity: shaderUniforms.lightningIntensity,
-    lightningColor: shaderUniforms.lightningColor
+    lightningColor: shaderUniforms.lightningColor,
+    lightningPos: shaderUniforms.lightningPos
   },
   side: THREE.DoubleSide
 });
@@ -1086,38 +1374,197 @@ ocean.rotation.x = -Math.PI / 2;
 oceanGroup.add(ocean);
 
 // Landing point PointLight (orange thruster glow on water)
-const landingThrusterLight = new THREE.PointLight(0xff6600, 0, 95);
+const landingThrusterLight = new THREE.PointLight(0xff5500, 0, 100);
 oceanGroup.add(landingThrusterLight);
 
-// Ethereal drifting clouds in the twilight sky
-const skyClouds = new THREE.Group();
-oceanGroup.add(skyClouds);
-const skyCloudMat = new THREE.MeshBasicMaterial({
-  alphaMap: cloudTexture,
-  transparent: true,
-  opacity: 0.15,
-  color: 0xda7e8c, // pinkish-purple tint from sunset
-  depthWrite: false
-});
-for (let i = 0; i < 10; i++) {
-  const geom = new THREE.PlaneGeometry(400, 200);
-  const mesh = new THREE.Mesh(geom, skyCloudMat);
-  mesh.position.set(
-    THREE.MathUtils.randFloatSpread(800),
-    120 + THREE.MathUtils.randFloatSpread(40),
-    -300 - THREE.MathUtils.randFloat(0, 300)
-  );
-  mesh.rotation.x = Math.PI / 2.5; // slight tilt towards camera
-  skyClouds.add(mesh);
+
+// Helper to generate a 3D cartoonish bubble cloud cluster
+function createCartoonBubbleCloud(colorHex = 0xddddee) {
+  const cloudGroup = new THREE.Group();
+  
+  // MeshStandardMaterial with high roughness and flat shading for stylized cartoon look
+  const cloudMat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.92,
+    metalness: 0.05,
+    flatShading: true
+  });
+  
+  // Center main bubble
+  const mainBubble = new THREE.Mesh(new THREE.SphereGeometry(22, 5, 4), cloudMat);
+  cloudGroup.add(mainBubble);
+  
+  // Surrounding overlapping bubbles to form classic cartoon cloud shape
+  const bubbleOffsets = [
+    { x: -16, y: -3, z: 0, r: 15 },
+    { x: 16, y: -3, z: 0, r: 15 },
+    { x: -8, y: 10, z: -3, r: 14 },
+    { x: 8, y: 8, z: 3, r: 16 },
+    { x: 0, y: -8, z: 10, r: 13 },
+    { x: 0, y: -4, z: -10, r: 13 }
+  ];
+  
+  bubbleOffsets.forEach(info => {
+    const bubble = new THREE.Mesh(new THREE.SphereGeometry(info.r, 5, 4), cloudMat);
+    bubble.position.set(info.x, info.y, info.z);
+    cloudGroup.add(bubble);
+  });
+  
+  return cloudGroup;
 }
 
+// Ethereal drifting clouds in the twilight sky (low-altitude storm clouds)
+const skyClouds = new THREE.Group();
+oceanGroup.add(skyClouds);
+
+const skyCloudMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float time;
+    uniform vec3 cloudColor;
+    varying vec2 vUv;
+    
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f*f*(3.0-2.0*f);
+      return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                 mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+    }
+    
+    void main() {
+      float centerD = length(vUv - vec2(0.5));
+      float mask = smoothstep(0.5, 0.15, centerD);
+      vec2 nUv = vUv * 3.0 + vec2(time * 0.015, time * 0.005);
+      float n = noise(nUv) * 0.6 + noise(nUv * 2.0) * 0.4;
+      gl_FragColor = vec4(cloudColor, mask * 0.28 * n);
+    }
+  `,
+  uniforms: {
+    time: shaderUniforms.time,
+    cloudColor: { value: new THREE.Color(0xd27080) } // twilight tinted cloud
+  },
+  transparent: true,
+  depthWrite: false
+});
+
+for (let i = 0; i < 20; i++) {
+  const cloud = createCartoonBubbleCloud(0xa2a5b2); // Storm tinted bubble cloud
+  cloud.position.set(
+    THREE.MathUtils.randFloatSpread(800),
+    70 + THREE.MathUtils.randFloatSpread(40),
+    -200 - THREE.MathUtils.randFloat(0, 500)
+  );
+  // Random scale for variety
+  const s = THREE.MathUtils.randFloat(0.6, 1.4);
+  cloud.scale.set(s, s, s);
+  skyClouds.add(cloud);
+}
+
+// Low-altitude drifting storm fog particles
+const stormFogGroup = new THREE.Group();
+oceanGroup.add(stormFogGroup);
+
+const stormFogMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
+    void main() {
+      vUv = uv;
+      vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float time;
+    varying vec2 vUv;
+    varying vec3 vWorldPosition;
+    
+    float hash(vec2 p) {
+      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+    float noise(vec2 p) {
+      vec2 i = floor(p);
+      vec2 f = fract(p);
+      vec2 u = f*f*(3.0-2.0*f);
+      return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                 mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+    }
+    
+    void main() {
+      float centerD = length(vUv - vec2(0.5));
+      float mask = smoothstep(0.5, 0.22, centerD);
+      vec2 nUv = vWorldPosition.xz * 0.015 + vec2(time * 0.08, time * 0.03);
+      float n = noise(nUv) * 0.55 + noise(nUv * 2.2) * 0.45;
+      
+      vec3 fogCol = vec3(0.08, 0.09, 0.13); // dark oceanic storm mist
+      gl_FragColor = vec4(fogCol, mask * 0.38 * n);
+    }
+  `,
+  uniforms: {
+    time: shaderUniforms.time
+  },
+  transparent: true,
+  depthWrite: false,
+  side: THREE.DoubleSide
+});
+
+for (let i = 0; i < 40; i++) {
+  const geom = new THREE.PlaneGeometry(350, 350);
+  const mesh = new THREE.Mesh(geom, stormFogMat);
+  mesh.position.set(
+    THREE.MathUtils.randFloatSpread(1000),
+    2 + THREE.MathUtils.randFloatSpread(4),
+    THREE.MathUtils.randFloatSpread(1000)
+  );
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.rotation.z = Math.random() * Math.PI * 2;
+  stormFogGroup.add(mesh);
+}
+
+// Slanted Rain Particle System
+const rainCount = 4000;
+const rainGeometry = new THREE.BufferGeometry();
+const rainPositions = new Float32Array(rainCount * 3);
+const rainSpeeds = [];
+
+for (let i = 0; i < rainCount; i++) {
+  rainPositions[i * 3] = THREE.MathUtils.randFloatSpread(600);
+  rainPositions[i * 3 + 1] = THREE.MathUtils.randFloat(0, 160);
+  rainPositions[i * 3 + 2] = THREE.MathUtils.randFloatSpread(600);
+  
+  rainSpeeds.push({
+    x: -0.8 - Math.random() * 0.4, // wind force
+    y: -4.5 - Math.random() * 2.5,
+    z: -0.2 - Math.random() * 0.2
+  });
+}
+
+rainGeometry.setAttribute("position", new THREE.BufferAttribute(rainPositions, 3));
+const rainMaterial = new THREE.PointsMaterial({
+  color: 0x8899aa,
+  size: 0.6,
+  transparent: true,
+  opacity: 0.45,
+  depthWrite: false
+});
+// Rain particles removed per user request
 
 // ==========================================
 // 3. LOAD HIGH-FIDELITY GLTF MODELS
 // ==========================================
 
 const envReflectionMap = createProceduralEnvMap();
-scene.environment = envReflectionMap; // Chrome reflects space gradient!
+scene.environment = envReflectionMap;
 
 const manager = new THREE.LoadingManager();
 const loader = new GLTFLoader(manager);
@@ -1126,6 +1573,7 @@ let rocketModel = null;
 let monolithScene = null;
 let plasmaShield = null;
 let thrusterFlame = null;
+let volumetricLightCone = null;
 
 const fireNoiseTexture = createFireNoiseTexture();
 
@@ -1139,21 +1587,20 @@ function configureChromeModel(model) {
         const materials = Array.isArray(node.material) ? node.material : [node.material];
         materials.forEach((mat) => {
           mat.metalness = 1.0;
-          mat.roughness = 0.04;
+          mat.roughness = 0.02; // More reflective liquid chrome
           mat.envMap = envReflectionMap;
-          mat.envMapIntensity = 2.0;
+          mat.envMapIntensity = 2.5;
           mat.needsUpdate = true;
           
           // Setup dynamic fire/plasma re-entry emissive reflections
           mat.emissiveMap = fireNoiseTexture;
-          mat.emissive = new THREE.Color(0xffbb66);
+          mat.emissive = new THREE.Color(0xffaa44);
           mat.emissiveIntensity = 0.0;
         });
       }
     }
   });
 }
-
 
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
   const pct = Math.floor((itemsLoaded / itemsTotal) * 100);
@@ -1187,9 +1634,9 @@ loader.load(rocketModelUrl.href, (gltf) => {
   rocketModel.scale.set(0.65, 0.65, 0.65);
   scene.add(rocketModel);
   
-  // Start position in orbit
-  rocketModel.position.set(0, 30, 80);
-  rocketModel.rotation.set(-Math.PI / 5, 0, 0); // pointing down towards Earth
+  // Start position in Warp (Scene X)
+  rocketModel.position.set(0, 50, 200);
+  rocketModel.rotation.set(-Math.PI / 2, 0, 0); // pointing along Z-axis (towards Earth)
   
   // Custom Plasma Shockwave Shield
   const shieldGeom = new THREE.ConeGeometry(3.5, 14, 32, 1, true);
@@ -1212,17 +1659,19 @@ loader.load(rocketModelUrl.href, (gltf) => {
   plasmaShield.rotation.x = Math.PI; // point cone forward
   plasmaShield.position.set(0, 3.2, 0);
   
-  rocketModel.add(plasmaShield);
+  // rocketModel.add(plasmaShield); // Removed shield clutter per user request
 
-  // Volumetric Thruster Exhaust Flame
-  const thrusterFlameGeom = new THREE.ConeGeometry(1.2, 8.0, 16, 1, true);
-  thrusterFlameGeom.translate(0, -4.0, 0);
+  // Volumetric Thruster Exhaust Flame (Shock-Diamond Shader)
+  const thrusterFlameGeom = new THREE.ConeGeometry(1.2, 9.0, 16, 1, true);
+  thrusterFlameGeom.translate(0, -4.5, 0);
   
   const thrusterFlameMaterial = new THREE.ShaderMaterial({
     vertexShader: `
       varying vec2 vUv;
+      varying vec3 vPosition;
       void main() {
         vUv = uv;
+        vPosition = position;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -1230,6 +1679,7 @@ loader.load(rocketModelUrl.href, (gltf) => {
       uniform float time;
       uniform float thrusterIntensity;
       varying vec2 vUv;
+      varying vec3 vPosition;
       
       float hash(vec2 p) {
         return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
@@ -1244,21 +1694,27 @@ loader.load(rocketModelUrl.href, (gltf) => {
       
       void main() {
         vec2 tempUv = vUv;
-        tempUv.y += time * 4.0;
+        tempUv.y += time * 5.2;
         
-        float n = noise(tempUv * 6.0) * 0.6 + noise(tempUv * 12.0) * 0.4;
+        float n = noise(tempUv * 7.5) * 0.65 + noise(tempUv * 15.0) * 0.35;
         
-        float radialFactor = smoothstep(1.0, 0.0, vUv.x);
-        float lengthFactor = smoothstep(1.0, 0.2, vUv.y);
+        float radialFactor = smoothstep(1.0, 0.05, vUv.x);
+        float lengthFactor = smoothstep(1.0, 0.15, vUv.y);
         
-        vec3 coreColor = vec3(1.0, 0.55, 0.05);
-        vec3 outerColor = vec3(0.9, 0.15, 0.01);
+        // Shock Diamonds: compression nodes along flame length
+        float shockWave = sin(vUv.y * 32.0 - time * 28.0) * 0.5 + 0.5;
+        float shockIntensity = smoothstep(0.4, 0.8, shockWave) * (1.0 - vUv.y);
+        
+        vec3 coreColor = vec3(1.0, 0.65, 0.12);
+        vec3 outerColor = vec3(0.9, 0.18, 0.01);
+        vec3 shockColor = vec3(0.95, 0.95, 1.0); // Bright white/blue diamonds
         
         vec3 col = mix(outerColor, coreColor, n * lengthFactor);
+        col = mix(col, shockColor, shockIntensity * 0.72);
         
-        float alpha = radialFactor * lengthFactor * (0.2 + 0.8 * n) * (thrusterIntensity / 12.0);
+        float alpha = radialFactor * lengthFactor * (0.22 + 0.78 * n) * (thrusterIntensity / 12.0);
         
-        gl_FragColor = vec4(col * 2.5, alpha);
+        gl_FragColor = vec4(col * 3.5, alpha);
       }
     `,
     uniforms: {
@@ -1276,9 +1732,68 @@ loader.load(rocketModelUrl.href, (gltf) => {
   thrusterFlame.scale.set(1.0, 0.001, 1.0);
   thrusterFlame.visible = false;
   rocketModel.add(thrusterFlame);
+  
+  // Volumetric Thruster Light Cone (Casts light through dense sea-mist)
+  const coneGeom = new THREE.ConeGeometry(8.0, 48.0, 32, 1, true);
+  coneGeom.translate(0, -24.0, 0);
+  
+  const coneMat = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      void main() {
+        vUv = uv;
+        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      uniform float thrusterIntensity;
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
+                   mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+      }
+      
+      void main() {
+        float radialFactor = smoothstep(1.0, 0.0, vUv.x);
+        float lengthFactor = smoothstep(1.0, 0.1, vUv.y);
+        
+        vec2 nUv = vWorldPosition.xz * 0.03 + vec2(time * 0.05);
+        float n = noise(nUv) * 0.6 + noise(nUv * 2.0) * 0.4;
+        
+        vec3 lightCol = vec3(1.0, 0.55, 0.15); // Warm retro lighting
+        float intensity = radialFactor * lengthFactor * (thrusterIntensity / 12.0) * (0.28 + 0.72 * n) * 0.25;
+        
+        gl_FragColor = vec4(lightCol * 2.0, intensity);
+      }
+    `,
+    uniforms: {
+      time: shaderUniforms.time,
+      thrusterIntensity: shaderUniforms.thrusterIntensity
+    },
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide
+  });
+  
+  volumetricLightCone = new THREE.Mesh(coneGeom, coneMat);
+  volumetricLightCone.position.set(0, -1.8, 0);
+  volumetricLightCone.visible = false;
+  rocketModel.add(volumetricLightCone);
 });
 
-// Load Monolith Scene (Platform + Obsidian Tower)
+// Load Monolith Scene
 loader.load(monolithSceneUrl.href, (gltf) => {
   monolithScene = gltf.scene;
   monolithScene.traverse((node) => {
@@ -1288,31 +1803,65 @@ loader.load(monolithSceneUrl.href, (gltf) => {
       if (node.material) {
         const materials = Array.isArray(node.material) ? node.material : [node.material];
         materials.forEach((mat) => {
-          mat.envMap = skyTexture; // Reflect twilight sky gradient!
-          mat.envMapIntensity = 1.5;
+          mat.envMap = skyEnvMap;
+          mat.envMapIntensity = 1.8;
           // Configure Obsidian properties
           if (node.name.includes("Monolith")) {
-            mat.roughness = 0.08;
-            mat.metalness = 0.95;
-            mat.color.setHex(0x010103);
+            mat.roughness = 0.04;
+            mat.metalness = 0.98;
+            mat.color.setHex(0x010102);
           }
         });
       }
     }
   });
-  // Position and scale to 0.6 to frame it perfectly within the camera lens
+  
   monolithScene.scale.set(0.6, 0.6, 0.6);
-  monolithScene.position.set(0, 0.05, -45); // Float pad at water level, offset Z to -45
+  monolithScene.position.set(0, 2.5, -45); // Hovering/floating pad, slightly lifted
   oceanGroup.add(monolithScene);
+
+  // Cyan hover light underneath the platform reflecting off the water surface
+  const hoverLight = new THREE.PointLight(0x00ffff, 8.0, 60);
+  hoverLight.position.set(0, 0.2, -45);
+  oceanGroup.add(hoverLight);
 });
 
-// Initial Camera positioning in open space
-camera.position.set(0, 38, 120);
-actualLookAtTarget.set(0, 20, 60);
-cameraRig.targetPos.set(0, 38, 120);
-cameraRig.targetLook.set(0, 20, 60);
-camera.lookAt(actualLookAtTarget);
+// Steam rising from water under landing ship (spawns under rocket)
+const steamParticlesCount = 100;
+const steamGeometry = new THREE.BufferGeometry();
+const steamPositions = new Float32Array(steamParticlesCount * 3);
+const steamSpeeds = [];
 
+for (let i = 0; i < steamParticlesCount; i++) {
+  steamPositions[i * 3] = THREE.MathUtils.randFloatSpread(30);
+  steamPositions[i * 3 + 1] = -50.0; // Hidden initially
+  steamPositions[i * 3 + 2] = -45 + THREE.MathUtils.randFloatSpread(30);
+  
+  steamSpeeds.push({
+    x: THREE.MathUtils.randFloatSpread(0.12),
+    y: 0.15 + Math.random() * 0.2,
+    z: THREE.MathUtils.randFloatSpread(0.12)
+  });
+}
+
+steamGeometry.setAttribute("position", new THREE.BufferAttribute(steamPositions, 3));
+const steamMaterial = new THREE.PointsMaterial({
+  color: 0xdddddd,
+  size: 3.5,
+  transparent: true,
+  opacity: 0.0, // Managed dynamically
+  depthWrite: false
+});
+const steamParticles = new THREE.Points(steamGeometry, steamMaterial);
+oceanGroup.add(steamParticles);
+
+// Initial Camera positioning in open space (warp camera coordinates - looking forward along Z-axis)
+camera.position.set(-1.45, 50.8, 203.5);
+actualLookAtTarget.set(0.5, 49.8, 188.0);
+cameraRig.targetPos.set(-1.45, 50.8, 203.5);
+cameraRig.targetLook.set(0.5, 49.8, 188.0);
+cameraMode = "warp"; // Ensure we start strictly in warp camera mode
+camera.lookAt(actualLookAtTarget);
 
 // ==========================================
 // 4. ANIMATION SEQUENCE TIMELINE (GSAP)
@@ -1323,144 +1872,258 @@ function executeDescentSequence() {
   
   const timeline = gsap.timeline();
   
-  // --- PHASE 1: SPACE ORBIT DESCENDING (0.0s - 5.5s) ---
-  cameraMode = "orbit";
-  telemetryText.innerText = "SEQUENCE ACTIVE // INITIATING RETRO-BURN DE-ORBIT";
+  // --- SCENE X: THE WARP (0.0s - 10.0s) ---
+  cameraMode = "warp";
+  telemetryText.innerText = "ORBIT RANGE: 342 KM // COORD: ALPHA_STAGE";
   
-  timeline.to(cameraRig.targetPos, {
-    x: 0,
-    y: 35,
-    z: 110,
-    duration: 5.5,
-    ease: "power2.inOut"
-  }, 0);
+  // Frame X-001 (0.0s): Static space, rocket cold & still.
+  shaderUniforms.warpProgress.value = 0.0;
+  cameraRig.shakeIntensity = 0.0;
+  if (warpCylinder) {
+    warpCylinder.visible = false;
+    warpCylinderMaterial.uniforms.opacity.value = 0.0;
+  }
   
-  timeline.to(rocketModel.position, {
-    x: 0,
-    y: -75,
-    z: -80,
-    duration: 6.5,
-    ease: "power1.in"
-  }, 0);
-
+  // Frame X-010 (0.33s): One star begins stretching.
+  timeline.to(shaderUniforms.warpProgress, { value: 0.05, duration: 0.33, ease: "power1.in" }, 0.0);
   
-  // --- PHASE 2: FRICTION ENTRY BURN (4.5s - 8.5s) ---
+  // Frame X-020 (0.67s): Several stars stretch.
+  timeline.to(shaderUniforms.warpProgress, { value: 0.10, duration: 0.34, ease: "power1.in" }, 0.33);
+  
+  // Frame X-035 (1.17s): Space begins bending.
+  timeline.to(shaderUniforms.warpProgress, { value: 0.20, duration: 0.50, ease: "power1.in" }, 0.67);
+  
+  // Frame X-050 (1.67s): Vortex appears small & far.
+  timeline.to(shaderUniforms.warpProgress, { value: 0.35, duration: 0.50, ease: "power1.in" }, 1.17);
+  
+  // Frame X-070 (2.33s): Vortex grows. Camera vibration spools up (low-amplitude).
+  timeline.to(shaderUniforms.warpProgress, { value: 0.55, duration: 0.66, ease: "power1.in" }, 1.67);
+  timeline.to(cameraRig, { shakeIntensity: 0.15, duration: 0.66, ease: "power1.in" }, 1.67);
+  
+  // Frame X-090 (3.0s): Vortex expands. Camera vibration increases.
+  timeline.to(shaderUniforms.warpProgress, { value: 0.75, duration: 0.67, ease: "power1.in" }, 2.33);
+  timeline.to(cameraRig, { shakeIntensity: 0.35, duration: 0.67, ease: "power1.in" }, 2.33);
+  
+  // Frame X-120 (4.0s): Entering tunnel edge. Stars become streaks. Warp cylinder fades in.
   timeline.add(() => {
-    cameraMode = "reentry";
-    telemetryText.innerText = "ATMOSPHERIC COMPRESSION THRESHOLD // HULL TEMP: 1650°C";
-  }, 4.5);
+    if (warpCylinder) {
+      warpCylinder.visible = true;
+    }
+  }, 3.0);
+  timeline.to(warpCylinderMaterial.uniforms.opacity, { value: 0.5, duration: 1.0, ease: "power1.in" }, 3.0);
+  timeline.to(shaderUniforms.warpProgress, { value: 0.85, duration: 1.0, ease: "power1.in" }, 3.0);
+  timeline.to(cameraRig, { shakeIntensity: 0.65, duration: 1.0, ease: "power1.in" }, 3.0);
   
-  // Activate plasma shockwave shield
-  timeline.to(shaderUniforms.plasmaIntensity, {
-    value: 1.0,
-    duration: 2.0,
-    ease: "power1.out"
-  }, 4.5);
+  // Frame X-150 (5.0s): Tunnel surrounds reality. Opacity to max. Rocket hull liquid chrome emissive glow.
+  timeline.to(warpCylinderMaterial.uniforms.opacity, { value: 1.0, duration: 1.0, ease: "power1.out" }, 4.0);
+  timeline.to(shaderUniforms.warpProgress, { value: 1.0, duration: 1.0, ease: "power1.out" }, 4.0);
+  timeline.to(cameraRig, { shakeIntensity: 1.0, duration: 1.0, ease: "power1.out" }, 4.0);
   
-  // Heat up rocket chrome metal (glow emissive red/orange)
+  // Animate rocket emissive reflection to simulate liquid chrome warp energy
   rocketModel.traverse((node) => {
     if (node.isMesh && node.material) {
       const materials = Array.isArray(node.material) ? node.material : [node.material];
       materials.forEach((mat) => {
         if (mat.emissive) {
-          timeline.to(mat.emissive, {
-            r: 1.0,
-            g: 0.22,
-            b: 0.02,
-            duration: 2.5,
-            ease: "power1.in"
-          }, 4.5);
-          timeline.to(mat, {
-            emissiveIntensity: 2.8,
-            duration: 2.5,
-            ease: "power1.in"
-          }, 4.5);
+          timeline.to(mat.emissive, { r: 0.1, g: 0.52, b: 0.98, duration: 1.0, ease: "power1.out" }, 4.0);
+          timeline.to(mat, { emissiveIntensity: 1.8, duration: 1.0, ease: "power1.out" }, 4.0);
         }
       });
     }
   });
   
-  // Exosphere background glow transitions from space black to hot plasma orange
-  const tempBgColor = new THREE.Color(0x0a0a1a);
+  // Frame X-200 (6.67s): Maximum warp.
+  // Frame X-240 (8.0s): Streaks become organized lanes.
+  // Frame X-280 (9.33s): Tunnel becomes architectural.
+  // Frame X-300 (10.0s): Instant snap-back freeze/black out.
+  timeline.add(() => {
+    // Snap everything to black instantly
+    cameraMode = "blackout";
+    telemetryText.innerText = "";
+    if (warpCylinder) warpCylinder.visible = false;
+    starfield.visible = false;
+    shaderUniforms.warpProgress.value = 0.0;
+    cameraRig.shakeIntensity = 0.0;
+    
+    // Clear rocket emissive
+    rocketModel.traverse((node) => {
+      if (node.isMesh && node.material) {
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        materials.forEach((mat) => {
+          if (mat.emissive) {
+            mat.emissive.setHex(0x000000);
+            mat.emissiveIntensity = 0.0;
+          }
+        });
+      }
+    });
+    
+    // Clear exosphere glow and position planet
+    rocketModel.position.set(0, 30, 80);
+    rocketModel.rotation.set(-Math.PI / 4, 0, 0); // nose pointing down-forward
+  }, 10.0);
+  
+  // --- BEAT 1: THE SNAP-BACK (10.0s - 12.0s) ---
+  // B1-001 (10.0s): Total blackness, eerie silence, duration 0.3s
+  
+  // B1-010 (10.33s): Thin blue curve (Earth exosphere) appears far away.
+  timeline.add(() => {
+    cameraMode = "orbit";
+    starfield.visible = true; // stars visible again
+    telemetryText.innerText = "WARP TUNNEL DE-ACTIVATED // EXOSPHERE HORIZON DETECTED";
+    
+    cameraRig.targetPos.set(0, 38, 120);
+    cameraRig.targetLook.set(0, 20, 60);
+  }, 10.33);
+  
+  // B1-020 (10.67s) to B1-060 (12.0s): Curve grows rapidly, planet horizon dominates.
+  timeline.to(rocketModel.position, {
+    x: 0,
+    y: -75,
+    z: -80,
+    duration: 1.67,
+    ease: "power2.in"
+  }, 10.33);
+  
+  // --- BEAT 2: ATMOSPHERIC ENTRY (12.0s - 16.0s) ---
+  // B2-001 (12.0s): Faint purple haze around the nose cone.
+  timeline.add(() => {
+    cameraMode = "reentry";
+    telemetryText.innerText = "ATMOSPHERIC COMPRESSION THRESHOLD // CORE PITCH ADJUSTMENT";
+  }, 12.0);
+  
+  timeline.to(shaderUniforms.plasmaIntensity, {
+    value: 0.25,
+    duration: 0.67,
+    ease: "power1.out"
+  }, 12.0);
+  
+  // B2-020 (12.67s): warm reflections transition on chrome hull (blue to orange).
+  rocketModel.traverse((node) => {
+    if (node.isMesh && node.material) {
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      materials.forEach((mat) => {
+        if (mat.emissive) {
+          timeline.to(mat.emissive, { r: 0.85, g: 0.35, b: 0.05, duration: 1.33, ease: "power1.in" }, 12.67);
+          timeline.to(mat, { emissiveIntensity: 1.2, duration: 1.33, ease: "power1.in" }, 12.67);
+        }
+      });
+    }
+  });
+  
+  // B2-040 (13.33s): plasma skin forms (glowing cocoon).
+  timeline.to(shaderUniforms.plasmaIntensity, {
+    value: 0.65,
+    duration: 0.67,
+    ease: "power1.in"
+  }, 12.67);
+  
+  // B2-060 (14.0s): plasma unstable, heat distortion ripples, camera shake starts.
+  timeline.to(cameraRig, {
+    shakeIntensity: 0.85,
+    duration: 2.0,
+    ease: "power2.inOut"
+  }, 14.0);
+  
+  // Slowly adjust rocket pitch rotation to vertical upright for landing
+  timeline.to(rocketModel.rotation, {
+    x: 0,
+    duration: 3.5,
+    ease: "power2.inOut"
+  }, 12.5);
+  
+  // Fade in scene fog smoothly (transitions from exosphere to storm)
+  const tempBgColor = new THREE.Color(0x020208);
   timeline.to(tempBgColor, {
-    r: 0.9,
-    g: 0.28,
-    b: 0.05,
-    duration: 3.0,
+    r: 0.023,
+    g: 0.031,
+    b: 0.047, // deep storm blue-grey
+    duration: 4.0,
     onUpdate: () => {
       renderer.setClearColor(tempBgColor);
       scene.fog.color.copy(tempBgColor);
     },
     ease: "power1.in"
-  }, 4.5);
+  }, 12.0);
   
-  // Ramp up fog density inside atmosphere exosphere
   timeline.to(scene.fog, {
-    density: 0.045,
-    duration: 3.0,
+    density: 0.048,
+    duration: 4.0,
     ease: "power1.in"
-  }, 4.5);
+  }, 12.0);
   
-  // Sheets of clouds fade in
   timeline.to(cloudSheetMaterial.uniforms.opacity, {
-    value: 0.98,
-    duration: 2.5,
-    ease: "power1.in"
-  }, 4.5);
-  
-  // Camera structural shake
-  timeline.to(cameraRig, {
-    shakeIntensity: 1.2,
+    value: 1.0,
     duration: 3.0,
-    ease: "power1.inOut"
-  }, 4.5);
+    ease: "power1.in"
+  }, 13.0);
   
-  // --- PHASE 3: CLOUD DECK PLUNGE & INTER-SCENE SWAP (7.0s - 10.5s) ---
-  timeline.add(() => {
-    telemetryText.innerText = "DEEP CLOUD TRANSITION // VOLUMETRIC STORM DUST";
-  }, 7.0);
-  
-  // Fade full screen storm gray overlay
-  timeline.to(stormOverlay, {
-    backgroundColor: "rgba(70, 75, 85, 1.0)",
+  // B2-090 (15.0s): individual flame tongues become visible.
+  timeline.to(shaderUniforms.plasmaIntensity, {
+    value: 1.0,
     duration: 1.0,
+    ease: "power1.in"
+  }, 15.0);
+  
+  // B2-120 (16.0s): inferno dominates.
+  
+  // --- BEAT 3: THE CLOUD PIERCER (16.0s - 22.0s) ---
+  // B3-001 (16.0s): strikes cloud, visibility collapses instantly.
+  timeline.add(() => {
+    telemetryText.innerText = "DEEP VOLUMETRIC STORM CLOUD DECK PLUNGE";
+  }, 16.0);
+  
+  timeline.to(stormOverlay, {
+    backgroundColor: "rgba(35, 38, 45, 1.0)",
+    duration: 0.5,
     ease: "power2.in"
-  }, 7.0);
+  }, 16.0);
   
   timeline.to(scene.fog, {
-    density: 0.09,
-    duration: 1.0,
-    ease: "none"
-  }, 7.0);
+    density: 0.095,
+    duration: 1.5,
+    ease: "power1.in"
+  }, 16.0);
   
-  // Lightning flashes
-  timeline.add(() => { triggerLightningStrike(); }, 7.2);
+  // B3-040 (17.33s): lightning flash reveals rocket silhouette.
+  timeline.add(() => { triggerLightningStrike(); }, 17.33);
   timeline.to(stormOverlay, {
-    backgroundColor: "rgba(200, 235, 255, 1.0)",
+    backgroundColor: "rgba(180, 225, 255, 1.0)",
     duration: 0.05,
     repeat: 4,
     yoyo: true,
     ease: "none"
-  }, 7.3);
-  timeline.add(() => { triggerLightningStrike(); }, 7.8);
+  }, 17.38);
+  
+  // B3-080 (18.67s): lightning flash cockpit glimpse.
+  timeline.add(() => { triggerLightningStrike(); }, 18.67);
+  
+  // B3-100 (19.33s): lightning reveals cloud towers.
+  timeline.add(() => { triggerLightningStrike(); }, 19.5);
+  
+  // B3-140 (20.67s): storm core, max shake.
+  timeline.to(cameraRig, {
+    shakeIntensity: 1.45,
+    duration: 2.0,
+    ease: "power1.inOut"
+  }, 19.33);
+  
+  // B3-180 (22.0s): escape begins.
   
   // ============================================
-  // CRITICAL SWAP FRAME AT peak fog (8.0s)
+  // CRITICAL SWAP FRAME AT peak fog (22.0s)
   // ============================================
   timeline.add(() => {
     console.log("EXECUTE LANDING COORDINATE SWAP");
     cameraMode = "landing";
-    telemetryText.innerText = "HULL TEMP DECAYING // RETRO-PROPULSION IGNITION // ALT: 3 KM";
+    telemetryText.innerText = "PROPULSION IGNITION // HOVER LEVEL PLATFORM SEARCH // ALT: 1.5 KM";
     
-    // 1. Swap Group Renderers
     spaceGroup.visible = false;
     oceanGroup.visible = true;
     
-    // 2. Adjust fog properties for twilight ocean horizon
-    scene.fog.color.setHex(0x0a0c16);
-    renderer.setClearColor(0x0a0c16);
+    scene.fog.color.setHex(0x06080c); // Stormy slate grey fog
+    renderer.setClearColor(0x06080c);
     
-    // 3. Remove entry friction materials
     shaderUniforms.plasmaIntensity.value = 0.0;
     rocketModel.traverse((node) => {
       if (node.isMesh && node.material) {
@@ -1474,110 +2137,107 @@ function executeDescentSequence() {
       }
     });
     
-    // 4. Place Rocket exactly above the Landing Platform (located at x=0, z=-45)
+    // Position rocket for landing
     rocketModel.position.set(0, 42, -45);
-    rocketModel.rotation.set(0, 0, 0); // straight vertical orientation
+    rocketModel.rotation.set(0, 0, 0);
     
-    // 5. Reset camera to new landing base coords to prevent massive lerps
     camera.position.set(0, 32, -15);
     actualLookAtTarget.set(0, 15, -45);
     cameraRig.targetPos.set(0, 32, -15);
     cameraRig.targetLook.set(0, 15, -45);
     cameraRig.shakeIntensity = 0.0;
     
-    // 6. Thruster light
-    landingThrusterLight.position.set(0, 40, -45);
-    landingThrusterLight.intensity = 8.0;
+    if (thrusterFlame) thrusterFlame.visible = true;
+    if (volumetricLightCone) volumetricLightCone.visible = true;
     
-  }, 8.0);
+    landingThrusterLight.position.set(0, 40, -45);
+    landingThrusterLight.intensity = 10.0;
+  }, 22.0);
   
-  // --- PHASE 4: CLOUD LAYER EXIT & OCEAN PLATFORM REVEAL (8.0s - 10.5s) ---
-  
+  // --- BEAT 4: THE MONOLITH REVEAL (22.0s - 30.8s) ---
+  // B4-001 (22.0s): Cloud layer tears open. First glimpse of ocean.
   timeline.to(stormOverlay, {
-    backgroundColor: "rgba(70, 75, 85, 0.0)",
+    backgroundColor: "rgba(35, 38, 45, 0.0)",
     duration: 1.5,
     ease: "power2.out"
-  }, 8.0);
+  }, 22.0);
   
-  // Decelerate fog to reveal twilight horizon
+  // B4-020 (22.67s): Exit storm. Silence.
   timeline.to(scene.fog, {
-    density: 0.0035,
-    duration: 2.5,
+    density: 0.0055,
+    duration: 3.5,
     ease: "power2.out"
-  }, 8.0);
+  }, 22.0);
   
-  // --- PHASE 5: FLOATING PAD LANDING & ENGINE SHUTDOWN (8.2s - 16.0s) ---
-  
-  // Camera pans down following the rocket to frame touchdown
-  timeline.to(cameraRig.targetPos, {
-    x: 0,
-    y: 12,
-    z: -20,
-    duration: 6.8,
-    ease: "power1.out"
-  }, 8.2);
-  
-  // Rocket slows down vertically to land on the platform at y=0.425
+  // B4-040 (23.33s) to B4-140 (26.67s): approach hover and descend
   timeline.to(rocketModel.position, {
-    y: 0.425,
+    y: 2.925, // raised platform touchdown Y
     duration: 6.8,
     ease: "power2.out"
-  }, 8.2);
+  }, 23.0);
   
-  // Animate thruster wash PointLight
   timeline.to(landingThrusterLight.position, {
-    y: 0.3,
+    y: 2.8,
     duration: 6.8,
     ease: "power2.out"
-  }, 8.2);
+  }, 23.0);
   
+  // Ignite retro thrusters
   timeline.to(landingThrusterLight, {
-    intensity: 15.0,
+    intensity: 22.0,
     duration: 2.0,
     ease: "power1.in"
-  }, 8.5);
+  }, 23.5);
   timeline.to(shaderUniforms.thrusterIntensity, {
     value: 12.0,
     duration: 2.0,
     ease: "power1.in"
-  }, 8.5);
+  }, 23.5);
   
+  // B4-220 (29.33s): Descent slows down, engine shutdown starts
   timeline.to(landingThrusterLight, {
     intensity: 0.0,
-    duration: 1.0,
+    duration: 2.33,
     ease: "power2.out"
-  }, 14.5);
+  }, 27.5);
   timeline.to(shaderUniforms.thrusterIntensity, {
     value: 0.0,
-    duration: 1.0,
+    duration: 2.33,
     ease: "power2.out"
-  }, 14.5);
+  }, 27.5);
   
-  // Pulse Monolith glow gold/cyan on ship touchdown
+  // Monolith pulse veins
   timeline.to(shaderUniforms.monolithPulse, {
-    value: 3.5,
-    duration: 1.5,
+    value: 4.5,
+    duration: 2.0,
     yoyo: true,
     repeat: 1,
     ease: "power2.inOut"
-  }, 14.0);
+  }, 26.5);
   
+  // B4-260 (30.8s): Touchdown & OrbitControls handoff
   timeline.add(() => {
-    telemetryText.innerText = "TOUCHDOWN CONFIRMED // SYSTEM SECURED ON FLOATING PAD";
+    telemetryText.innerText = "TOUCHDOWN CONFIRMED // SYSTEM SECURED ON HOVER PLATFORM";
+    if (volumetricLightCone) volumetricLightCone.visible = false;
     
-    // Enable manual orbit controls
+    // Impact camera shake
+    cameraRig.shakeIntensity = 1.4;
+    gsap.to(cameraRig, {
+      shakeIntensity: 0.0,
+      duration: 1.6,
+      ease: "power2.out"
+    });
+    
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxPolarAngle = Math.PI / 2 - 0.03; // prevent camera going below ocean water level
-    controls.target.set(0, 6, -45); // Focus around landing platform
-    
+    controls.maxPolarAngle = Math.PI / 2 - 0.03;
+    controls.target.set(0, 8.5, -45);
     window.activeControls = controls;
-  }, 16.0);
+  }, 30.8);
 }
 
 descentBtn.addEventListener("click", executeDescentSequence);
-
 
 // ==========================================
 // 5. RENDER LOOP & WINDOW EVENT LISTENERS
@@ -1587,56 +2247,93 @@ const clock = new THREE.Clock();
 
 function tick() {
   const elapsedTime = clock.getElapsedTime();
+  const delta = clock.getDelta();
   
   // Update shader clock
   shaderUniforms.time.value = elapsedTime;
+  shaderUniforms.cameraHeight.value = camera.position.y;
 
   // Sync thruster light position with rocket model and update exhaust flame
   if (rocketModel) {
     shaderUniforms.thrusterLightPos.value.copy(rocketModel.position);
+    
     if (thrusterFlame) {
       const targetScale = shaderUniforms.thrusterIntensity.value / 12.0;
       thrusterFlame.scale.set(1.0, targetScale, 1.0);
       thrusterFlame.visible = targetScale > 0.02;
     }
+    
+    if (volumetricLightCone) {
+      const targetScale = shaderUniforms.thrusterIntensity.value / 12.0;
+      volumetricLightCone.scale.set(1.0, targetScale, 1.0);
+      volumetricLightCone.visible = targetScale > 0.02;
+    }
   }
-  
-  // Starfield slow rotation
-  starfield.rotation.y = elapsedTime * 0.006;
   
   // Rotate cloud layer sphere slowly over earth
   if (cloudSphere) {
-    cloudSphere.rotation.y = elapsedTime * 0.012;
-    cloudSphere.rotation.x = elapsedTime * 0.004;
+    cloudSphere.rotation.y = elapsedTime * 0.009;
+    cloudSphere.rotation.x = elapsedTime * 0.003;
   }
   
-  // Move volumetric clouds to simulate high-speed descent
-  if ((cameraMode === "reentry" || cameraMode === "orbit") && volumetricClouds) {
-    volumetricClouds.children.forEach((sheet, index) => {
-      sheet.position.y += 2.2; // move clouds upward
-      if (sheet.position.y > 60) {
-        sheet.position.y = -180; // loop back down
-      }
-    });
-  }
+  // Cloud translation handled directly inside the raymarching shader noise scroll
 
-  // Position the cyan lightning DirectionalLight directly above the rocket
+  // Position the lightning DirectionalLight
   if (lightningLight && rocketModel) {
     lightningLight.position.set(rocketModel.position.x, rocketModel.position.y + 100, rocketModel.position.z);
   }
 
-  // Drifting clouds in the twilight sky
+  // Drifting 3D bubble clouds
   if (skyClouds && skyClouds.children) {
     skyClouds.children.forEach((cloud, index) => {
-      cloud.position.x += Math.sin(elapsedTime * 0.05 + index) * 0.08;
-      cloud.position.z += 0.03; // slowly drift forward
-      if (cloud.position.z > 100) cloud.position.z = -500; // loop back
+      cloud.rotation.y += 0.002;
+      cloud.position.x += Math.sin(elapsedTime * 0.03 + index) * 0.08;
+      cloud.position.z += 0.08;
+      if (cloud.position.z > 100) {
+        cloud.position.z = -700;
+        cloud.position.x = THREE.MathUtils.randFloatSpread(800);
+      }
     });
   }
+
+  // Rain updates removed per user request
+
+  // Manage Steam Particles behavior on landing approach
+  if (steamParticles && oceanGroup.visible && rocketModel) {
+    const posAttr = steamGeometry.getAttribute("position");
+    const rocketY = rocketModel.position.y;
+    
+    // Show steam when rocket gets low
+    if (rocketY < 18.0 && shaderUniforms.thrusterIntensity.value > 0.5) {
+      steamMaterial.opacity = THREE.MathUtils.lerp(steamMaterial.opacity, 0.55, 0.08);
+      for (let i = 0; i < steamParticlesCount; i++) {
+        let x = posAttr.getX(i);
+        let y = posAttr.getY(i);
+        let z = posAttr.getZ(i);
+        
+        const spd = steamSpeeds[i];
+        x += spd.x;
+        y += spd.y;
+        z += spd.z;
+        
+        // Rise and dissipate
+        if (y > 10.0 || y < 0) {
+          x = THREE.MathUtils.randFloatSpread(40);
+          y = 0.1;
+          z = -45 + THREE.MathUtils.randFloatSpread(40);
+        }
+        
+        posAttr.setXYZ(i, x, y, z);
+      }
+      posAttr.needsUpdate = true;
+    } else {
+      steamMaterial.opacity = THREE.MathUtils.lerp(steamMaterial.opacity, 0.0, 0.1);
+    }
+  }
   
-  // Update dynamic fire/plasma texture scroll
+  // Update fire texture scroll
   if (fireNoiseTexture) {
-    fireNoiseTexture.offset.y -= 1.8 * clock.getDelta(); // Frame-rate independent scrolling
+    fireNoiseTexture.offset.y -= 1.6 * delta;
   }
 
   // Update Monolith glow materials dynamically
@@ -1657,23 +2354,52 @@ function tick() {
     window.activeControls.update();
   } else {
     if (rocketModel) {
-      if (cameraMode === "orbit") {
-        cameraRig.targetLook.copy(rocketModel.position);
-      } else if (cameraMode === "reentry") {
+      if (cameraMode === "warp") {
+        // Hull-attached warping camera (mounted on side-rear hull looking forward into the eye of the storm)
         cameraRig.targetPos.set(
-          rocketModel.position.x + 3.5,
-          rocketModel.position.y + 4.0,
-          rocketModel.position.z + 10.0
+          rocketModel.position.x - 1.45,
+          rocketModel.position.y + 0.8,
+          rocketModel.position.z + 3.5
         );
         cameraRig.targetLook.set(
-          rocketModel.position.x - 2.0,
-          rocketModel.position.y + 7.0,
-          rocketModel.position.z - 25.0
+          rocketModel.position.x + 0.5,
+          rocketModel.position.y - 0.2,
+          rocketModel.position.z - 12.0
         );
-      } else if (cameraMode === "landing") {
+      } else if (cameraMode === "orbit") {
+        // Chase cam during orbit (close behind hull, looking down-forward)
+        cameraRig.targetPos.set(
+          rocketModel.position.x,
+          rocketModel.position.y + 4.5,
+          rocketModel.position.z + 9.0
+        );
         cameraRig.targetLook.set(
           rocketModel.position.x,
+          rocketModel.position.y - 8.0,
+          rocketModel.position.z - 12.0
+        );
+      } else if (cameraMode === "reentry") {
+        // Mounted on the hull looking forward-down through reentry plasma
+        cameraRig.targetPos.set(
+          rocketModel.position.x + 1.5,
           rocketModel.position.y + 3.0,
+          rocketModel.position.z + 2.5
+        );
+        cameraRig.targetLook.set(
+          rocketModel.position.x - 1.0,
+          rocketModel.position.y - 12.0,
+          rocketModel.position.z - 8.0
+        );
+      } else if (cameraMode === "landing") {
+        // Chase cam looking down-forward at the hovering platform
+        cameraRig.targetPos.set(
+          rocketModel.position.x,
+          rocketModel.position.y + 9.0,
+          rocketModel.position.z + 12.0
+        );
+        cameraRig.targetLook.set(
+          rocketModel.position.x,
+          rocketModel.position.y - 3.0,
           rocketModel.position.z
         );
       }
@@ -1684,7 +2410,7 @@ function tick() {
     actualLookAtTarget.lerp(cameraRig.targetLook, cameraRig.lerpSpeed);
     
     // Add non-cumulative camera shake
-    const activeShake = (cameraMode === "reentry" ? 0.15 * shaderUniforms.plasmaIntensity.value : 0) + cameraRig.shakeIntensity * 0.15;
+    const activeShake = (cameraMode === "reentry" ? 0.08 * shaderUniforms.plasmaIntensity.value : 0) + cameraRig.shakeIntensity * 0.12;
     if (activeShake > 0) {
       camera.position.x += (Math.random() - 0.5) * activeShake;
       camera.position.y += (Math.random() - 0.5) * activeShake;
@@ -1694,7 +2420,6 @@ function tick() {
     camera.lookAt(actualLookAtTarget);
   }
 
-  
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
