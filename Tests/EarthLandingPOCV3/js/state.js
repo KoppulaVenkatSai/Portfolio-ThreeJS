@@ -1,6 +1,7 @@
 export const ENGINE_STATE = {
   currentScene: "INITIAL", // INITIAL, WARP, SNAP_BACK, REENTRY, STORM, LANDING, MANUAL
   globalTime: 0.0,
+  timelineTime: 0.0,
   warpProgress: 0.0,
   cameraShakeAmp: 0.0,
   globalFogDensity: 0.0,
@@ -8,6 +9,7 @@ export const ENGINE_STATE = {
   thrusterIntensity: 0.0,
   lightningIntensity: 0.0,
   monolithPulse: 1.0,
+  starsOpacity: 1.0,
   
   // Transition hooks
   setScene(sceneName) {

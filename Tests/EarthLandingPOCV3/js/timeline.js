@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import gsap from "gsap";
 import { CONFIG } from "./config.js";
 import { ENGINE_STATE } from "./state.js";
@@ -15,101 +16,233 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (bloomPass) bloomPass.strength = 0.0;
     CAMERA_RIG.localYOffset = -1.0;
     if (rocket) {
+      rocket.visible = true;
       rocket.rotation.set(Math.PI / 2, 0, 0);
     }
+    if (spaceGroup) spaceGroup.visible = true;
+    if (oceanGroup) oceanGroup.visible = false;
+    if (earthGroup) earthGroup.visible = false;
   }, 0.0);
   
-  // Custom timing-driven progressive warp build-up (mimicking Frame X-010 to X-200)
+  // Slow start: 0.0 to 0.1 over 4.0s (slowing the part where the stars start moving)
+  tl.to(ENGINE_STATE, {
+    warpProgress: 0.1,
+    duration: 4.0,
+    ease: "power2.in"
+  }, 0.0);
+  
+  // Acceleration: 0.1 to 1.0 over 6.0s
   tl.to(ENGINE_STATE, {
     warpProgress: 1.0,
-    duration: CONFIG.timeline.warpEnd,
-    ease: "power2.inOut"
-  }, 0.0);
+    duration: 6.0,
+    ease: "power2.in"
+  }, 4.0);
   
-  // Warp camera FOV stretching
-  tl.to(camera, {
-    fov: 95,
-    duration: CONFIG.timeline.warpEnd,
-    ease: "power2.in",
-    onUpdate: () => camera.updateProjectionMatrix()
-  }, 0.0);
+  // Camera shoots forward ahead of the rocket during warp peak (slower over 10.0s)
+  tl.to(CAMERA_RIG, {
+    localYOffset: 50.0,
+    duration: 10.0,
+    ease: "power2.out"
+  }, 6.8);
   
-  if (bloomPass) {
-    tl.to(bloomPass, {
-      strength: 1.3, // Lowered from 2.2 to reduce eye of the storm glare
-      duration: CONFIG.timeline.warpEnd,
-      ease: "power2.in"
-    }, 0.0);
+  // Find all lights in the scene
+  let spaceSun = null;
+  let earthFrontLight = null;
+  let spaceAmbient = null;
+  let hemisphereLight = null;
+  let searchLight = null;
+  
+  if (spaceGroup) {
+    spaceGroup.traverse((child) => {
+      if (child.isDirectionalLight) {
+        if (child.name === "spaceSun") {
+          spaceSun = child;
+        } else if (child.name === "earthFrontLight") {
+          earthFrontLight = child;
+        }
+      }
+      if (child.isAmbientLight) spaceAmbient = child;
+    });
+    const scene = spaceGroup.parent;
+    if (scene) {
+      scene.traverse((child) => {
+        if (child.isHemisphereLight) hemisphereLight = child;
+        if (child.isSpotLight && child.name !== "lightningLight") searchLight = child;
+      });
+    }
   }
 
-  // Camera shoots forward ahead of the rocket during warp peak (9.0s to 10.0s)
-  tl.to(CAMERA_RIG, {
-    localYOffset: 20.0,
-    duration: 1.0,
-    ease: "power2.in"
-  }, 9.0);
-  
-  // 2. BEAT 1: SNAP-BACK
+  // Find earthMesh inside earthGroup
+  let earthMesh = null;
+  if (earthGroup) {
+    earthGroup.traverse((child) => {
+      if (child.isMesh) {
+        earthMesh = child;
+      }
+    });
+  }
+
+  // Fade out stars and ambient lights as camera goes past the rocket (8.8s to 16.8s)
+  // We fade starsOpacity to 0.25 (allowing background drift) and warpProgress to 0.02 (drift speed)
+  tl.to(ENGINE_STATE, {
+    starsOpacity: 0.25,
+    duration: 8.0,
+    ease: "power1.inOut"
+  }, 8.8);
+
+  tl.to(ENGINE_STATE, {
+    warpProgress: 0.02,
+    duration: 8.0,
+    ease: "power1.inOut"
+  }, 8.8);
+
+  if (spaceAmbient) {
+    tl.to(spaceAmbient, {
+      intensity: 0.0,
+      duration: 8.0,
+      ease: "power1.inOut"
+    }, 8.8);
+  }
+  if (hemisphereLight) {
+    tl.to(hemisphereLight, {
+      intensity: 0.0,
+      duration: 8.0,
+      ease: "power1.inOut"
+    }, 8.8);
+  }
+  if (searchLight) {
+    tl.to(searchLight, {
+      intensity: 0.0,
+      duration: 8.0,
+      ease: "power1.inOut"
+    }, 8.8);
+  }
+  if (spaceSun) {
+    tl.to(spaceSun, {
+      intensity: 0.0,
+      duration: 8.0,
+      ease: "power1.inOut"
+    }, 8.8);
+  }
+  if (earthFrontLight) {
+    tl.to(earthFrontLight, {
+      intensity: 0.0,
+      duration: 8.0,
+      ease: "power1.inOut"
+    }, 8.8);
+  }
+
+  // 2. BEAT 1: SNAP-BACK (EARTH SILHOUETTE REVEAL & BLACKOUT)
   tl.add(() => {
     ENGINE_STATE.setScene("SNAP_BACK");
-    if (bloomPass) bloomPass.strength = 0.0;
-    // Hide space environment, show exosphere default blue sphere
-    if (earthGroup) {
+    
+    // Hide the rocket entirely
+    if (rocket) rocket.visible = false;
+    
+    // Complete light blackout (nothing is visible, completely black)
+    if (spaceAmbient) spaceAmbient.intensity = 0.0;
+    if (hemisphereLight) hemisphereLight.intensity = 0.0;
+    if (searchLight) searchLight.intensity = 0.0;
+    if (spaceSun) spaceSun.intensity = 0.0;
+    if (earthFrontLight) earthFrontLight.intensity = 0.0;
+    
+    // Position a small Earth in the middle of the screen
+    if (earthGroup && rocket) {
       earthGroup.visible = true;
-      earthGroup.scale.set(0.01, 0.01, 0.01);
-      earthGroup.position.set(0, -500, -850);
+      earthGroup.scale.set(0.12, 0.12, 0.12); // starts small
+      
+      rocket.updateMatrixWorld();
+      const earthPos = new THREE.Vector3(0, 300, 0).applyMatrix4(rocket.matrixWorld);
+      earthGroup.position.copy(earthPos);
+      
+      // Position spaceSun behind and slightly above the Earth to prepare it (starts unlit)
+      if (spaceSun) {
+        // Offset (0, 130, 80) in rocket's local space relative to Earth
+        // Earth is at (0, 300, 0) locally, so sun is at (0, 430, 80) locally
+        const localSunPos = new THREE.Vector3(0, 430, 80);
+        const sunPos = localSunPos.applyMatrix4(rocket.matrixWorld);
+        spaceSun.position.copy(sunPos);
+        spaceSun.target = earthGroup;
+        spaceSun.intensity = 0.0; // Starts unlit
+      }
+
+      // Position earthFrontLight in front-top-right relative to the rocket, pointing to Earth
+      if (earthFrontLight) {
+        const localLightPos = new THREE.Vector3(150, 150, 150);
+        const lightPos = localLightPos.applyMatrix4(rocket.matrixWorld);
+        earthFrontLight.position.copy(lightPos);
+        earthFrontLight.target = earthGroup;
+        earthFrontLight.intensity = 0.0; // Starts unlit
+      }
+    }
+    
+    // Turn off Earth emissive completely (completely black)
+    if (earthMesh && earthMesh.material) {
+      earthMesh.material.emissiveIntensity = 0.0;
     }
   }, CONFIG.timeline.snapBackStart);
 
-  // Keep camera ahead of rocket briefly to show only the Earth initially
-  tl.to(CAMERA_RIG, {
-    localYOffset: 20.0,
-    duration: 0.6
-  }, CONFIG.timeline.snapBackStart);
-
-  // Rocket catches back up again (camera moves back to -1.0)
-  tl.to(CAMERA_RIG, {
-    localYOffset: -1.0,
-    duration: 1.15,
-    ease: "power3.out"
-  }, CONFIG.timeline.snapBackStart + 0.6);
-  
-  // Return FOV to normal
-  tl.to(camera, {
-    fov: 50,
-    duration: CONFIG.timeline.snapBackDuration,
-    ease: "power2.out",
-    onUpdate: () => camera.updateProjectionMatrix()
-  }, CONFIG.timeline.snapBackStart);
-  
-  // Rapid exosphere scaling (frightening rate of arrival)
-  tl.to(earthGroup.scale, {
-    x: 1.0,
-    y: 1.0,
-    z: 1.0,
-    duration: CONFIG.timeline.snapBackDuration,
-    ease: "power3.out"
-  }, CONFIG.timeline.snapBackStart);
-  
-  tl.to(earthGroup.position, {
-    x: 0,
-    y: -100,
-    z: -180,
-    duration: CONFIG.timeline.snapBackDuration,
-    ease: "power3.out"
-  }, CONFIG.timeline.snapBackStart);
-  
-  if (rocket) {
-    tl.to(rocket.rotation, {
-      x: -2.078,
-      y: 0.0,
-      z: 0.0,
-      duration: CONFIG.timeline.snapBackDuration,
-      ease: "power2.out"
+  // Slowly fade in the directional light from the backside of the Earth from 16.8s to 23.8s
+  if (spaceSun) {
+    tl.to(spaceSun, {
+      intensity: 1.5,
+      duration: 7.0,
+      ease: "power1.inOut"
     }, CONFIG.timeline.snapBackStart);
   }
-  
-  // 3. BEAT 2: ATMOSPHERIC ENTRY (PLASMA BURN)
+
+  // Slowly increase the size of the Earth over 7 seconds (from 16.8s to 23.8s)
+  if (earthGroup) {
+    tl.to(earthGroup.scale, {
+      x: 0.45,
+      y: 0.45,
+      z: 0.45,
+      duration: 7.0,
+      ease: "power1.inOut"
+    }, CONFIG.timeline.snapBackStart);
+  }
+
+  // Slowly fade in the directional light from the front-top-right of the Earth from 23.8s to 28.8s
+  if (earthFrontLight) {
+    tl.to(earthFrontLight, {
+      intensity: 2.0,
+      duration: 5.0,
+      ease: "power1.inOut"
+    }, 19.8);
+  }
+
+  // Stop the animation sequence here as requested (just before atmospheric entry phase)
+  tl.add(() => {
+    tl.pause();
+    console.log("[TIMELINE] Paused just before atmospheric entry phase.");
+  }, 30.8);
+
+  // 4. BEAT 3: ROCKET FLY-PAST
+  tl.add(() => {
+    if (rocket) {
+      rocket.visible = true;
+      // Ensure the rocket is rotated facing forward (along +Y)
+      rocket.rotation.set(Math.PI / 2, 0, 0);
+    }
+  }, CONFIG.timeline.rocketFlyPastStart);
+
+  // Camera retreats back to the base of the rocket
+  tl.to(CAMERA_RIG, {
+    localYOffset: -1.0,
+    duration: CONFIG.timeline.rocketFlyPastDuration,
+    ease: "power3.out"
+  }, CONFIG.timeline.rocketFlyPastStart);
+
+  // Move the rocket forward in world space past the camera (Z: 2.0 -> 50.0)
+  if (rocket) {
+    tl.to(rocket.position, {
+      z: 50.0,
+      duration: CONFIG.timeline.rocketFlyPastDuration,
+      ease: "power3.out"
+    }, CONFIG.timeline.rocketFlyPastStart);
+  }
+
+  // 5. BEAT 4: ATMOSPHERIC ENTRY (PLASMA BURN)
   tl.add(() => {
     ENGINE_STATE.setScene("REENTRY");
     ENGINE_STATE.atmosphereFriction = 0.0;
@@ -118,26 +251,35 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
   tl.to(ENGINE_STATE, {
     atmosphereFriction: 1.0,
     duration: CONFIG.timeline.reentryDuration,
-    ease: "power1.inOut"
+    ease: "none"
   }, CONFIG.timeline.reentryStart);
-  
-  if (bloomPass) {
-    tl.to(bloomPass, {
-      strength: 1.1, // Reduced from 1.8 to reduce glare
+
+  // Slowly move the rocket towards the Earth along the world +Z axis (Z: 50.0 -> 70.0)
+  if (rocket) {
+    tl.to(rocket.position, {
+      z: 70.0,
       duration: CONFIG.timeline.reentryDuration,
       ease: "power1.inOut"
     }, CONFIG.timeline.reentryStart);
   }
   
-  // 4. BEAT 3: CLOUD PIERCER
+  // 6. BEAT 5: CLOUD PIERCER
   tl.add(() => {
     ENGINE_STATE.setScene("STORM");
-    if (bloomPass) bloomPass.strength = 0.30; // Reduced from 0.45
     // Hide space elements
     spaceGroup.visible = false;
     // Show ocean elements (but fog is thick, so ocean is invisible at first)
     oceanGroup.visible = true;
     ENGINE_STATE.globalFogDensity = 0.045;
+
+    // Reset camera rig localYOffset to -1.0 so the detached storm camera correctly mounts at the engine bells
+    CAMERA_RIG.localYOffset = -1.0;
+    
+    // Reset rocket Z position to 2.0 to align with the landing path
+    if (rocket) {
+      rocket.position.set(0.0, 120.0, -45.0);
+      rocket.rotation.set(0.0, 0.0, 0.0);
+    }
   }, CONFIG.timeline.stormStart);
   
   // Move rocket down through clouds (descent along Y coordinates)
@@ -154,58 +296,43 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
       y: 0.0,
       z: 0.0,
       duration: 1.5,
-      ease: "power1.inOut"
+      ease: "none"
     }, CONFIG.timeline.stormStart);
     
-    // Turn the rocket upright (upside down relative to descent) at the end of the storm cloud entry (19.5s to 22.0s)
+    // Turn the rocket upright (upside down relative to descent) at the end of the storm cloud entry
     tl.to(rocket.rotation, {
       x: 0.0,
       y: -Math.PI / 4,
       z: 0.0,
       duration: 2.5,
-      ease: "power2.inOut"
-    }, 19.5);
+      ease: "none"
+    }, CONFIG.timeline.stormStart + 3.5);
   }
   
   // 5. BEAT 4: MONOLITH REVEAL & LANDING
   tl.add(() => {
     ENGINE_STATE.setScene("LANDING");
-    CAMERA_RIG.shakeIntensity = 1.0;
-    // Dissipate fog smoothly to reveal the ocean and monolith
-    gsap.to(ENGINE_STATE, {
-      globalFogDensity: 0.008,
-      duration: 3.0,
-      ease: "power1.out"
-    });
+    ENGINE_STATE.globalFogDensity = 0.008; // Set instantly
   }, CONFIG.timeline.landingStart);
   
-  // Slow down descent for hover & landing
+  // Slow down descent for hover & landing (easing out to land smoothly)
   if (rocket) {
     tl.to(rocket.position, {
       y: 2.9, // hover alignment height
       duration: CONFIG.timeline.touchdownTime - CONFIG.timeline.landingStart,
-      ease: "power2.out"
+      ease: "power3.out"
     }, CONFIG.timeline.landingStart);
   }
   
   // Ignite / fade thrusters
-  tl.to(ENGINE_STATE, {
-    thrusterIntensity: 8.0,
-    duration: 1.0,
-    ease: "power1.inOut"
+  tl.add(() => {
+    ENGINE_STATE.thrusterIntensity = 8.0; // Set instantly
   }, CONFIG.timeline.landingStart);
   
   // Touchdown confirmed at 29.8s
   tl.add(() => {
     ENGINE_STATE.setScene("MANUAL");
     ENGINE_STATE.thrusterIntensity = 0.0;
-    // Touchdown impact camera rumble
-    CAMERA_RIG.shakeIntensity = 2.0;
-    gsap.to(CAMERA_RIG, {
-      shakeIntensity: 0.0,
-      duration: CONFIG.shake.touchdown.duration,
-      ease: "power2.out"
-    });
   }, CONFIG.timeline.touchdownTime);
   
   // Enable movable controls hand-off at 30.8s

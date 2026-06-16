@@ -1,0 +1,7 @@
+# Global Rules for AI Coding Assistant
+
+1. **Self-Service / User Change Preference (Single Changes)**:
+   - If the change needed is small or a single contiguous modification, do **NOT** modify the files directly. Instead, explain exactly what needs to be changed and where (providing the file name, line numbers, and exact code snippet), so the USER can apply it themselves.
+
+2. **Assistant-Service Preference (Multiple Changes)**:
+   - When there are **more than 1 changes** to be done (i.e., multiple separate edits, edits across multiple files, or a complex multi-step modification), do them yourself. Apply the edits directly using the file replacement/write tools.

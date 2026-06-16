@@ -181,8 +181,7 @@ export class LandingSystem {
     this.moonLight.shadow.bias = -0.0004;
     this.moonGroup.add(this.moonLight);
     
-    // Storm ambient fill light
-    this.stormAmbient = new THREE.AmbientLight(0x0a0f1d, 0.20); // Lowered from 0.9 to fix washed-out gray shadows
+    this.stormAmbient = new THREE.AmbientLight(0xffffff, 0.6); // Raised ambient light for clean blockout visibility
     this.scene.add(this.stormAmbient);
     
     // Storm sky directional light (illuminates the descending rocket)
@@ -288,27 +287,31 @@ export class LandingSystem {
   }
   
   update(elapsed, rocket) {
-    this.oceanMat.uniforms.uTime.value = elapsed;
+    this.oceanMat.uniforms.uTime.value = 0.0; // Freeze ocean wave movements
     
     const sc = ENGINE_STATE.currentScene;
     const isOcean = (sc === "LANDING" || sc === "MANUAL");
+    const isStormOrLanding = (sc === "STORM" || sc === "LANDING" || sc === "MANUAL");
     
     this.moonGroup.visible = isOcean;
     this.ocean.visible = isOcean;
     this.ambientHoverLight.visible = isOcean;
     this.hoverPool.visible = isOcean;
     
+    this.stormAmbient.visible = isStormOrLanding;
+    this.stormSkyLight.visible = isStormOrLanding;
+    
     if (rocket) {
       this.oceanMat.uniforms.uThrusterIntensity.value = ENGINE_STATE.thrusterIntensity;
       this.oceanMat.uniforms.uThrusterPos.value.copy(rocket.position);
     }
     
-    // Update pulsing monolith cyan emissive veins
+    // Freeze pulsing monolith cyan emissive veins to a static state
     if (isOcean) {
-      const pulse = 0.35 + 0.65 * Math.sin(elapsed * 2.0);
+      const pulse = 1.0;
       this.monolithMat.emissiveIntensity = pulse;
-      this.ambientHoverLight.intensity = 4.5 * pulse;
-      this.poolMat.opacity = 0.15 + 0.45 * pulse;
+      this.ambientHoverLight.intensity = 4.5;
+      this.poolMat.opacity = 0.60;
     }
   }
 }

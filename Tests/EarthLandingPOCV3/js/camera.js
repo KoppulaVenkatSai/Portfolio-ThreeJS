@@ -29,7 +29,7 @@ class CameraRigController {
     const sc = ENGINE_STATE.currentScene;
     
     if (rocket && (sc === "WARP" || sc === "INITIAL" || sc === "SNAP_BACK" || sc === "REENTRY" || sc === "STORM")) {
-      if (sc === "STORM" && elapsed >= 19.5) {
+      if (sc === "STORM") {
         // Camera detaches and stays behind in the clouds, looking down as the rocket plunges away
         if (!this.stormDetachPos) {
           rocket.updateMatrixWorld();
@@ -41,12 +41,40 @@ class CameraRigController {
       } else {
         this.stormDetachPos = null;
         
-        // Hull camera: mounted 2m to the side of the 2.5m radius hull, shifted further up the circumference (local X = 3.92, local Z = 2.2)
-        const localCamPos = new THREE.Vector3(3.92, this.localYOffset, 2.2);
+        let localCamPos, localCamLook;
         
-        // Local look-at target: looking along heading direction (+Y), angled 4.0 degrees towards rocket's top/axis
-        // tan(4.0 deg) = 0.69 / 10.0, look-at target at (3.3, 9.0, 1.9)
-        const localCamLook = new THREE.Vector3(3.3, 9.0, 1.9);
+        // Continuous blend function to smoothly slide the camera from the hull offset to the forward center axis
+        const startY = -1.0;
+        const endY = 35.0;
+        const blend = THREE.MathUtils.clamp((this.localYOffset - startY) / (endY - startY), 0.0, 1.0);
+        
+        localCamPos = new THREE.Vector3();
+        localCamPos.y = this.localYOffset;
+
+        // Transition from side hull to centerline without going inside the rocket fuselage (skimming just above it):
+        // 1. Move the camera to the left and slightly up early (X=0.0, Z=2.75, which is directly above the rocket fuselage).
+        // 2. Travel straight along the top of the rocket body/nose (X=0.0, Z=2.75).
+        // 3. Once past the nose cone, smoothly glide down to the centerline (X=0.0, Z=0.0).
+        if (blend < 0.25) {
+          const phaseBlend = blend / 0.25;
+          localCamPos.x = THREE.MathUtils.lerp(3.92, 0.0, phaseBlend);
+          localCamPos.z = THREE.MathUtils.lerp(2.2, 2.75, phaseBlend);
+        } else if (blend < 0.65) {
+          localCamPos.x = 0.0;
+          localCamPos.z = 2.75;
+        } else if (blend < 0.90) {
+          const phaseBlend = (blend - 0.65) / 0.25;
+          const t = Math.sin(phaseBlend * Math.PI / 2); // smooth ease-out slide
+          localCamPos.x = 0.0;
+          localCamPos.z = THREE.MathUtils.lerp(2.75, 0.0, t);
+        } else {
+          localCamPos.x = 0.0;
+          localCamPos.z = 0.0;
+        }
+        
+        // Point straight ahead parallel to the Y axis to keep the warp center aligned
+        // and eliminate any camera yaw/pitch swivels relative to the tunnel direction
+        localCamLook = new THREE.Vector3(localCamPos.x, this.localYOffset + 30.0, localCamPos.z);
         
         rocket.updateMatrixWorld();
         const worldCamPos = localCamPos.clone().applyMatrix4(rocket.matrixWorld);
@@ -81,24 +109,24 @@ class CameraRigController {
     }
     
     // 2. Perform smooth interpolation (lerp) with dynamic speed per phase
-    const isFlight = (sc === "WARP" || sc === "INITIAL" || sc === "SNAP_BACK" || sc === "REENTRY" || (sc === "STORM" && elapsed < 19.5));
+    const isFlight = (sc === "WARP" || sc === "INITIAL" || sc === "SNAP_BACK" || sc === "REENTRY");
     
     if (isFlight) {
       // Direct lock-on for onboard hull camera to prevent lag at high speeds
       this.currentPos.copy(this.targetPos);
       this.currentLook.copy(this.targetLook);
       
-      // Lock camera's up vector to the rocket's local +Z axis ONLY during WARP/INITIAL to prevent flips during snapback/reentry pitch maneuvers
-      if (rocket && (sc === "WARP" || sc === "INITIAL")) {
+      // Lock camera's up vector to the rocket's local +Z axis during WARP/INITIAL/SNAP_BACK to prevent flips/rolls
+      if (rocket && (sc === "WARP" || sc === "INITIAL" || sc === "SNAP_BACK")) {
         const localCamUp = new THREE.Vector3(0.0, 0.0, 1.0);
         const worldCamUp = localCamUp.clone().applyQuaternion(rocket.quaternion);
         camera.up.copy(worldCamUp);
       } else {
-        // Stabilized upright view for SNAP_BACK, REENTRY, and STORM flight phases
+        // Stabilized upright view for REENTRY and STORM flight phases
         camera.up.lerp(new THREE.Vector3(0.0, 1.0, 0.0), 0.1);
       }
     } else {
-      // Smooth detach transition during landing & manual & storm exit (after 19.5s)
+      // Smooth detach transition during landing & manual & storm exit (after storm entry)
       this.lerpSpeed = 0.04;
       this.currentPos.lerp(this.targetPos, this.lerpSpeed);
       this.currentLook.lerp(this.targetLook, this.lerpSpeed);
@@ -109,36 +137,6 @@ class CameraRigController {
     
     // Apply interpolated values to camera
     camera.position.copy(this.currentPos);
-    
-    // 3. Add non-cumulative multi-frequency noise camera shake
-    let shakeFactor = 0.0;
-    let frequency = 1.0;
-    
-    if (sc === "WARP") {
-      shakeFactor = ENGINE_STATE.warpProgress * CONFIG.shake.warp.amp;
-      frequency = CONFIG.shake.warp.freq;
-    } else if (sc === "REENTRY") {
-      shakeFactor = ENGINE_STATE.atmosphereFriction * CONFIG.shake.reentry.amp;
-      frequency = CONFIG.shake.reentry.freq;
-    } else if (sc === "STORM") {
-      shakeFactor = CONFIG.shake.storm.amp;
-      frequency = CONFIG.shake.storm.freq;
-    } else if (sc === "LANDING") {
-      shakeFactor = this.shakeIntensity * CONFIG.shake.landing.amp;
-      frequency = CONFIG.shake.landing.freq;
-    }
-    
-    if (shakeFactor > 0.0) {
-      const timeScale = elapsed * frequency;
-      // Multi-octave sinusoidal offsets to simulate engine vibration and aerodynamic drag
-      const dx = Math.sin(timeScale) * Math.cos(timeScale * 0.7) * shakeFactor;
-      const dy = Math.cos(timeScale * 1.3) * Math.sin(timeScale * 0.4) * shakeFactor;
-      const dz = Math.sin(timeScale * 0.9) * Math.cos(timeScale * 1.6) * shakeFactor;
-      
-      camera.position.x += dx;
-      camera.position.y += dy;
-      camera.position.z += dz;
-    }
     
     camera.lookAt(this.currentLook);
   }

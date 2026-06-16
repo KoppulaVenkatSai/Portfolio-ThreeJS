@@ -6,7 +6,7 @@ const WarpShaders = {
   stars: {
     vertex: `
       uniform float uWarpProgress;
-      uniform float uTime;
+      uniform float uWarpOffset;
       uniform vec3 uCameraPos;
       attribute float aSpeed;
       attribute float aAngle;
@@ -21,15 +21,19 @@ const WarpShaders = {
         vSpeed = aSpeed;
         vWarpProgress = uWarpProgress;
         
-        // Calculate the base Z position, animated by time
-        float zBase = position.z - (uWarpProgress * aSpeed * uTime * 220.0);
+        // Calculate the base Z position, animated by the accumulated warp offset
+        float zBase = position.z - (aSpeed * uWarpOffset);
         
         // Wrap Z base to keep stars in the tunnel [-500, 500]
         zBase = mod(zBase + 500.0, 1000.0) - 500.0;
         
         // Spiral curve position based on Z coordinate (distance from camera)
-        float spiral = aAngle + uWarpProgress * 4.5 * log(1.0 + (500.0 - zBase) * 0.012);
+        // Reduced from 2.8 to 0.9 to turn down the dramatic rotation while keeping stars curvy
+        float spiral = aAngle + uWarpProgress * 0.9 * log(1.0 + (500.0 - zBase) * 0.015);
+        
         float r = length(position.xy);
+        // Spread stars wider in the background when not at warp speed
+        r = mix(r * 2.5, r, clamp(uWarpProgress / 0.2, 0.0, 1.0));
         
         // Center the stars relative to the camera position
         vec3 pos = vec3(
@@ -62,6 +66,7 @@ const WarpShaders = {
       }
     `,
     fragment: `
+      uniform float uStarsOpacity;
       varying vec3 vColor;
       varying float vOpacity;
       varying float vAngle;
@@ -69,6 +74,11 @@ const WarpShaders = {
       varying float vWarpProgress;
       
       void main() {
+        // Gradually reduce the density of stars as warp progress decays (only keep ~29% in space)
+        float starHash = fract(vSpeed * 73.849);
+        float densityThreshold = mix(0.18, 1.0, clamp(vWarpProgress / 0.15, 0.0, 1.0));
+        if (starHash > densityThreshold) discard;
+
         // Rotate gl_PointCoord around (0.5, 0.5) by vAngle
         vec2 p = gl_PointCoord - vec2(0.5);
         float cosA = cos(vAngle);
@@ -76,8 +86,8 @@ const WarpShaders = {
         vec2 rp = vec2(p.x * cosA - p.y * sinA, p.x * sinA + p.y * cosA);
         
         // Progressive stretch: start as round points (halfLength=0) and stretch into long capsules
-        float halfLength = (0.02 + vSpeed * 0.22) * vWarpProgress;
-        float thickness = mix(0.12, 0.012, vWarpProgress); // Start thicker/rounder, get thin/sharp at warp speed
+        float halfLength = (0.05 + vSpeed * 0.55) * vWarpProgress;
+        float thickness = mix(0.12, 0.008, vWarpProgress); // Start thicker/rounder, get thin/sharp at warp speed
         
         // Distance to the line segment from (-halfLength, 0) to (halfLength, 0)
         float dist = length(vec2(rp.x - clamp(rp.x, -halfLength, halfLength), rp.y));
@@ -85,7 +95,7 @@ const WarpShaders = {
         // Volumetric glow and core falloff (tightened to keep stars sharp and distinct)
         float core = smoothstep(thickness, 0.0, dist);
         float glow = exp(-dist * 55.0) * 0.60;
-        float intensity = (core * 0.60 + glow * 0.40) * vOpacity;
+        float intensity = (core * 0.60 + glow * 0.40) * vOpacity * uStarsOpacity;
         
         if (intensity < 0.01) discard;
         
@@ -111,6 +121,7 @@ const WarpShaders = {
     fragment: `
       uniform float uTime;
       uniform float uWarpProgress;
+      uniform float uStarsOpacity;
       varying vec2 vUv;
       varying vec3 vPosition;
       
@@ -147,7 +158,7 @@ const WarpShaders = {
         float angle = vUv.x * 6.28318;
         
         // Spiraling coordinates (slower rotation and scroll to reduce eye of storm hyperactivity)
-        vec2 uv = vec2(angle + vUv.y * 2.5 - uTime * 2.0, vUv.y * 1.0 - uTime * 4.0);
+        vec2 uv = vec2(angle + vUv.y * 2.5 - uTime * 0.2, vUv.y * 1.0 - uTime * 5.0);
         
         // Multi-layered storm clouds noise
         float n1 = snoise(uv * 1.2);
@@ -156,7 +167,7 @@ const WarpShaders = {
         
         // Smoothly fade out the tunnel opacity towards the far end to blend into deep space
         float tunnelFade = smoothstep(0.85, 0.35, vUv.y);
-        float opacity = stormCloud * 0.6 * tunnelFade * uWarpProgress;
+        float opacity = stormCloud * 0.6 * tunnelFade * uWarpProgress * uStarsOpacity;
         
         // Deep space storm colors: dark violet to muted cobalt blue (toned down to highlight stars)
         vec3 colorBg = vec3(0.01, 0.005, 0.02);
@@ -205,13 +216,16 @@ export class WarpSystem {
     this.starGeom.setAttribute("aAngle", new THREE.Float32BufferAttribute(angles, 1));
     this.starGeom.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
     
+    this.warpOffset = 0.0;
+
     this.starMat = new THREE.ShaderMaterial({
       vertexShader: WarpShaders.stars.vertex,
       fragmentShader: WarpShaders.stars.fragment,
       uniforms: {
         uWarpProgress: { value: 0.0 },
-        uTime: { value: 0.0 },
-        uCameraPos: { value: new THREE.Vector3() }
+        uWarpOffset: { value: 0.0 },
+        uCameraPos: { value: new THREE.Vector3() },
+        uStarsOpacity: { value: 1.0 }
       },
       transparent: true,
       depthWrite: false,
@@ -250,8 +264,9 @@ export class WarpSystem {
       fragmentShader: WarpShaders.stars.fragment,
       uniforms: {
         uWarpProgress: { value: 0.0 },
-        uTime: { value: 0.0 },
-        uCameraPos: { value: new THREE.Vector3() }
+        uWarpOffset: { value: 0.0 },
+        uCameraPos: { value: new THREE.Vector3() },
+        uStarsOpacity: { value: 1.0 }
       },
       transparent: true,
       depthWrite: false,
@@ -270,7 +285,8 @@ export class WarpSystem {
       fragmentShader: WarpShaders.tunnel.fragment,
       uniforms: {
         uTime: { value: 0.0 },
-        uWarpProgress: { value: 0.0 }
+        uWarpProgress: { value: 0.0 },
+        uStarsOpacity: { value: 1.0 }
       },
       transparent: true,
       depthWrite: false,
@@ -283,29 +299,38 @@ export class WarpSystem {
     this.scene.add(this.tunnel);
   }
   
-  update(elapsed, camera) {
+  update(elapsed, camera, delta) {
     const sc = ENGINE_STATE.currentScene;
-    const showStars = (sc === "WARP" || sc === "INITIAL");
+    const showStars = (sc === "WARP" || sc === "INITIAL" || ENGINE_STATE.starsOpacity > 0.01);
     this.stars.visible = showStars;
     this.centerStars.visible = showStars;
     this.tunnel.visible = showStars;
     
+    if (sc === "INITIAL") {
+      this.warpOffset = 0.0;
+    } else if (delta) {
+      // Accumulate warp offset incrementally on CPU to avoid direction reversal on speed changes
+      this.warpOffset += (0.015 + ENGINE_STATE.warpProgress * 0.985) * delta * 480.0;
+    }
+    
     if (camera) {
+      // Centroid of warp particles and cylinder is centered on camera's position (both X/Y and Z)
       this.starMat.uniforms.uCameraPos.value.copy(camera.position);
       this.centerMat.uniforms.uCameraPos.value.copy(camera.position);
       
-      // Center the warp cylinder around the camera coordinate
-      this.tunnel.position.x = camera.position.x;
-      this.tunnel.position.y = camera.position.y;
+      this.tunnel.position.copy(camera.position);
     }
     
     this.starMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;
-    this.starMat.uniforms.uTime.value = elapsed;
+    this.starMat.uniforms.uWarpOffset.value = this.warpOffset;
+    this.starMat.uniforms.uStarsOpacity.value = ENGINE_STATE.starsOpacity;
     
     this.centerMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;
-    this.centerMat.uniforms.uTime.value = elapsed;
+    this.centerMat.uniforms.uWarpOffset.value = this.warpOffset;
+    this.centerMat.uniforms.uStarsOpacity.value = ENGINE_STATE.starsOpacity;
     
     this.cylinderMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;
     this.cylinderMat.uniforms.uTime.value = elapsed;
+    this.cylinderMat.uniforms.uStarsOpacity.value = ENGINE_STATE.starsOpacity;
   }
 }

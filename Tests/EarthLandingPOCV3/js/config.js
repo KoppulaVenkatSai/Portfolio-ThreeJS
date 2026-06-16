@@ -13,22 +13,27 @@ export const CONFIG = {
     warpMaxSpeed: 8.0,
     warpEnd: 10.0,
     
-    // Beat 1: Snap-back exosphere
-    snapBackStart: 10.05,
-    snapBackDuration: 1.67, // rapid scale to horizon
+    // New sequence phases
+    snapBackStart: 16.8, // Earth silhouette reveal start
+    snapBackDuration: 3.0,
     
-    // Beat 2: Reentry burn
-    reentryStart: 12.0,
+    earthGrowStart: 16.8, // Earth grow and light sweep
+    earthGrowDuration: 7.0,
+    
+    rocketFlyPastStart: 28.8, // Rocket fly past (shifted by +5.0s for Earth illumination)
+    rocketFlyPastDuration: 2.0,
+    
+    reentryStart: 30.8, // Reentry burn (shifted by +5.0s)
     reentryDuration: 4.0,
     
     // Beat 3: Cloud Piercer
-    stormStart: 16.0,
+    stormStart: 34.8, // Shifted by +5.0s
     stormDuration: 6.0,
     
     // Beat 4: Monolith reveal & landing
-    landingStart: 22.0,
-    touchdownTime: 29.8,
-    manualControlTime: 30.8
+    landingStart: 40.8, // Shifted by +5.0s
+    touchdownTime: 48.6, // Shifted by +5.0s
+    manualControlTime: 49.6 // Shifted by +5.0s
   },
 
   // Color mappings
@@ -79,10 +84,10 @@ export const CONFIG = {
 
   // Noise & vibration factors
   shake: {
-    warp: { freq: 35.0, amp: 0.003 },
-    reentry: { freq: 30.0, amp: 0.012 },
-    storm: { freq: 45.0, amp: 0.06 }, // Reduced turbulence
-    landing: { freq: 15.0, amp: 0.008 },
-    touchdown: { duration: 1.5, maxAmp: 0.4 } // Reduced touchdown impact
+    warp: { freq: 35.0, amp: 0.0 },
+    reentry: { freq: 30.0, amp: 0.0 },
+    storm: { freq: 45.0, amp: 0.0 },
+    landing: { freq: 15.0, amp: 0.0 },
+    touchdown: { duration: 1.5, maxAmp: 0.0 }
   }
 };

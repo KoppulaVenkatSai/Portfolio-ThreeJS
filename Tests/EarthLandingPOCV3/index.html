@@ -37,9 +37,45 @@
 
   <!-- Sci-Fi HUD HUD Telemetry Overlay -->
   <div id="hud-container">
-    <div class="hud-header">
-      <div class="hud-title">V3_DESCENT_SYSTEM</div>
-      <div id="hud-telemetry" class="hud-status">STANDBY // READY FOR IGNITION</div>
+    <!-- Unified Top HUD Status Bar -->
+    <div class="hud-top-bar">
+      <!-- Left: System & Scene Status -->
+      <div class="hud-top-section system-info">
+        <div class="hud-title">V3_DESCENT_SYSTEM</div>
+        <div id="hud-telemetry" class="hud-status">STANDBY // READY FOR IGNITION</div>
+      </div>
+      
+      <!-- Center: Timeline Tracker -->
+      <div class="hud-top-section timeline-info">
+        <div class="hud-timeline-track">
+          <div id="hud-timeline-progress"></div>
+          <div id="hud-timeline-marker"></div>
+          
+          <!-- Segment Indicators -->
+          <div class="hud-timeline-step" style="left: 0%;">WARP</div>
+          <div class="hud-timeline-step" style="left: 33%;">SNAP-BACK</div>
+          <div class="hud-timeline-step" style="left: 39%;">REENTRY</div>
+          <div class="hud-timeline-step" style="left: 52%;">STORM</div>
+          <div class="hud-timeline-step" style="left: 71%;">LANDING</div>
+          <div class="hud-timeline-step" style="left: 97%;">MANUAL</div>
+        </div>
+      </div>
+      
+      <!-- Right: Real-time Telemetry Readouts -->
+      <div class="hud-top-section telemetry-info">
+        <div class="telemetry-bar-item">
+          <span class="label">ALTITUDE</span>
+          <span id="hud-altitude" class="value">-- m</span>
+        </div>
+        <div class="telemetry-bar-item">
+          <span class="label">VELOCITY</span>
+          <span id="hud-velocity" class="value">-- m/s</span>
+        </div>
+        <div class="telemetry-bar-item">
+          <span class="label">VECTOR COORDS</span>
+          <span id="hud-coords" class="value">X: --, Y: --, Z: --</span>
+        </div>
+      </div>
     </div>
 
     <div class="hud-footer">

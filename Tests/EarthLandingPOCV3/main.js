@@ -74,12 +74,66 @@ const earthMesh = new THREE.Mesh(earthGeom, earthMat);
 earthGroup.add(earthMesh);
 
 // Shared Lights
-const spaceAmbient = new THREE.AmbientLight(0x0a0a0f, 0.15); // Lowered from 0.5 to keep deep space shadows rich
+const spaceAmbient = new THREE.AmbientLight(0xffffff, 0.9); // Raised ambient light for clean blockout visibility
 spaceGroup.add(spaceAmbient);
 
-const spaceSun = new THREE.DirectionalLight(0xffffff, 1.3); // Lowered from 2.5 to prevent blowing out highlights on chrome rocket
+const spaceSun = new THREE.DirectionalLight(0xffffff, 1.5); // Prevent blowing out highlights on chrome rocket
+spaceSun.name = "spaceSun";
 spaceSun.position.set(-100, 150, 100);
 spaceGroup.add(spaceSun);
+
+const earthFrontLight = new THREE.DirectionalLight(0xffffff, 0.0);
+earthFrontLight.name = "earthFrontLight";
+spaceGroup.add(earthFrontLight);
+
+// Hemisphere Fill Light to keep the shadow areas lit
+const hemisphereLight = new THREE.HemisphereLight(0x7dd3fc, 0x1e293b, 1.2); // sky blue, dark gray, intensity
+scene.add(hemisphereLight);
+
+// Rocket green searchlight pointing downwards in world coordinates
+export const searchLight = new THREE.SpotLight(0x00ffaa, 20.0, 180, Math.PI / 5, 0.4, 0.5);
+searchLight.castShadow = true;
+searchLight.shadow.mapSize.width = 1024;
+searchLight.shadow.mapSize.height = 1024;
+scene.add(searchLight);
+scene.add(searchLight.target);
+
+// Ocean coordinates landing target grid helper (green)
+export const oceanGrid = new THREE.GridHelper(800, 80, 0x00ff66, 0x032210);
+oceanGrid.position.y = 0.2;
+oceanGroup.add(oceanGrid);
+
+// Flight Trajectory descent path line (neon green)
+const pathPoints = [
+  new THREE.Vector3(1.4, 120, 2.0), // deep space start
+  new THREE.Vector3(1.4, 45, 2.0),  // storm entry
+  new THREE.Vector3(0.7, 20, -21.5), // midway descent
+  new THREE.Vector3(0.0, 2.9, -45.0) // landing target
+];
+const pathCurve = new THREE.CatmullRomCurve3(pathPoints);
+const pathGeom = new THREE.BufferGeometry().setFromPoints(pathCurve.getPoints(80));
+const pathMat = new THREE.LineDashedMaterial({
+  color: 0x00ffaa,
+  dashSize: 2.5,
+  gapSize: 1.5
+});
+export const trajectoryLine = new THREE.Line(pathGeom, pathMat);
+trajectoryLine.computeLineDistances();
+scene.add(trajectoryLine);
+
+// Circular target ring on the landing zone
+const targetRingGeom = new THREE.RingGeometry(4.0, 4.4, 32);
+const targetRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+export const targetRing = new THREE.Mesh(targetRingGeom, targetRingMat);
+targetRing.rotation.x = -Math.PI / 2;
+targetRing.position.set(0.0, 0.25, -45.0);
+oceanGroup.add(targetRing);
+
+// Vertical laser beacon connecting rocket to its ground projection point
+const beaconGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)]);
+const beaconMat = new THREE.LineBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.65 });
+export const beaconLine = new THREE.Line(beaconGeom, beaconMat);
+scene.add(beaconLine);
 
 // Camera Initial Locking
 camera.position.copy(CONFIG.camera.initial.pos);
@@ -126,7 +180,7 @@ const RingShader = {
       float edge = step(0.95, vUv.y) + step(vUv.y, 0.05);
       
       float intensity = (arc * 2.0 + edge * 0.4) * radialGlow;
-      vec3 color = vec3(0.0, 0.75, 1.0); // Neon blue HUD color
+      vec3 color = vec3(0.0, 1.0, 0.4); // Neon green HUD color
       
       gl_FragColor = vec4(color, intensity * uOpacity);
     }
@@ -157,13 +211,14 @@ loadingManager.onLoad = () => {
   
   // Setup timeline once models are loaded
   cinematicTimeline = buildCinematicTimeline(rocketModel, earthGroup, spaceGroup, oceanGroup, renderer, camera);
+  window.cinematicTimeline = cinematicTimeline;
   
   // Connect leg animation triggers
   cinematicTimeline.add(() => {
     landingLegs.forEach((leg) => {
-      gsap.to(leg.scale, { x: 1.0, y: 1.0, z: 1.0, duration: 1.5, ease: "back.out(1.7)" });
+      leg.scale.set(1.0, 1.0, 1.0);
     });
-  }, CONFIG.timeline.landingStart + 5.0); // deploy legs 5s after exiting clouds
+  }, CONFIG.timeline.landingStart + 5.0); // deploy legs instantly 5s after exiting clouds
   
   UI_MANAGER.hideLoader(() => {
     startSequence();
@@ -174,7 +229,7 @@ loadingManager.onError = (url) => {
   console.error("Critical System Load Failure on: " + url);
 };
 
-// Configure Rocket Chrome properties and locate landing legs
+// Configure Rocket Matte Grey properties and locate landing legs
 function configureRocketModel(model) {
   model.traverse((node) => {
     if (node.name && (node.name.toLowerCase().includes("leg") || node.name.toLowerCase().includes("foot") || node.name.toLowerCase().includes("gear") || node.name.toLowerCase().includes("strut"))) {
@@ -188,10 +243,11 @@ function configureRocketModel(model) {
       if (node.material) {
         const mats = Array.isArray(node.material) ? node.material : [node.material];
         mats.forEach((mat) => {
-          mat.metalness = 1.0;
-          mat.roughness = 0.08;
-          mat.envMap = cubeRenderTarget.texture; // Real-time reflections
-          mat.envMapIntensity = 2.5;
+          mat.metalness = 0.8;
+          mat.roughness = 0.2;
+          if (mat.color) mat.color.setHex(0xaaaaaa); // Solid neutral gray matte color
+          mat.envMap = cubeRenderTarget.texture; // Enable real-time reflection
+          mat.envMapIntensity = 2.0;
           mat.needsUpdate = true;
           
           // Inject custom diagnostic scan overlay
@@ -236,11 +292,11 @@ function configureRocketModel(model) {
                 float vertLine = step(0.992, cos(angle * 8.0 + uAnalysisTime * 0.5));
                 
                 // 5. Combined HUD scan glow
-                vec3 diagnosticBlue = vec3(0.0, 0.75, 1.0); // Neon blue HUD
+                vec3 diagnosticGreen = vec3(0.0, 1.0, 0.4); // Neon green HUD
                 float totalGlow = (ring * 1.5 + arcRing * 2.5 + gridDots * 0.9 + vertLine * 0.65) * uAnalysisActive;
                 
-                gl_FragColor.rgb = mix(gl_FragColor.rgb, diagnosticBlue, totalGlow * 0.55);
-                gl_FragColor.rgb += diagnosticBlue * totalGlow * 1.4;
+                gl_FragColor.rgb = mix(gl_FragColor.rgb, diagnosticGreen, totalGlow * 0.55);
+                gl_FragColor.rgb += diagnosticGreen * totalGlow * 1.4;
               }
             `;
             shader.fragmentShader = shader.fragmentShader.replace(entry, replacement);
@@ -330,12 +386,25 @@ function startSequence() {
 
 // Tick loop
 const clock = new THREE.Clock();
+let sequenceTime = 0.0;
+
 function tick() {
-  const elapsed = clock.getElapsedTime();
   const delta = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
   ENGINE_STATE.globalTime = elapsed;
+  if (cinematicTimeline) {
+    ENGINE_STATE.timelineTime = cinematicTimeline.time();
+  } else {
+    ENGINE_STATE.timelineTime = 0.0;
+  }
   
-  UI_MANAGER.tick();
+  if (ENGINE_STATE.currentScene !== "INITIAL") {
+    sequenceTime += delta;
+  } else {
+    sequenceTime = 0.0;
+  }
+  
+  UI_MANAGER.tick(rocketModel);
   
   // Update dynamic cube reflection camera
   if (rocketModel && cubeCamera) {
@@ -346,16 +415,48 @@ function tick() {
   }
   
   // Update camera rig continuous movement
-  CAMERA_RIG.update(camera, rocketModel, elapsed, delta);
+  CAMERA_RIG.update(camera, rocketModel, sequenceTime, delta);
   
+  // Update searchlight target and position
+  if (rocketModel && searchLight) {
+    searchLight.position.copy(rocketModel.position);
+    searchLight.target.position.set(rocketModel.position.x, rocketModel.position.y - 60.0, rocketModel.position.z);
+  }
+
+  // Update vertical beacon laser line to project rocket's ground location
+  if (rocketModel && beaconLine) {
+    const rPos = rocketModel.position;
+    const targetY = (ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL") ? 0.2 : -15.0;
+    const points = [
+      rPos.clone(),
+      new THREE.Vector3(rPos.x, targetY, rPos.z)
+    ];
+    beaconLine.geometry.setFromPoints(points);
+    
+    // Only show beacon line during descent when rocket is visible
+    const isDescent = (ENGINE_STATE.currentScene === "REENTRY" || ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING");
+    beaconLine.visible = isDescent && rocketModel.visible;
+  }
+
+  // Update visibility of flight path trajectory line, target ring, and searchlight
+  if (trajectoryLine) {
+    trajectoryLine.visible = (ENGINE_STATE.currentScene !== "WARP" && ENGINE_STATE.currentScene !== "INITIAL" && ENGINE_STATE.currentScene !== "SNAP_BACK");
+  }
+  if (targetRing) {
+    targetRing.visible = (ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL");
+  }
+  if (searchLight) {
+    // Only show searchlight when the rocket is visible and not in warp/silhouette phase
+    searchLight.visible = rocketModel && rocketModel.visible && (ENGINE_STATE.currentScene !== "WARP" && ENGINE_STATE.currentScene !== "INITIAL" && ENGINE_STATE.currentScene !== "SNAP_BACK");
+  }
+
   // Update rocket hull analysis shader uniforms (disabled during Warp and Initial phases)
   const isAnalysisActive = (ENGINE_STATE.currentScene !== "WARP" && ENGINE_STATE.currentScene !== "INITIAL" && ENGINE_STATE.currentScene !== "LANDING" && ENGINE_STATE.currentScene !== "MANUAL");
   const targetActive = isAnalysisActive ? 1.0 : 0.0;
   
   analysisMaterials.forEach((mat) => {
     if (mat.userData.shader) {
-      mat.userData.shader.uniforms.uAnalysisTime.value = elapsed;
-      // Smoothly interpolate the active state
+      mat.userData.shader.uniforms.uAnalysisTime.value = sequenceTime;
       const currentVal = mat.userData.shader.uniforms.uAnalysisActive.value;
       mat.userData.shader.uniforms.uAnalysisActive.value = THREE.MathUtils.lerp(currentVal, targetActive, 0.06);
     }
@@ -364,60 +465,25 @@ function tick() {
   // Update 3D holographic diagnostic rings uniforms and positions
   if (diagnosticGroup) {
     ringMaterials.forEach((mat) => {
-      mat.uniforms.uTime.value = elapsed;
+      mat.uniforms.uTime.value = sequenceTime;
       const currentOpacity = mat.uniforms.uOpacity.value;
       mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(currentOpacity, targetActive * 0.75, 0.06);
     });
     
     // Slide the rings up and down along Y axis using independent speeds and offsets
-    diagnosticGroup.children[0].position.y = 1.5 + Math.sin(elapsed * 1.5) * 1.0;
-    diagnosticGroup.children[1].position.y = -0.5 + Math.cos(elapsed * 2.2) * 1.2;
-    diagnosticGroup.children[2].position.y = -2.2 + Math.sin(elapsed * 0.9 + 1.5) * 0.8;
-  }
-  
-  // Update modular scene system parameters
-  warpSystem.update(elapsed, camera);
-  atmosphereSystem.update(elapsed);
-  landingSystem.update(elapsed, rocketModel);
-  
-  if (stormSystem) {
-    stormSystem.update(elapsed, delta, rocketModel);
-  }
-  
-  // Dynamic rocket color styling transitions based on friction heating
-  if (rocketModel && (ENGINE_STATE.currentScene === "REENTRY" || ENGINE_STATE.currentScene === "STORM")) {
-    // Animate hull metal color from white/chrome -> glowing yellow/orange -> black soot silhouette
-    const factor = ENGINE_STATE.atmosphereFriction;
-    if (ENGINE_STATE.currentScene === "REENTRY") {
-      reentryHullColor.setRGB(
-        1.0,
-        THREE.MathUtils.lerp(1.0, 0.35, factor),
-        THREE.MathUtils.lerp(1.0, 0.05, factor)
-      );
-    } else {
-      // Dark grey soot silhouette in storm for visibility
-      reentryHullColor.setHex(0x3c3e45);
+    if (diagnosticGroup.children.length >= 3) {
+      diagnosticGroup.children[0].position.y = 1.5 + Math.sin(sequenceTime * 1.5) * 1.0;
+      diagnosticGroup.children[1].position.y = -0.5 + Math.cos(sequenceTime * 2.2) * 1.2;
+      diagnosticGroup.children[2].position.y = -2.2 + Math.sin(sequenceTime * 0.9 + 1.5) * 0.8;
     }
-    
-    rocketModel.traverse((node) => {
-      if (node.isMesh && node.material) {
-        const mats = Array.isArray(node.material) ? node.material : [node.material];
-        mats.forEach((mat) => {
-          if (mat.color) mat.color.copy(reentryHullColor);
-        });
-      }
-    });
-  } else if (rocketModel && reentryHullColor.r < 1.0) {
-    // Restore chrome color upon exiting storm
-    reentryHullColor.setHex(0xffffff);
-    rocketModel.traverse((node) => {
-      if (node.isMesh && node.material) {
-        const mats = Array.isArray(node.material) ? node.material : [node.material];
-        mats.forEach((mat) => {
-          if (mat.color) mat.color.copy(reentryHullColor);
-        });
-      }
-    });
+  }
+
+  // Update modular scene system parameters
+  warpSystem.update(sequenceTime, camera, delta);
+  atmosphereSystem.update(sequenceTime);
+  landingSystem.update(sequenceTime, rocketModel);
+  if (stormSystem) {
+    stormSystem.update(sequenceTime, delta, rocketModel);
   }
   
   // Thruster Flame scale/opacity updates
@@ -452,6 +518,15 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   composer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space" || e.code === "Enter") {
+    if (cinematicTimeline && cinematicTimeline.paused()) {
+      cinematicTimeline.resume();
+      console.log("[INPUT] Resumed cinematic timeline via keypress.");
+    }
+  }
 });
 
 tick();
