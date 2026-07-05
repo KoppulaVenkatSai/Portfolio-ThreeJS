@@ -245,6 +245,8 @@ export class LandingSystem {
     this.hoverPool = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), this.poolMat);
     this.hoverPool.rotation.x = -Math.PI / 2;
     this.hoverPool.position.set(0, 0.1, -45);
+    
+    this.createCottonCandyClouds();
   }
   
   configureMonolith(monolithScene) {
@@ -286,6 +288,33 @@ export class LandingSystem {
     this.scene.add(this.ocean);
   }
   
+  createCottonCandyClouds() {
+    this.cloudsGroup = new THREE.Group();
+    this.scene.add(this.cloudsGroup);
+    
+    const colors = [0xffeef5, 0xf5e6ff, 0xe0f2fe, 0xf8fafc];
+    
+    for (let i = 0; i < 20; i++) {
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      const scale = 1.0 + Math.random() * 1.5;
+      const cloud = createCottonCandyCloud(color, scale);
+      
+      // Scatter in the sky around the descent corridor
+      const x = THREE.MathUtils.randFloatSpread(250);
+      const y = 15.0 + Math.random() * 45.0; // cloud layer between Y=15 and Y=60
+      const z = -150.0 + Math.random() * 200.0;
+      
+      cloud.position.set(x, y, z);
+      cloud.userData = {
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.05 + Math.random() * 0.1,
+        startY: y
+      };
+      
+      this.cloudsGroup.add(cloud);
+    }
+  }
+  
   update(elapsed, rocket) {
     this.oceanMat.uniforms.uTime.value = 0.0; // Freeze ocean wave movements
     
@@ -301,6 +330,16 @@ export class LandingSystem {
     this.stormAmbient.visible = isStormOrLanding;
     this.stormSkyLight.visible = isStormOrLanding;
     
+    if (this.cloudsGroup) {
+      this.cloudsGroup.visible = isStormOrLanding || isOcean;
+      
+      // Gentle drift for cartoonish clouds
+      this.cloudsGroup.children.forEach((cloud) => {
+        cloud.position.x += Math.sin(elapsed * 0.1 + cloud.userData.phase) * 0.02;
+        cloud.position.y = cloud.userData.startY + Math.cos(elapsed * 0.2 + cloud.userData.phase) * 0.5;
+      });
+    }
+    
     if (rocket) {
       this.oceanMat.uniforms.uThrusterIntensity.value = ENGINE_STATE.thrusterIntensity;
       this.oceanMat.uniforms.uThrusterPos.value.copy(rocket.position);
@@ -314,4 +353,47 @@ export class LandingSystem {
       this.poolMat.opacity = 0.60;
     }
   }
+}
+
+function createCottonCandyCloud(colorHex, scale) {
+  const cloudGroup = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({
+    color: colorHex,
+    roughness: 0.95,
+    metalness: 0.0,
+    emissive: colorHex,
+    emissiveIntensity: 0.12,
+    flatShading: false
+  });
+  
+  const sphereGeom = new THREE.SphereGeometry(1.0, 14, 14);
+  const numSpheres = 5 + Math.floor(Math.random() * 4);
+  
+  for (let i = 0; i < numSpheres; i++) {
+    const mesh = new THREE.Mesh(sphereGeom, mat);
+    let sScale, offset;
+    
+    if (i === 0) {
+      sScale = new THREE.Vector3(4.0, 2.5, 4.0).multiplyScalar(scale);
+      offset = new THREE.Vector3(0, 0, 0);
+    } else {
+      const r = 2.0 + Math.random() * 2.0;
+      sScale = new THREE.Vector3(r, r * 0.8, r).multiplyScalar(scale);
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 1.5 + Math.random() * 2.0;
+      offset = new THREE.Vector3(
+        Math.cos(angle) * dist,
+        THREE.MathUtils.randFloatSpread(1.0),
+        Math.sin(angle) * dist
+      );
+    }
+    
+    mesh.scale.copy(sScale);
+    mesh.position.copy(offset);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    cloudGroup.add(mesh);
+  }
+  
+  return cloudGroup;
 }

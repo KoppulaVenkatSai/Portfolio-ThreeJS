@@ -6,7 +6,7 @@ import { CAMERA_RIG } from "./camera.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 import { bloomPass } from "../main.js";
 
-export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGroup, renderer, camera) {
+export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGroup, renderer, camera, landingLegs) {
   const tl = gsap.timeline({ paused: true });
   
   // 1. SCENE X: THE WARP
@@ -14,10 +14,10 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     ENGINE_STATE.setScene("WARP");
     ENGINE_STATE.warpProgress = 0.0;
     if (bloomPass) bloomPass.strength = 0.0;
-    CAMERA_RIG.localYOffset = -1.0;
+    CAMERA_RIG.localYOffset = -8.0;
     if (rocket) {
       rocket.visible = true;
-      rocket.rotation.set(Math.PI / 2, 0, 0);
+      rocket.rotation.set(Math.PI / 2, 0, 5 * Math.PI / 180);
     }
     if (spaceGroup) spaceGroup.visible = true;
     if (oceanGroup) oceanGroup.visible = false;
@@ -136,8 +136,13 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
   tl.add(() => {
     ENGINE_STATE.setScene("SNAP_BACK");
     
-    // Hide the rocket entirely
-    if (rocket) rocket.visible = false;
+    // Hide the rocket entirely and reset its rotation/position to align along Y-axis
+    if (rocket) {
+      rocket.visible = false;
+      rocket.rotation.set(0.0, 0.0, 0.0);
+      rocket.position.set(-1.1, -1.0, -8.6);
+      rocket.updateMatrixWorld(true);
+    }
     
     // Complete light blackout (nothing is visible, completely black)
     if (spaceAmbient) spaceAmbient.intensity = 0.0;
@@ -147,30 +152,23 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (earthFrontLight) earthFrontLight.intensity = 0.0;
     
     // Position a small Earth in the middle of the screen
-    if (earthGroup && rocket) {
+    if (earthGroup) {
       earthGroup.visible = true;
       earthGroup.scale.set(0.12, 0.12, 0.12); // starts small
+      earthGroup.position.set(1.4, 296.5, 2.0);
       
-      rocket.updateMatrixWorld();
-      const earthPos = new THREE.Vector3(0, 300, 0).applyMatrix4(rocket.matrixWorld);
-      earthGroup.position.copy(earthPos);
-      
-      // Position spaceSun behind and slightly above the Earth to prepare it (starts unlit)
+      // Position spaceSun behind and slightly above the Earth (starts unlit)
       if (spaceSun) {
-        // Offset (0, 130, 80) in rocket's local space relative to Earth
-        // Earth is at (0, 300, 0) locally, so sun is at (0, 430, 80) locally
-        const localSunPos = new THREE.Vector3(0, 430, 80);
-        const sunPos = localSunPos.applyMatrix4(rocket.matrixWorld);
-        spaceSun.position.copy(sunPos);
+        // Earth is at (1.4, 296.5, 2.0), offset rotated to top side (behind): dx = 0, dy = 130, dz = -80
+        spaceSun.position.set(1.4, 426.5, -78.0);
         spaceSun.target = earthGroup;
         spaceSun.intensity = 0.0; // Starts unlit
       }
 
       // Position earthFrontLight in front-top-right relative to the rocket, pointing to Earth
       if (earthFrontLight) {
-        const localLightPos = new THREE.Vector3(150, 150, 150);
-        const lightPos = localLightPos.applyMatrix4(rocket.matrixWorld);
-        earthFrontLight.position.copy(lightPos);
+        // Rocket is at (1.4, -3.5, 2.0), offset rotated 90 deg clockwise around Y: dx = -150, dy = -150, dz = -150
+        earthFrontLight.position.set(-148.6, 146.5, -148.0);
         earthFrontLight.target = earthGroup;
         earthFrontLight.intensity = 0.0; // Starts unlit
       }
@@ -217,133 +215,143 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     console.log("[TIMELINE] Paused just before atmospheric entry phase.");
   }, 30.8);
 
-  // 4. BEAT 3: ROCKET FLY-PAST
-  tl.add(() => {
-    if (rocket) {
-      rocket.visible = true;
-      // Ensure the rocket is rotated facing forward (along +Y)
-      rocket.rotation.set(Math.PI / 2, 0, 0);
-    }
-  }, CONFIG.timeline.rocketFlyPastStart);
-
-  // Camera retreats back to the base of the rocket
-  tl.to(CAMERA_RIG, {
-    localYOffset: -1.0,
-    duration: CONFIG.timeline.rocketFlyPastDuration,
-    ease: "power3.out"
-  }, CONFIG.timeline.rocketFlyPastStart);
-
-  // Move the rocket forward in world space past the camera (Z: 2.0 -> 50.0)
-  if (rocket) {
-    tl.to(rocket.position, {
-      z: 50.0,
-      duration: CONFIG.timeline.rocketFlyPastDuration,
-      ease: "power3.out"
-    }, CONFIG.timeline.rocketFlyPastStart);
-  }
-
-  // 5. BEAT 4: ATMOSPHERIC ENTRY (PLASMA BURN)
+  // 3. BEAT 2: FLY TO EARTH ARC (Starts at 30.8s, duration 6.0s)
+  // Camera remains completely stationary during this curvy rocket flight phase
   tl.add(() => {
     ENGINE_STATE.setScene("REENTRY");
-    ENGINE_STATE.atmosphereFriction = 0.0;
-  }, CONFIG.timeline.reentryStart);
-  
-  tl.to(ENGINE_STATE, {
-    atmosphereFriction: 1.0,
-    duration: CONFIG.timeline.reentryDuration,
-    ease: "none"
-  }, CONFIG.timeline.reentryStart);
-
-  // Slowly move the rocket towards the Earth along the world +Z axis (Z: 50.0 -> 70.0)
-  if (rocket) {
-    tl.to(rocket.position, {
-      z: 70.0,
-      duration: CONFIG.timeline.reentryDuration,
-      ease: "power1.inOut"
-    }, CONFIG.timeline.reentryStart);
-  }
-  
-  // 6. BEAT 5: CLOUD PIERCER
-  tl.add(() => {
-    ENGINE_STATE.setScene("STORM");
-    // Hide space elements
-    spaceGroup.visible = false;
-    // Show ocean elements (but fog is thick, so ocean is invisible at first)
-    oceanGroup.visible = true;
-    ENGINE_STATE.globalFogDensity = 0.045;
-
-    // Reset camera rig localYOffset to -1.0 so the detached storm camera correctly mounts at the engine bells
-    CAMERA_RIG.localYOffset = -1.0;
+    ENGINE_STATE.rocketArcProgress = 0.0;
+    ENGINE_STATE.cameraArcProgress = 0.0;
+    ENGINE_STATE.whiteoutOpacity = 0.0;
     
-    // Reset rocket Z position to 2.0 to align with the landing path
     if (rocket) {
-      rocket.position.set(0.0, 120.0, -45.0);
-      rocket.rotation.set(0.0, 0.0, 0.0);
+      rocket.visible = true;
+      rocket.scale.set(0.65, 0.65, 0.65);
     }
-  }, CONFIG.timeline.stormStart);
-  
-  // Move rocket down through clouds (descent along Y coordinates)
-  if (rocket) {
-    tl.to(rocket.position, {
-      y: 45.0,
-      duration: CONFIG.timeline.stormDuration,
-      ease: "none"
-    }, CONFIG.timeline.stormStart);
-    
-    // Point straight down first
-    tl.to(rocket.rotation, {
-      x: -Math.PI,
-      y: 0.0,
-      z: 0.0,
-      duration: 1.5,
-      ease: "none"
-    }, CONFIG.timeline.stormStart);
-    
-    // Turn the rocket upright (upside down relative to descent) at the end of the storm cloud entry
-    tl.to(rocket.rotation, {
-      x: 0.0,
-      y: -Math.PI / 4,
-      z: 0.0,
-      duration: 2.5,
-      ease: "none"
-    }, CONFIG.timeline.stormStart + 3.5);
-  }
-  
-  // 5. BEAT 4: MONOLITH REVEAL & LANDING
+  }, CONFIG.timeline.flyToEarthStart);
+
+  tl.to(ENGINE_STATE, {
+    rocketArcProgress: 1.0,
+    duration: CONFIG.timeline.flyToEarthDuration,
+    ease: "power1.inOut"
+  }, CONFIG.timeline.flyToEarthStart);
+
+  // 3b. BEAT 2b: CAMERA CHASE PLUNGE (Starts at 36.8s, duration 6.0s)
+  // Once the rocket has vanished, the camera starts plunging down towards the Earth
+  tl.add(() => {
+    if (rocket) {
+      rocket.visible = false; // Rocket is now barely visible and vanishes
+    }
+  }, CONFIG.timeline.cameraChaseStart);
+
+  tl.to(ENGINE_STATE, {
+    cameraArcProgress: 1.0,
+    duration: CONFIG.timeline.cameraChaseDuration,
+    ease: "power1.inOut"
+  }, CONFIG.timeline.cameraChaseStart);
+
+  // 4. BEAT 3: CLOUDBREAK WHITEOUT (Starts at 42.8s, duration 3.0s)
+  tl.add(() => {
+    // Setup for whiteout
+  }, CONFIG.timeline.whiteoutStart);
+
+  // Fade screen to solid white over 1.0s
+  tl.to(ENGINE_STATE, {
+    whiteoutOpacity: 1.0,
+    duration: 1.0,
+    ease: "none"
+  }, CONFIG.timeline.whiteoutStart);
+
+  // Switch scene at peak whiteout (44.3s)
   tl.add(() => {
     ENGINE_STATE.setScene("LANDING");
-    ENGINE_STATE.globalFogDensity = 0.008; // Set instantly
+    ENGINE_STATE.globalFogDensity = 0.045; // Start with thick fog
+    
+    // Hide space, show ocean
+    if (spaceGroup) spaceGroup.visible = false;
+    if (oceanGroup) oceanGroup.visible = true;
+    
+    // Position rocket high up on the back-right corner
+    if (rocket) {
+      rocket.position.set(20.0, 70.0, -65.0);
+      rocket.scale.set(0.65, 0.65, 0.65);
+      rocket.rotation.set(0, -Math.PI / 4, 0);
+      rocket.visible = true;
+      
+      // Make sure landing legs are collapsed initially
+      landingLegs.forEach((leg) => {
+        leg.scale.set(0.001, 0.001, 0.001);
+      });
+    }
+    
+    // Prepare thruster intensity
+    ENGINE_STATE.thrusterIntensity = 8.0;
+    
+    // Reset camera descent progress
+    ENGINE_STATE.cameraDescentProgress = 0.0;
+  }, CONFIG.timeline.whiteoutStart + 1.5); // 42.8 + 1.5 = 44.3s
+
+  // Fade whiteout back to transparent over 1.0s
+  tl.to(ENGINE_STATE, {
+    whiteoutOpacity: 0.0,
+    duration: 1.0,
+    ease: "none"
+  }, CONFIG.timeline.whiteoutStart + 2.0); // 42.8 + 2.0 = 44.8s
+
+  // 5. BEAT 4: OCEAN DESCENT & ANGLE SWEEP (Starts at 45.8s, duration 10.0s)
+  // PAUSE the sequence here as requested to wait for the next instructions
+  tl.add(() => {
+    tl.pause();
+    console.log("[TIMELINE] Paused after whiteout descent to wait for further instructions.");
+  }, CONFIG.timeline.landingStart); // 45.8s
+
+  tl.to(ENGINE_STATE, {
+    cameraDescentProgress: 1.0,
+    duration: 10.0,
+    ease: "power2.inOut"
   }, CONFIG.timeline.landingStart);
-  
-  // Slow down descent for hover & landing (easing out to land smoothly)
+
+  // Clear up fog during descent (over 8.0s)
+  tl.to(ENGINE_STATE, {
+    globalFogDensity: 0.008,
+    duration: 8.0,
+    ease: "power1.inOut"
+  }, CONFIG.timeline.landingStart);
+
+  // 6. BEAT 5: ROCKET CORNER LANDING (Starts at 55.0s, duration 10.0s)
+  tl.add(() => {
+    // Rocket begins descent
+  }, CONFIG.timeline.rocketDescentStart);
+
   if (rocket) {
     tl.to(rocket.position, {
-      y: 2.9, // hover alignment height
-      duration: CONFIG.timeline.touchdownTime - CONFIG.timeline.landingStart,
-      ease: "power3.out"
-    }, CONFIG.timeline.landingStart);
+      y: 2.9, // touchdown height
+      duration: CONFIG.timeline.touchdownTime - CONFIG.timeline.rocketDescentStart, // 10.0s
+      ease: "power1.out"
+    }, CONFIG.timeline.rocketDescentStart);
   }
-  
-  // Ignite / fade thrusters
+
+  // Deploy landing legs during descent (at 58.0s)
   tl.add(() => {
-    ENGINE_STATE.thrusterIntensity = 8.0; // Set instantly
-  }, CONFIG.timeline.landingStart);
-  
-  // Touchdown confirmed at 29.8s
+    landingLegs.forEach((leg) => {
+      leg.scale.set(1.0, 1.0, 1.0); // Deploy legs
+    });
+  }, CONFIG.timeline.rocketDescentStart + 3.0);
+
+  // Touchdown confirmed at 65.0s
   tl.add(() => {
     ENGINE_STATE.setScene("MANUAL");
     ENGINE_STATE.thrusterIntensity = 0.0;
   }, CONFIG.timeline.touchdownTime);
-  
-  // Enable movable controls hand-off at 30.8s
+
+  // Enable manual OrbitControls at 67.0s
   tl.add(() => {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 - 0.05; // don't go below water
-    controls.target.set(0, 2.5, -45.0); // target the monolith
+    controls.target.set(0, 2.5, -45.0); // target the monolith in center
     window.activeControls = controls;
-  }, CONFIG.timeline.manualControlTime);
-  
+  }, CONFIG.timeline.manualControlTime); // 55.0s
+
   return tl;
 }

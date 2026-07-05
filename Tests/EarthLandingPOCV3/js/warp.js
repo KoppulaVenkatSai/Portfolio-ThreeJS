@@ -22,24 +22,22 @@ const WarpShaders = {
         vWarpProgress = uWarpProgress;
         
         // Calculate the base Z position, animated by the accumulated warp offset
-        float zBase = position.z - (aSpeed * uWarpOffset);
+        float zBase = position.z + (aSpeed * uWarpOffset);
         
         // Wrap Z base to keep stars in the tunnel [-500, 500]
         zBase = mod(zBase + 500.0, 1000.0) - 500.0;
         
-        // Spiral curve position based on Z coordinate (distance from camera)
-        // Reduced from 2.8 to 0.9 to turn down the dramatic rotation while keeping stars curvy
-        float spiral = aAngle + uWarpProgress * 0.9 * log(1.0 + (500.0 - zBase) * 0.015);
+        float spiral = aAngle; // straight trails, no rotation
+
         
         float r = length(position.xy);
         // Spread stars wider in the background when not at warp speed
         r = mix(r * 2.5, r, clamp(uWarpProgress / 0.2, 0.0, 1.0));
         
-        // Center the stars relative to the camera position
         vec3 pos = vec3(
-          uCameraPos.x + r * cos(spiral),
-          uCameraPos.y + r * sin(spiral),
-          uCameraPos.z + zBase
+          r * cos(spiral),
+          r * sin(spiral),
+          zBase
         );
         
         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -157,12 +155,12 @@ const WarpShaders = {
       void main() {
         float angle = vUv.x * 6.28318;
         
-        // Spiraling coordinates (slower rotation and scroll to reduce eye of storm hyperactivity)
-        vec2 uv = vec2(angle + vUv.y * 2.5 - uTime * 0.2, vUv.y * 1.0 - uTime * 5.0);
+        // Straight coordinates down the tunnel, scrolling forward
+        vec2 uv = vec2(angle, vUv.y * 1.0 + uTime * 5.0);
         
         // Multi-layered storm clouds noise
         float n1 = snoise(uv * 1.2);
-        float n2 = snoise(uv * 3.5 + vec2(0.0, uTime * 2.0));
+        float n2 = snoise(uv * 3.5 - vec2(0.0, uTime * 2.0));
         float stormCloud = smoothstep(0.2, 0.85, n1 * 0.65 + n2 * 0.35);
         
         // Smoothly fade out the tunnel opacity towards the far end to blend into deep space
@@ -278,7 +276,8 @@ export class WarpSystem {
     
     // 3. Warp Cylinder
     this.cylinderGeom = new THREE.CylinderGeometry(20, 20, 300, 48, 48, true);
-    this.cylinderGeom.translate(0, 150, 0); // align pivot to end
+    this.cylinderGeom.rotateX(Math.PI / 2); // Align height along local Z-axis
+    this.cylinderGeom.translate(0, 0, 150); // Align pivot to end
     
     this.cylinderMat = new THREE.ShaderMaterial({
       vertexShader: WarpShaders.tunnel.vertex,
@@ -294,7 +293,6 @@ export class WarpSystem {
     });
     
     this.tunnel = new THREE.Mesh(this.cylinderGeom, this.cylinderMat);
-    this.tunnel.rotation.x = Math.PI / 2; // point along camera path
     this.tunnel.position.set(0, 0, 50);
     this.scene.add(this.tunnel);
   }
@@ -318,7 +316,14 @@ export class WarpSystem {
       this.starMat.uniforms.uCameraPos.value.copy(camera.position);
       this.centerMat.uniforms.uCameraPos.value.copy(camera.position);
       
+      this.stars.position.copy(camera.position);
+      this.stars.quaternion.copy(camera.quaternion); // Face exactly where the camera points
+      
+      this.centerStars.position.copy(camera.position);
+      this.centerStars.quaternion.copy(camera.quaternion);
+      
       this.tunnel.position.copy(camera.position);
+      this.tunnel.quaternion.copy(camera.quaternion); // Face exactly where the camera points
     }
     
     this.starMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;

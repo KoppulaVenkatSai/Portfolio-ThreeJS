@@ -222,11 +222,92 @@ export class StormSystem {
     flashTl.to(this.lightningLight, { intensity: 0.0, duration: 0.12 }, 0.16);
   }
   
-  update(elapsed, delta, rocket) {
+  triggerCameraLightning(camera) {
+    if (!camera) return;
+    
+    // Pick start & end points in camera's local viewport space to ensure they are visible
+    // Start at top of viewport, end at bottom, slightly in front
+    const startLocal = new THREE.Vector3(
+      THREE.MathUtils.randFloatSpread(30), // Y-axis in world is local heading, so Z/X are screen plane
+      THREE.MathUtils.randFloatSpread(30),
+      -15 - Math.random() * 15
+    );
+    
+    const endLocal = new THREE.Vector3(
+      THREE.MathUtils.randFloatSpread(30),
+      THREE.MathUtils.randFloatSpread(30),
+      -15 - Math.random() * 15
+    );
+    
+    const start = startLocal.applyMatrix4(camera.matrixWorld);
+    const end = endLocal.applyMatrix4(camera.matrixWorld);
+    
+    const pathPoints = this.generateLightningPaths(start, end, 16, 10);
+    
+    // Add simple branches for complexity
+    const totalCount = pathPoints.length;
+    for (let i = 0; i < 2; i++) {
+      const idx = Math.floor(Math.random() * (totalCount - 2));
+      const bStart = pathPoints[idx];
+      const bEnd = new THREE.Vector3(
+        bStart.x + THREE.MathUtils.randFloatSpread(10),
+        bStart.y - 8 - Math.random() * 8,
+        bStart.z + THREE.MathUtils.randFloatSpread(10)
+      );
+      pathPoints.push(...this.generateLightningPaths(bStart, bEnd, 8, 4));
+    }
+    
+    const positions = [];
+    for (let i = 0; i < pathPoints.length; i += 2) {
+      if (pathPoints[i] && pathPoints[i+1]) {
+        positions.push(
+          pathPoints[i].x, pathPoints[i].y, pathPoints[i].z,
+          pathPoints[i+1].x, pathPoints[i+1].y, pathPoints[i+1].z
+        );
+      }
+    }
+    
+    this.lightningGeom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    this.lightningGeom.attributes.position.needsUpdate = true;
+    
+    const chosenColor = CONFIG.colors.lightningColors[Math.floor(Math.random() * CONFIG.colors.lightningColors.length)];
+    const color = new THREE.Color(chosenColor);
+    
+    this.lightningMat.color.copy(color);
+    this.lightningLight.color.copy(color);
+    this.lightningLight.position.copy(start);
+    
+    const overlay = document.getElementById("storm-overlay");
+    const flashTl = gsap.timeline();
+    flashTl.to(this.lightningMat, { opacity: 0.95, duration: 0.05 });
+    flashTl.to(this.lightningLight, { intensity: 15.0, duration: 0.05 }, 0);
+    if (overlay) {
+      flashTl.to(overlay, { opacity: 0.45, duration: 0.05, yoyo: true, repeat: 1 }, 0);
+    }
+    
+    flashTl.to(this.lightningMat, { opacity: 0.0, duration: 0.06 });
+    flashTl.to(this.lightningLight, { intensity: 0.0, duration: 0.06 }, 0.05);
+    
+    flashTl.to(this.lightningMat, { opacity: 0.75, duration: 0.04 }, 0.12);
+    flashTl.to(this.lightningLight, { intensity: 8.0, duration: 0.04 }, 0.12);
+    if (overlay) {
+      flashTl.to(overlay, { opacity: 0.22, duration: 0.04, yoyo: true, repeat: 1 }, 0.12);
+    }
+    
+    flashTl.to(this.lightningMat, { opacity: 0.0, duration: 0.12 }, 0.16);
+    flashTl.to(this.lightningLight, { intensity: 0.0, duration: 0.12 }, 0.16);
+  }
+  
+  update(elapsed, delta, rocket, camera) {
     this.cloudMat.uniforms.uTime.value = elapsed;
     
     const sc = ENGINE_STATE.currentScene;
     this.clouds.visible = (sc === "STORM");
+    
+    // Temporarily disabled lightning crackles during whiteout
+    // if (ENGINE_STATE.whiteoutOpacity > 0.1 && Math.random() < 0.25) {
+    //   this.triggerCameraLightning(camera);
+    // }
     
     if (sc === "STORM" || sc === "LANDING" || sc === "MANUAL") {
       this.rainMat.opacity = THREE.MathUtils.lerp(this.rainMat.opacity, 0.60, 0.05);

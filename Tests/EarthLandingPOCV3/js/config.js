@@ -1,6 +1,8 @@
 import * as THREE from "three";
 
 export const CONFIG = {
+  timeScale: 2.0, // Scale factor: set to 2.0 or 3.0 to make everything faster
+  
   assets: {
     rocketModel: new URL("../assets/NewRocket.glb", import.meta.url).href,
     monolithScene: new URL("../assets/MonolithScene.glb", import.meta.url).href
@@ -13,27 +15,26 @@ export const CONFIG = {
     warpMaxSpeed: 8.0,
     warpEnd: 10.0,
     
-    // New sequence phases
-    snapBackStart: 16.8, // Earth silhouette reveal start
+    // Silhouette and Grow phase (Pauses at 30.8s)
+    snapBackStart: 16.8,
     snapBackDuration: 3.0,
-    
-    earthGrowStart: 16.8, // Earth grow and light sweep
+    earthGrowStart: 16.8,
     earthGrowDuration: 7.0,
     
-    rocketFlyPastStart: 28.8, // Rocket fly past (shifted by +5.0s for Earth illumination)
-    rocketFlyPastDuration: 2.0,
+    // V3 sequence phases (slower, more majestic timings)
+    flyToEarthStart: 30.8,
+    flyToEarthDuration: 6.0,
     
-    reentryStart: 30.8, // Reentry burn (shifted by +5.0s)
-    reentryDuration: 4.0,
+    cameraChaseStart: 36.8,
+    cameraChaseDuration: 6.0,
     
-    // Beat 3: Cloud Piercer
-    stormStart: 34.8, // Shifted by +5.0s
-    stormDuration: 6.0,
+    whiteoutStart: 42.8,
+    whiteoutDuration: 3.0,
     
-    // Beat 4: Monolith reveal & landing
-    landingStart: 40.8, // Shifted by +5.0s
-    touchdownTime: 48.6, // Shifted by +5.0s
-    manualControlTime: 49.6 // Shifted by +5.0s
+    landingStart: 45.8,
+    rocketDescentStart: 55.0,
+    touchdownTime: 65.0,
+    manualControlTime: 67.0
   },
 
   // Color mappings
@@ -55,8 +56,8 @@ export const CONFIG = {
   // Camera coordinates relative to the rocket / world
   camera: {
     initial: {
-      pos: new THREE.Vector3(0.0, -4.0, -6.5),
-      look: new THREE.Vector3(0.0, 10.0, 15.0)
+      pos: new THREE.Vector3(9.36, 0.30, -2.60),
+      look: new THREE.Vector3(9.52, 0.08, 0.22)
     },
     warp: {
       pos: new THREE.Vector3(0.0, -4.0, -6.5),

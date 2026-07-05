@@ -10,6 +10,13 @@ export const ENGINE_STATE = {
   lightningIntensity: 0.0,
   monolithPulse: 1.0,
   starsOpacity: 1.0,
+  timeScale: 1.0,
+  
+  // V3 specific states
+  rocketArcProgress: 0.0,
+  cameraArcProgress: 0.0,
+  whiteoutOpacity: 0.0,
+  cameraDescentProgress: 0.0,
   
   // Transition hooks
   setScene(sceneName) {

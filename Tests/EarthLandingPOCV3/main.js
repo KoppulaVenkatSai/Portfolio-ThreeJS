@@ -13,6 +13,7 @@ import { LandingSystem } from "./js/landing.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
 // Main WebGL Setup
 const canvas = document.getElementById("webgl-canvas");
@@ -101,6 +102,7 @@ scene.add(searchLight.target);
 // Ocean coordinates landing target grid helper (green)
 export const oceanGrid = new THREE.GridHelper(800, 80, 0x00ff66, 0x032210);
 oceanGrid.position.y = 0.2;
+oceanGrid.visible = false;
 oceanGroup.add(oceanGrid);
 
 // Flight Trajectory descent path line (neon green)
@@ -126,7 +128,7 @@ const targetRingGeom = new THREE.RingGeometry(4.0, 4.4, 32);
 const targetRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
 export const targetRing = new THREE.Mesh(targetRingGeom, targetRingMat);
 targetRing.rotation.x = -Math.PI / 2;
-targetRing.position.set(0.0, 0.25, -45.0);
+targetRing.position.set(20.0, 0.25, -65.0);
 oceanGroup.add(targetRing);
 
 // Vertical laser beacon connecting rocket to its ground projection point
@@ -196,6 +198,8 @@ let landingLegs = [];
 let cinematicTimeline = null;
 let thrusterFlame = null;
 const analysisMaterials = [];
+export const rocketMaterials = [];
+
 
 // Animate color variations of rocket hull
 const reentryHullColor = new THREE.Color(0xffffff);
@@ -209,16 +213,16 @@ loadingManager.onLoad = () => {
   landingSystem.configureMonolith(monolithScene);
   landingSystem.activateOcean();
   
-  // Setup timeline once models are loaded
-  cinematicTimeline = buildCinematicTimeline(rocketModel, earthGroup, spaceGroup, oceanGroup, renderer, camera);
+  cinematicTimeline = buildCinematicTimeline(rocketModel, earthGroup, spaceGroup, oceanGroup, renderer, camera, landingLegs);
   window.cinematicTimeline = cinematicTimeline;
+  window.scene = scene;
+  window.camera = camera;
+  window.rocketModel = rocketModel;
+  window.ENGINE_STATE = ENGINE_STATE;
   
-  // Connect leg animation triggers
-  cinematicTimeline.add(() => {
-    landingLegs.forEach((leg) => {
-      leg.scale.set(1.0, 1.0, 1.0);
-    });
-  }, CONFIG.timeline.landingStart + 5.0); // deploy legs instantly 5s after exiting clouds
+  // Apply timeScale
+  ENGINE_STATE.timeScale = CONFIG.timeScale || 1.0;
+  cinematicTimeline.timeScale(ENGINE_STATE.timeScale);
   
   UI_MANAGER.hideLoader(() => {
     startSequence();
@@ -243,11 +247,12 @@ function configureRocketModel(model) {
       if (node.material) {
         const mats = Array.isArray(node.material) ? node.material : [node.material];
         mats.forEach((mat) => {
-          mat.metalness = 0.8;
-          mat.roughness = 0.2;
-          if (mat.color) mat.color.setHex(0xaaaaaa); // Solid neutral gray matte color
+          rocketMaterials.push(mat);
+          mat.metalness = 0.99;
+          mat.roughness = 0.01;
+          if (mat.color) mat.color.setHex(0xffffff); // Pure white base for correct mirror reflections
           mat.envMap = cubeRenderTarget.texture; // Enable real-time reflection
-          mat.envMapIntensity = 2.0;
+          mat.envMapIntensity = 1.8; // Reduced specular reflection intensity (was 3.0)
           mat.needsUpdate = true;
           
           // Inject custom diagnostic scan overlay
@@ -314,8 +319,8 @@ function configureRocketModel(model) {
 gltfLoader.load(CONFIG.assets.rocketModel, (gltf) => {
   rocketModel = gltf.scene;
   rocketModel.scale.set(0.65, 0.65, 0.65);
-  rocketModel.position.set(1.4, -3.5, 2.0);
-  rocketModel.rotation.set(0, -Math.PI / 4, 0);
+  rocketModel.position.set(12.0, -1.0, -0.5);
+  rocketModel.rotation.set(Math.PI / 2, 0, 5 * Math.PI / 180);
   scene.add(rocketModel);
   
   configureRocketModel(rocketModel);
@@ -379,6 +384,8 @@ gltfLoader.load(CONFIG.assets.monolithScene, (gltf) => {
 });
 
 function startSequence() {
+  orbitControls.enabled = false;
+  window.activeControls = null;
   if (cinematicTimeline) {
     cinematicTimeline.play();
   }
@@ -387,12 +394,14 @@ function startSequence() {
 // Tick loop
 const clock = new THREE.Clock();
 let sequenceTime = 0.0;
+let prevActiveControls = null; // Track orbit control transitions to reset camera on dismiss
 
 function tick() {
-  const delta = clock.getDelta();
-  const elapsed = clock.getElapsedTime();
-  ENGINE_STATE.globalTime = elapsed;
+  const delta = clock.getDelta() * ENGINE_STATE.timeScale;
   if (cinematicTimeline) {
+    if (cinematicTimeline.timeScale() !== ENGINE_STATE.timeScale) {
+      cinematicTimeline.timeScale(ENGINE_STATE.timeScale);
+    }
     ENGINE_STATE.timelineTime = cinematicTimeline.time();
   } else {
     ENGINE_STATE.timelineTime = 0.0;
@@ -403,15 +412,17 @@ function tick() {
   } else {
     sequenceTime = 0.0;
   }
+  ENGINE_STATE.globalTime = sequenceTime;
   
   UI_MANAGER.tick(rocketModel);
   
   // Update dynamic cube reflection camera
   if (rocketModel && cubeCamera) {
+    const originalVisibility = rocketModel.visible;
     rocketModel.visible = false;
     cubeCamera.position.copy(rocketModel.position);
     cubeCamera.update(renderer, scene);
-    rocketModel.visible = true;
+    rocketModel.visible = originalVisibility;
   }
   
   // Update camera rig continuous movement
@@ -483,7 +494,38 @@ function tick() {
   atmosphereSystem.update(sequenceTime);
   landingSystem.update(sequenceTime, rocketModel);
   if (stormSystem) {
-    stormSystem.update(sequenceTime, delta, rocketModel);
+    stormSystem.update(sequenceTime, delta, rocketModel, camera);
+  }
+  
+  // Apply whiteout overlay opacity
+  const whiteoutOverlay = document.getElementById("storm-overlay");
+  if (whiteoutOverlay) {
+    whiteoutOverlay.style.opacity = ENGINE_STATE.whiteoutOpacity;
+  }
+  
+  // Update rocket's curvy arc path towards Earth (finesse shot wide right, curving behind Earth)
+  if (ENGINE_STATE.currentScene === "REENTRY" && rocketModel) {
+    const u = ENGINE_STATE.rocketArcProgress;
+    const x = -30 * (1 - u) + 10 * u + 300 * u * (1 - u);
+    const y = 70 + 245 * u; // 70 to 315 (behind Earth center at 296.5)
+    const z = -20 * (1 - u) - 10 * u + 15 * Math.sin(Math.PI * u);
+    const scale = 0.65 * (1.0 - 0.9 * u);
+    
+    const xRot = z;
+    const zRot = -x;
+    rocketModel.position.set(1.4 + xRot, y, 2.0 + zRot);
+    rocketModel.scale.set(scale, scale, scale);
+    
+    // Face the Earth
+    const earthWorldPos = new THREE.Vector3();
+    if (earthGroup) {
+      earthGroup.getWorldPosition(earthWorldPos);
+    } else {
+      earthWorldPos.set(1.4, 296.5, 2.0);
+    }
+    const dir = new THREE.Vector3().subVectors(earthWorldPos, rocketModel.position).normalize();
+    const alignQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    rocketModel.quaternion.copy(alignQuaternion);
   }
   
   // Thruster Flame scale/opacity updates
@@ -506,8 +548,13 @@ function tick() {
   
   if (window.activeControls) {
     window.activeControls.update();
+  } else if (prevActiveControls) {
+    // activeControls was just cleared — snap the camera rig back to the default
+    // position so it resumes smooth lerping from the correct starting point
+    CAMERA_RIG.resetToDefault();
   }
-  
+  prevActiveControls = window.activeControls || null;
+
   composer.render();
   requestAnimationFrame(tick);
 }
@@ -528,5 +575,118 @@ window.addEventListener("keydown", (e) => {
     }
   }
 });
+
+// Settings UI & Metalness Slider Logic
+const settingsBtn = document.getElementById("hud-settings-btn");
+const settingsPanel = document.getElementById("hud-settings-panel");
+const metallicSlider = document.getElementById("metallic-slider");
+const metallicVal = document.getElementById("metallic-val");
+
+if (settingsBtn && settingsPanel) {
+  settingsBtn.addEventListener("click", () => {
+    const isVisible = settingsPanel.style.display === "flex";
+    settingsPanel.style.display = isVisible ? "none" : "flex";
+  });
+}
+
+if (metallicSlider) {
+  metallicSlider.addEventListener("input", (e) => {
+    const value = e.target.value;
+    if (metallicVal) metallicVal.innerText = `${value}%`;
+    const valFloat = parseFloat(value) / 100;
+    rocketMaterials.forEach((mat) => {
+      mat.metalness = valFloat;
+      mat.needsUpdate = true;
+    });
+  });
+}
+
+// Initialize OrbitControls (active by default so the user can frame the camera)
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+orbitControls.enableDamping = true;
+orbitControls.dampingFactor = 0.05;
+orbitControls.enabled = true;
+orbitControls.target.copy(CONFIG.camera.initial.look);
+window.activeControls = orbitControls;
+
+// Rocket position & rotation inputs
+const posX = document.getElementById("rocket-pos-x");
+const posY = document.getElementById("rocket-pos-y");
+const posZ = document.getElementById("rocket-pos-z");
+const rotX = document.getElementById("rocket-rot-x");
+const rotY = document.getElementById("rocket-rot-y");
+const rotZ = document.getElementById("rocket-rot-z");
+const applyBtn = document.getElementById("settings-apply-btn");
+const copyBtn = document.getElementById("settings-copy-btn");
+
+function applyRocketTransform() {
+  if (!rocketModel) return;
+  
+  const px = parseFloat(posX?.value) || 0;
+  const py = parseFloat(posY?.value) || 0;
+  const pz = parseFloat(posZ?.value) || 0;
+  
+  rocketModel.position.set(px, py, pz);
+  
+  // Keep the OrbitControls target locked to the rocket position as it changes
+  if (orbitControls.enabled) {
+    orbitControls.target.set(px, py, pz);
+  }
+  
+  const deg = Math.PI / 180;
+  rocketModel.rotation.set(
+    (parseFloat(rotX?.value) || 0) * deg,
+    (parseFloat(rotY?.value) || 0) * deg,
+    (parseFloat(rotZ?.value) || 0) * deg
+  );
+}
+
+if (applyBtn) {
+  applyBtn.addEventListener("click", applyRocketTransform);
+}
+
+[posX, posY, posZ, rotX, rotY, rotZ].forEach((el) => {
+  if (el) el.addEventListener("change", applyRocketTransform);
+  if (el) el.addEventListener("input", applyRocketTransform);
+});
+
+if (copyBtn) {
+  copyBtn.addEventListener("click", () => {
+    const rx = rocketModel ? rocketModel.position.x.toFixed(2) : "0.00";
+    const ry = rocketModel ? rocketModel.position.y.toFixed(2) : "0.00";
+    const rz = rocketModel ? rocketModel.position.z.toFixed(2) : "0.00";
+    
+    const rRotX = rocketModel ? (rocketModel.rotation.x * 180 / Math.PI).toFixed(1) : "0.0";
+    const rRotY = rocketModel ? (rocketModel.rotation.y * 180 / Math.PI).toFixed(1) : "0.0";
+    const rRotZ = rocketModel ? (rocketModel.rotation.z * 180 / Math.PI).toFixed(1) : "0.0";
+    
+    const cx = camera.position.x.toFixed(2);
+    const cy = camera.position.y.toFixed(2);
+    const cz = camera.position.z.toFixed(2);
+    
+    const tx = orbitControls.target.x.toFixed(2);
+    const ty = orbitControls.target.y.toFixed(2);
+    const tz = orbitControls.target.z.toFixed(2);
+    
+    const outputText = `--- EARTH LANDING POC V3 SETUP ---\n` +
+                       `Rocket Position: x: ${rx}, y: ${ry}, z: ${rz}\n` +
+                       `Rocket Rotation: x: ${rRotX}, y: ${rRotY}, z: ${rRotZ} (degrees)\n` +
+                       `Camera Position: x: ${cx}, y: ${cy}, z: ${cz}\n` +
+                       `Camera Target  : x: ${tx}, y: ${ty}, z: ${tz}\n` +
+                       `----------------------------------`;
+                       
+    navigator.clipboard.writeText(outputText).then(() => {
+      const originalText = copyBtn.innerText;
+      copyBtn.innerText = "COPIED!";
+      copyBtn.style.color = "#00ff66";
+      setTimeout(() => {
+        copyBtn.innerText = originalText;
+        copyBtn.style.color = "";
+      }, 2000);
+    }).catch(err => {
+      alert("Values:\n" + outputText);
+    });
+  });
+}
 
 tick();
