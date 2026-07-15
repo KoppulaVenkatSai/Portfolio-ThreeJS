@@ -11,12 +11,14 @@ export const ENGINE_STATE = {
   monolithPulse: 1.0,
   starsOpacity: 1.0,
   timeScale: 1.0,
+  ambientIntensity: 0.6,
   
   // V3 specific states
   rocketArcProgress: 0.0,
   cameraArcProgress: 0.0,
   whiteoutOpacity: 0.0,
   cameraDescentProgress: 0.0,
+  landingFadeInProgress: 0.0,
   
   // Transition hooks
   setScene(sceneName) {

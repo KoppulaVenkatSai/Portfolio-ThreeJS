@@ -75,7 +75,7 @@ const earthMesh = new THREE.Mesh(earthGeom, earthMat);
 earthGroup.add(earthMesh);
 
 // Shared Lights
-const spaceAmbient = new THREE.AmbientLight(0xffffff, 0.9); // Raised ambient light for clean blockout visibility
+const spaceAmbient = new THREE.AmbientLight(0xffffff, 0.6); // Raised ambient light for clean blockout visibility
 spaceGroup.add(spaceAmbient);
 
 const spaceSun = new THREE.DirectionalLight(0xffffff, 1.5); // Prevent blowing out highlights on chrome rocket
@@ -388,7 +388,7 @@ function startSequence() {
   window.activeControls = null;
   if (cinematicTimeline) {
     // Debug Mode: Seek with suppressEvents=false so all preceding setup callbacks run, then play
-    cinematicTimeline.seek(CONFIG.timeline.landingStart - 0.1, false);
+    cinematicTimeline.seek(CONFIG.timeline.cameraChaseStart - 0.1, false);
     cinematicTimeline.play();
   }
 }
@@ -545,14 +545,28 @@ function tick() {
   }
   
   // Synchronize dynamic scene fog
+  // Synchronize dynamic scene fog and background color
+  let fogColorHex = CONFIG.colors.bgSpace;
   if (ENGINE_STATE.currentScene === "STORM") {
-    scene.fog.color.setHex(CONFIG.colors.bgStorm);
-    scene.fog.density = ENGINE_STATE.globalFogDensity;
+    fogColorHex = CONFIG.colors.bgStorm;
   } else if (ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL") {
-    scene.fog.color.setHex(CONFIG.colors.bgLanding);
-    scene.fog.density = ENGINE_STATE.globalFogDensity;
+    fogColorHex = CONFIG.colors.bgLanding;
   } else if (ENGINE_STATE.currentScene === "REENTRY") {
-    scene.fog.color.setHex(CONFIG.colors.bgSpace);
+    fogColorHex = CONFIG.colors.bgSpace;
+  }
+  
+  const fogColor = new THREE.Color(fogColorHex);
+  
+  // Scale the fog and background color dynamically based on ambient intensity in storm/landing/manual phases
+  if (ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL") {
+    const scaleFactor = ENGINE_STATE.ambientIntensity / 0.6; // 0.6 is the default
+    fogColor.multiplyScalar(scaleFactor);
+  }
+  
+  scene.fog.color.copy(fogColor);
+  scene.background.copy(fogColor);
+  
+  if (ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL" || ENGINE_STATE.currentScene === "REENTRY") {
     scene.fog.density = ENGINE_STATE.globalFogDensity;
   } else {
     scene.fog.density = 0.0;
@@ -610,6 +624,34 @@ if (metallicSlider) {
       mat.metalness = valFloat;
       mat.needsUpdate = true;
     });
+  });
+}
+
+const ambientSlider = document.getElementById("ambient-slider");
+const ambientVal = document.getElementById("ambient-val");
+
+if (ambientSlider) {
+  ambientSlider.addEventListener("input", (e) => {
+    const value = e.target.value;
+    if (ambientVal) ambientVal.innerText = `${value}%`;
+    const valFloat = parseFloat(value) / 100;
+    ENGINE_STATE.ambientIntensity = valFloat;
+    
+    // Live update lights during active playback or static framing
+    if (spaceAmbient) {
+      const sc = ENGINE_STATE.currentScene;
+      if (sc === "WARP" || sc === "SNAP_BACK" || sc === "REENTRY") {
+        spaceAmbient.intensity = valFloat;
+      }
+    }
+    if (landingSystem && landingSystem.stormAmbient) {
+      const sc = ENGINE_STATE.currentScene;
+      if (sc === "LANDING" || sc === "MANUAL") {
+        landingSystem.stormAmbient.intensity = valFloat * ENGINE_STATE.landingFadeInProgress;
+      } else if (sc === "STORM") {
+        landingSystem.stormAmbient.intensity = valFloat;
+      }
+    }
   });
 }
 

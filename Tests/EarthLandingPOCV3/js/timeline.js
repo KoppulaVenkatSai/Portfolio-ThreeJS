@@ -23,6 +23,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (spaceGroup) spaceGroup.visible = true;
     if (oceanGroup) oceanGroup.visible = false;
     if (earthGroup) earthGroup.visible = false;
+    if (spaceAmbient) spaceAmbient.intensity = ENGINE_STATE.ambientIntensity;
   }, 0.0);
   
   // Slow start: 0.0 to 0.1 over 4.0s (slowing the part where the stars start moving)
@@ -299,7 +300,9 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
   // Switch scene at peak dark transition (50.3s)
   tl.add(() => {
     ENGINE_STATE.setScene("LANDING");
+    CAMERA_RIG.instantSnapNextFrame = true;
     ENGINE_STATE.globalFogDensity = 0.045; // Start with thick fog
+    ENGINE_STATE.landingFadeInProgress = 0.0;
     
     // Hide space, show ocean
     if (spaceGroup) spaceGroup.visible = false;
@@ -352,6 +355,13 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
   tl.to(ENGINE_STATE, {
     globalFogDensity: 0.008,
     duration: 8.0,
+    ease: "power1.inOut"
+  }, CONFIG.timeline.landingStart);
+
+  // Fade in the sea and monolith lights (over 4.0s)
+  tl.to(ENGINE_STATE, {
+    landingFadeInProgress: 1.0,
+    duration: 4.0,
     ease: "power1.inOut"
   }, CONFIG.timeline.landingStart);
 

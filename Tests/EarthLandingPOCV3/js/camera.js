@@ -12,7 +12,8 @@ class CameraRigController {
     
     this.snapBackPos = new THREE.Vector3().copy(CONFIG.camera.initial.pos);
     this.snapBackLook = new THREE.Vector3().copy(CONFIG.camera.initial.look);
-    
+    this.snapBackCaptured = false;
+    this.instantSnapNextFrame = false;
     this.shakeIntensity = 0.0;
     this.lerpSpeed = 0.04; // Dampened smooth tracking
     this.stormDetachPos = null;
@@ -37,6 +38,8 @@ class CameraRigController {
     this.targetLook.copy(CONFIG.camera.initial.look);
     this.snapBackPos.copy(CONFIG.camera.initial.pos);
     this.snapBackLook.copy(CONFIG.camera.initial.look);
+    this.snapBackCaptured = false;
+    this.instantSnapNextFrame = false;
   }
   
   update(camera, rocket, elapsed, delta) {
@@ -48,6 +51,14 @@ class CameraRigController {
     
     if (sc === "REENTRY") {
       this.stormDetachPos = null;
+      if (!this.snapBackCaptured) {
+        const rocketPos = new THREE.Vector3(-1.1, -1.0, -8.6);
+        const rocketScale = new THREE.Vector3(0.65, 0.65, 0.65);
+        const localCamPos = new THREE.Vector3(0.0, 50.0, 0.0);
+        this.snapBackPos.copy(localCamPos).multiply(rocketScale).add(rocketPos);
+        this.snapBackLook.set(1.4, 296.5, 2.0);
+        this.snapBackCaptured = true;
+      }
       const u = ENGINE_STATE.cameraArcProgress;
       
       // Define the start point and the end point for the zoom-past trajectory
@@ -153,15 +164,16 @@ class CameraRigController {
         if (sc === "SNAP_BACK") {
           this.snapBackPos.copy(worldCamPos);
           this.snapBackLook.copy(worldCamLook);
+          this.snapBackCaptured = true;
         }
       }
     } else if (sc === "LANDING") {
       this.stormDetachPos = null;
-      // Independent ocean descent and angle sweep (from 30 deg down to level)
+      // Independent ocean descent and angle sweep (from 45 deg down looking at monolith, to level manual orbit)
       const u = ENGINE_STATE.cameraDescentProgress;
-      const camY = 30.0 * (1 - u) + 6.0 * u;
+      const camY = 52.5 * (1 - u) + 6.0 * u;
       const camZ = 5.0 * (1 - u) + 12.0 * u;
-      const lookY = 6.0 * (1 - u) + 3.5 * u;
+      const lookY = 2.5 * (1 - u) + 3.5 * u;
       
       this.setTarget(new THREE.Vector3(0, camY, camZ), new THREE.Vector3(0, lookY, -45.0));
     } else if (sc === "MANUAL") {
@@ -197,11 +209,18 @@ class CameraRigController {
     } else {
       // Smooth detach transition during landing & manual
       this.lerpSpeed = 0.04;
-      this.currentPos.lerp(this.targetPos, this.lerpSpeed);
-      this.currentLook.lerp(this.targetLook, this.lerpSpeed);
-      
-      // Smoothly return up vector to standard world UP (0, 1, 0)
-      camera.up.lerp(new THREE.Vector3(0.0, 1.0, 0.0), this.lerpSpeed);
+      if (this.instantSnapNextFrame) {
+        this.currentPos.copy(this.targetPos);
+        this.currentLook.copy(this.targetLook);
+        camera.up.set(0.0, 1.0, 0.0);
+        this.instantSnapNextFrame = false;
+      } else {
+        this.currentPos.lerp(this.targetPos, this.lerpSpeed);
+        this.currentLook.lerp(this.targetLook, this.lerpSpeed);
+        
+        // Smoothly return up vector to standard world UP (0, 1, 0)
+        camera.up.lerp(new THREE.Vector3(0.0, 1.0, 0.0), this.lerpSpeed);
+      }
     }
     
     // Apply interpolated values to camera

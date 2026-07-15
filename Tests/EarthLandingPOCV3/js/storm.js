@@ -76,39 +76,7 @@ export class StormSystem {
       this.clouds.add(mesh);
     }
     
-    // 2. Build Rain Line Segments System (streaks)
-    this.rainCount = 3000;
-    this.rainGeom = new THREE.BufferGeometry();
-    const rainPositions = [];
-    this.rainVelocities = [];
-    
-    for (let i = 0; i < this.rainCount; i++) {
-      const x = THREE.MathUtils.randFloatSpread(160);
-      const y = THREE.MathUtils.randFloatSpread(100);
-      const z = THREE.MathUtils.randFloatSpread(160);
-      const len = 2.0 + Math.random() * 3.0; // rain streak length
-      
-      // Start point
-      rainPositions.push(x, y, z);
-      // End point
-      rainPositions.push(x, y - len, z);
-      
-      const speed = 140.0 + Math.random() * 70.0;
-      this.rainVelocities.push(speed, speed);
-    }
-    
-    this.rainGeom.setAttribute("position", new THREE.Float32BufferAttribute(rainPositions, 3));
-    this.rainPositionsAttr = this.rainGeom.getAttribute("position");
-    
-    this.rainMat = new THREE.LineBasicMaterial({
-      color: 0x7daed8,
-      transparent: true,
-      opacity: 0.0,
-      depthWrite: false
-    });
-    
-    this.rainLines = new THREE.LineSegments(this.rainGeom, this.rainMat);
-    this.scene.add(this.rainLines);
+
     
     // 3. Build Procedural Lightning Bolt Lines
     this.lightningGeom = new THREE.BufferGeometry();
@@ -310,37 +278,6 @@ export class StormSystem {
     // }
     
     if (sc === "STORM" || sc === "LANDING" || sc === "MANUAL") {
-      this.rainMat.opacity = THREE.MathUtils.lerp(this.rainMat.opacity, 0.60, 0.05);
-      
-      const arr = this.rainPositionsAttr.array;
-      const referenceY = rocket ? rocket.position.y : 0;
-      
-      for (let i = 0; i < this.rainCount; i++) {
-        const idx1 = i * 6;
-        const idx2 = i * 6 + 3;
-        
-        const speed = this.rainVelocities[i * 2];
-        const dy = speed * delta;
-        
-        arr[idx1 + 1] -= dy;
-        arr[idx2 + 1] -= dy;
-        
-        if (arr[idx1 + 1] < referenceY - 50.0) {
-          const x = THREE.MathUtils.randFloatSpread(160);
-          const y = referenceY + 50.0;
-          const z = THREE.MathUtils.randFloatSpread(160);
-          const len = 2.0 + Math.random() * 3.0;
-          
-          arr[idx1] = x;
-          arr[idx1 + 1] = y;
-          arr[idx1 + 2] = z;
-          
-          arr[idx2] = x;
-          arr[idx2 + 1] = y - len;
-          arr[idx2 + 2] = z;
-        }
-      }
-      this.rainPositionsAttr.needsUpdate = true;
       
       // Move clouds down past camera to simulate continuous descent
       this.clouds.position.y += delta * 120.0;
@@ -359,7 +296,6 @@ export class StormSystem {
         this.triggerStrike(rocket);
       }
     } else {
-      this.rainMat.opacity = THREE.MathUtils.lerp(this.rainMat.opacity, 0.0, 0.1);
       this.lightningLight.intensity = 0;
       this.lightningMat.opacity = 0;
     }
