@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rocket Model Inspector</title>
+  <link rel="stylesheet" href="./style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #020205;
+      font-family: 'Outfit', sans-serif;
+    }
+    #viewer-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .inspector-hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(10, 12, 16, 0.85);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 8px;
+      padding: 20px;
+      color: #fff;
+      backdrop-filter: blur(8px);
+      max-width: 320px;
+      max-height: 90vh;
+      overflow-y: auto;
+      z-index: 10;
+    }
+    .hud-title {
+      font-family: 'Share Tech Mono', monospace;
+      color: #00f0ff;
+      font-size: 1.1rem;
+      margin-bottom: 12px;
+      letter-spacing: 1.5px;
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      padding-bottom: 8px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 8px 0;
+      font-size: 0.9rem;
+    }
+    .info-row .label {
+      color: rgba(255, 255, 255, 0.6);
+    }
+    .info-row .value {
+      color: #fff;
+      font-weight: 600;
+    }
+    .inspector-controls {
+      margin-top: 15px;
+      border-top: 1px solid rgba(0, 240, 255, 0.15);
+      padding-top: 12px;
+    }
+    .control-btn {
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid #00f0ff;
+      color: #00f0ff;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Share Tech Mono', monospace;
+      width: 100%;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+    .control-btn:hover {
+      background: rgba(0, 240, 255, 0.25);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+    }
+    .component-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .component-item label {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 0.85rem;
+    }
+    .component-item label:hover {
+      color: #00f0ff;
+    }
+    .component-item input[type="checkbox"] {
+      cursor: pointer;
+      accent-color: #00f0ff;
+    }
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(10, 12, 16, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+      z-index: 10;
+    }
+    .back-btn:hover {
+      border-color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <a href="./index.html" class="back-btn">← BACK TO POC</a>
+
+  <div class="inspector-hud">
+    <div class="hud-title">MODEL_INSPECTOR // NEW_ROCKET</div>
+    <div class="info-row">
+      <span class="label">MODEL SOURCE</span>
+      <span class="value">NewRocket.glb</span>
+    </div>
+    <div class="info-row">
+      <span class="label">POLY COUNT</span>
+      <span class="value" id="poly-count">Loading...</span>
+    </div>
+    <div class="info-row">
+      <span class="label">MATERIALS</span>
+      <span class="value" id="mat-count">Loading...</span>
+    </div>
+    <div class="inspector-controls">
+      <button class="control-btn" id="toggle-grid">TOGGLE HELPER GRID</button>
+    </div>
+    
+    <div class="hud-title" style="margin-top: 20px;">MODEL COMPONENTS</div>
+    <div id="components-list" style="max-height: 350px; overflow-y: auto; padding-right: 5px;">
+      <!-- Populated dynamically -->
+    </div>
+  </div>
+
+  <canvas id="viewer-canvas"></canvas>
+
+  <script type="module" src="./rocket_viewer.js"></script>
+</body>
+</html>

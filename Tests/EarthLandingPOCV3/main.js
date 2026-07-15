@@ -387,6 +387,8 @@ function startSequence() {
   orbitControls.enabled = false;
   window.activeControls = null;
   if (cinematicTimeline) {
+    // Debug Mode: Seek with suppressEvents=false so all preceding setup callbacks run, then play
+    cinematicTimeline.seek(CONFIG.timeline.landingStart - 0.1, false);
     cinematicTimeline.play();
   }
 }
@@ -451,7 +453,7 @@ function tick() {
 
   // Update visibility of flight path trajectory line, target ring, and searchlight
   if (trajectoryLine) {
-    trajectoryLine.visible = (ENGINE_STATE.currentScene !== "WARP" && ENGINE_STATE.currentScene !== "INITIAL" && ENGINE_STATE.currentScene !== "SNAP_BACK");
+    trajectoryLine.visible = false;
   }
   if (targetRing) {
     targetRing.visible = (ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL");
@@ -506,26 +508,33 @@ function tick() {
   // Update rocket's curvy arc path towards Earth (finesse shot wide right, curving behind Earth)
   if (ENGINE_STATE.currentScene === "REENTRY" && rocketModel) {
     const u = ENGINE_STATE.rocketArcProgress;
-    const x = -30 * (1 - u) + 10 * u + 300 * u * (1 - u);
-    const y = 70 + 245 * u; // 70 to 315 (behind Earth center at 296.5)
-    const z = -20 * (1 - u) - 10 * u + 15 * Math.sin(Math.PI * u);
-    const scale = 0.65 * (1.0 - 0.9 * u);
+    // Curving diagonally from the bottom-left of the screen, looping wide around the Earth's right limb.
+    // Start position (u=0): (99.45, -53.54, 25.23) -> 100.0 units behind camera, offset bottom-left to prevent lens clipping, scaled to 10.0 (half-size)
+    // End position (u=1): (-31.84, 380.0, -16.91) -> Behind Earth, physically outside its 54-unit radius (dist: 90.1) but visually occluded
+    // Middle excursion (u=0.5): (-60.7, 163.23, 21.3) -> Wide-Right loop clear of Earth's surface (dist: 134.2)
+    const rx = 99.45 * (1.0 - u) - 31.84 * u - 378.02 * u * (1.0 - u);
+    const ry = -53.54 + 433.54 * u;
+    const rz = 25.23 * (1.0 - u) - 16.91 * u + 68.56 * u * (1.0 - u);
+    const scale = 10.0 * (1.0 - 0.94 * u); // Starts at 10.0 (half size), shrinks to 0.6 at the end
     
-    const xRot = z;
-    const zRot = -x;
-    rocketModel.position.set(1.4 + xRot, y, 2.0 + zRot);
+    rocketModel.position.set(rx, ry, rz);
     rocketModel.scale.set(scale, scale, scale);
     
-    // Face the Earth
-    const earthWorldPos = new THREE.Vector3();
-    if (earthGroup) {
-      earthGroup.getWorldPosition(earthWorldPos);
+    // Calculate direction of travel (tangent of the path) for realistic steering
+    const nextU = Math.min(u + 0.002, 1.0);
+    const nextRx = 99.45 * (1.0 - nextU) - 31.84 * nextU - 378.02 * nextU * (1.0 - nextU);
+    const nextRy = -53.54 + 433.54 * nextU;
+    const nextRz = 25.23 * (1.0 - nextU) - 16.91 * nextU + 68.56 * nextU * (1.0 - nextU);
+    
+    const travelDir = new THREE.Vector3(nextRx - rx, nextRy - ry, nextRz - rz).normalize();
+    
+    // Instantly snap rotation to initial tangent at u === 0 to prevent abrupt turning; smoothly slerp thereafter
+    const targetQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), travelDir);
+    if (u === 0) {
+      rocketModel.quaternion.copy(targetQuaternion);
     } else {
-      earthWorldPos.set(1.4, 296.5, 2.0);
+      rocketModel.quaternion.slerp(targetQuaternion, 0.08);
     }
-    const dir = new THREE.Vector3().subVectors(earthWorldPos, rocketModel.position).normalize();
-    const alignQuaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    rocketModel.quaternion.copy(alignQuaternion);
   }
   
   // Thruster Flame scale/opacity updates
@@ -541,6 +550,9 @@ function tick() {
     scene.fog.density = ENGINE_STATE.globalFogDensity;
   } else if (ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL") {
     scene.fog.color.setHex(CONFIG.colors.bgLanding);
+    scene.fog.density = ENGINE_STATE.globalFogDensity;
+  } else if (ENGINE_STATE.currentScene === "REENTRY") {
+    scene.fog.color.setHex(CONFIG.colors.bgSpace);
     scene.fog.density = ENGINE_STATE.globalFogDensity;
   } else {
     scene.fog.density = 0.0;

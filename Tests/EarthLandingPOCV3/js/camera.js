@@ -10,6 +10,9 @@ class CameraRigController {
     this.targetPos = new THREE.Vector3().copy(CONFIG.camera.initial.pos);
     this.targetLook = new THREE.Vector3().copy(CONFIG.camera.initial.look);
     
+    this.snapBackPos = new THREE.Vector3().copy(CONFIG.camera.initial.pos);
+    this.snapBackLook = new THREE.Vector3().copy(CONFIG.camera.initial.look);
+    
     this.shakeIntensity = 0.0;
     this.lerpSpeed = 0.04; // Dampened smooth tracking
     this.stormDetachPos = null;
@@ -32,6 +35,8 @@ class CameraRigController {
     this.currentLook.copy(CONFIG.camera.initial.look);
     this.targetPos.copy(CONFIG.camera.initial.pos);
     this.targetLook.copy(CONFIG.camera.initial.look);
+    this.snapBackPos.copy(CONFIG.camera.initial.pos);
+    this.snapBackLook.copy(CONFIG.camera.initial.look);
   }
   
   update(camera, rocket, elapsed, delta) {
@@ -45,36 +50,28 @@ class CameraRigController {
       this.stormDetachPos = null;
       const u = ENGINE_STATE.cameraArcProgress;
       
-      // Curved orbit camera path towards the Earth
-      const camX = 15 * u - 20 * Math.sin(Math.PI * u);
-      const camY = 46.5 + 113.5 * u; // Go from 46.5 to 160.0 (near Earth surface)
-      const camZ = 15 * u - 15 * Math.sin(Math.PI * u);
+      // Define the start point and the end point for the zoom-past trajectory
+      // Start point (u=0): The captured camera snapBackPos
+      const p0 = this.snapBackPos;
       
-      const camXRot = camZ;
-      const camZRot = -camX;
-      const worldCamPos = new THREE.Vector3(1.4 + camXRot, camY, 2.0 + camZRot);
+      // End point (u=1): Centered with Earth, stopping just behind Earth in Z
+      // USER CONFIGURABLE: Adjust these coordinates to change where the camera ends up
+      // - (1.4, 296.5) matches Earth's center in X and Y.
+      // - Z = -70.0 stops just behind Earth's 54-unit radius (Earth center is at Z=2.0).
+      const p1 = new THREE.Vector3(-100.4, 296.5, -30.0);
       
-      // Calculate flight direction (tangent of the orbit)
-      const vX = 15.0 - 20.0 * Math.PI * Math.cos(Math.PI * u);
-      const vY = 113.5;
-      const vZ = 15.0 - 15.0 * Math.PI * Math.cos(Math.PI * u);
-      const vXRot = vZ;
-      const vZRot = -vX;
-      const flightDir = new THREE.Vector3(vXRot, vY, vZRot).normalize();
+      // Linearly interpolate the camera position
+      const worldCamPos = new THREE.Vector3().lerpVectors(p0, p1, u);
       
-      // Direction towards Earth center
-      const earthPos = new THREE.Vector3(1.4, 296.5, 2.0);
-      const toEarth = new THREE.Vector3().subVectors(earthPos, worldCamPos).normalize();
+      // Calculate direction looking at the Earth at the start of the reentry phase
+      const initialLookDir = new THREE.Vector3().subVectors(this.snapBackLook, p0).normalize();
       
-      // Blend look direction to keep Earth and horizon in view
-      // At u = 0, lookDir is exactly toEarth. As u increases to 1, we blend in flightDir.
-      const lookDir = new THREE.Vector3().addScaledVector(flightDir, 0.65 * u).addScaledVector(toEarth, 1.0 - 0.65 * u).normalize();
-      const worldCamLook = new THREE.Vector3().addVectors(worldCamPos, lookDir.multiplyScalar(100.0));
+      // Lock the look direction to be constant, achieving purely translation and zero rotation
+      const worldCamLook = new THREE.Vector3().addVectors(worldCamPos, initialLookDir.multiplyScalar(100.0));
       
       this.setTarget(worldCamPos, worldCamLook);
       
-      // Up vector rotates from (1,0,0) (90 deg rotated from 0,0,1) in space to (0,1,0) at the end of the plunge
-      camera.up.set(1.0 - u, u, 0.0);
+      camera.up.set(0.0, 1.0, 0.0);
     } else if (rocket && (sc === "WARP" || sc === "INITIAL" || sc === "SNAP_BACK" || sc === "STORM")) {
       if (sc === "INITIAL") {
         this.stormDetachPos = null;
@@ -153,6 +150,10 @@ class CameraRigController {
         }
         
         this.setTarget(worldCamPos, worldCamLook);
+        if (sc === "SNAP_BACK") {
+          this.snapBackPos.copy(worldCamPos);
+          this.snapBackLook.copy(worldCamLook);
+        }
       }
     } else if (sc === "LANDING") {
       this.stormDetachPos = null;

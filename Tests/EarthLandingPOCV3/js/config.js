@@ -22,19 +22,19 @@ export const CONFIG = {
     earthGrowDuration: 7.0,
     
     // V3 sequence phases (slower, more majestic timings)
-    flyToEarthStart: 30.8,
-    flyToEarthDuration: 6.0,
+    flyToEarthStart: 25.8,
+    flyToEarthDuration: 11.0,
     
     cameraChaseStart: 36.8,
-    cameraChaseDuration: 6.0,
+    cameraChaseDuration: 9.2,
     
-    whiteoutStart: 42.8,
+    whiteoutStart: 44.2,
     whiteoutDuration: 3.0,
     
-    landingStart: 45.8,
-    rocketDescentStart: 55.0,
-    touchdownTime: 65.0,
-    manualControlTime: 67.0
+    landingStart: 47.2,
+    rocketDescentStart: 56.4,
+    touchdownTime: 66.4,
+    manualControlTime: 68.4
   },
 
   // Color mappings

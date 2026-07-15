@@ -13,6 +13,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
   tl.add(() => {
     ENGINE_STATE.setScene("WARP");
     ENGINE_STATE.warpProgress = 0.0;
+    ENGINE_STATE.starsOpacity = 1.0; // Reset stars opacity
     if (bloomPass) bloomPass.strength = 0.0;
     CAMERA_RIG.localYOffset = -8.0;
     if (rocket) {
@@ -209,33 +210,33 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     }, 19.8);
   }
 
-  // Stop the animation sequence here as requested (just before atmospheric entry phase)
-  tl.add(() => {
-    tl.pause();
-    console.log("[TIMELINE] Paused just before atmospheric entry phase.");
-  }, 30.8);
-
-  // 3. BEAT 2: FLY TO EARTH ARC (Starts at 30.8s, duration 6.0s)
+  // 3. BEAT 2: FLY TO EARTH ARC (Starts at 25.8s, duration 11.0s)
   // Camera remains completely stationary during this curvy rocket flight phase
   tl.add(() => {
     ENGINE_STATE.setScene("REENTRY");
     ENGINE_STATE.rocketArcProgress = 0.0;
     ENGINE_STATE.cameraArcProgress = 0.0;
     ENGINE_STATE.whiteoutOpacity = 0.0;
+    ENGINE_STATE.globalFogDensity = 0.0; // Reset fog density for space
+    ENGINE_STATE.starsOpacity = 0.25; // Reset stars opacity to snapshot level for reentry start
+    
+    // Ensure lights are initialized to full intensity at start of phase
+    if (spaceSun) spaceSun.intensity = 1.5;
+    if (earthFrontLight) earthFrontLight.intensity = 2.0;
     
     if (rocket) {
       rocket.visible = true;
-      rocket.scale.set(0.65, 0.65, 0.65);
+      rocket.scale.set(10.0, 10.0, 10.0);
     }
   }, CONFIG.timeline.flyToEarthStart);
 
   tl.to(ENGINE_STATE, {
     rocketArcProgress: 1.0,
     duration: CONFIG.timeline.flyToEarthDuration,
-    ease: "power1.inOut"
+    ease: "power2.inOut"
   }, CONFIG.timeline.flyToEarthStart);
 
-  // 3b. BEAT 2b: CAMERA CHASE PLUNGE (Starts at 36.8s, duration 6.0s)
+  // 3b. BEAT 2b: CAMERA CHASE PLUNGE (Starts at 36.8s, duration 12.0s)
   // Once the rocket has vanished, the camera starts plunging down towards the Earth
   tl.add(() => {
     if (rocket) {
@@ -249,19 +250,53 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     ease: "power1.inOut"
   }, CONFIG.timeline.cameraChaseStart);
 
-  // 4. BEAT 3: CLOUDBREAK WHITEOUT (Starts at 42.8s, duration 3.0s)
+  // Fade out directional lights as camera approaches the Earth
+  if (spaceSun) {
+    tl.to(spaceSun, {
+      intensity: 0.0,
+      duration: CONFIG.timeline.cameraChaseDuration,
+      ease: "power1.inOut"
+    }, CONFIG.timeline.cameraChaseStart);
+  }
+  if (earthFrontLight) {
+    tl.to(earthFrontLight, {
+      intensity: 0.0,
+      duration: CONFIG.timeline.cameraChaseDuration,
+      ease: "power1.inOut"
+    }, CONFIG.timeline.cameraChaseStart);
+  }
+
+  // Increase space fog density to simulate moving through dark, thick mist
+  tl.to(ENGINE_STATE, {
+    globalFogDensity: 0.08,
+    duration: CONFIG.timeline.cameraChaseDuration,
+    ease: "power2.in"
+  }, CONFIG.timeline.cameraChaseStart);
+
+  // Fade out stars in sync with the lights
+  tl.to(ENGINE_STATE, {
+    starsOpacity: 0.0,
+    duration: CONFIG.timeline.cameraChaseDuration,
+    ease: "power1.inOut"
+  }, CONFIG.timeline.cameraChaseStart);
+
+  // 4. BEAT 3: CLOUDBREAK WHITEOUT (Starts at 48.8s, duration 3.0s)
   tl.add(() => {
-    // Setup for whiteout
+    // Setup for dark transition: change overlay color to dark space color
+    const overlay = document.getElementById("storm-overlay");
+    if (overlay) {
+      overlay.style.backgroundColor = "#020205";
+    }
   }, CONFIG.timeline.whiteoutStart);
 
-  // Fade screen to solid white over 1.0s
+  // Fade screen to solid dark mist over 1.0s
   tl.to(ENGINE_STATE, {
     whiteoutOpacity: 1.0,
     duration: 1.0,
     ease: "none"
   }, CONFIG.timeline.whiteoutStart);
 
-  // Switch scene at peak whiteout (44.3s)
+  // Switch scene at peak dark transition (50.3s)
   tl.add(() => {
     ENGINE_STATE.setScene("LANDING");
     ENGINE_STATE.globalFogDensity = 0.045; // Start with thick fog
@@ -288,21 +323,24 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     
     // Reset camera descent progress
     ENGINE_STATE.cameraDescentProgress = 0.0;
-  }, CONFIG.timeline.whiteoutStart + 1.5); // 42.8 + 1.5 = 44.3s
+  }, CONFIG.timeline.whiteoutStart + 1.5);
 
-  // Fade whiteout back to transparent over 1.0s
+  // Fade dark overlay back to transparent over 1.0s
   tl.to(ENGINE_STATE, {
     whiteoutOpacity: 0.0,
     duration: 1.0,
     ease: "none"
-  }, CONFIG.timeline.whiteoutStart + 2.0); // 42.8 + 2.0 = 44.8s
+  }, CONFIG.timeline.whiteoutStart + 2.0);
 
-  // 5. BEAT 4: OCEAN DESCENT & ANGLE SWEEP (Starts at 45.8s, duration 10.0s)
-  // PAUSE the sequence here as requested to wait for the next instructions
+  // Reset overlay background color to white for lightning strikes once it's invisible
   tl.add(() => {
-    tl.pause();
-    console.log("[TIMELINE] Paused after whiteout descent to wait for further instructions.");
-  }, CONFIG.timeline.landingStart); // 45.8s
+    const overlay = document.getElementById("storm-overlay");
+    if (overlay) {
+      overlay.style.backgroundColor = "#ffffff";
+    }
+  }, CONFIG.timeline.landingStart);
+
+  // 5. BEAT 4: OCEAN DESCENT & ANGLE SWEEP (Starts at 40.3s, duration 10.0s)
 
   tl.to(ENGINE_STATE, {
     cameraDescentProgress: 1.0,
