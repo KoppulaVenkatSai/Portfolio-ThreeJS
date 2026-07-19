@@ -99,11 +99,6 @@ searchLight.shadow.mapSize.height = 1024;
 scene.add(searchLight);
 scene.add(searchLight.target);
 
-// Ocean coordinates landing target grid helper (green)
-export const oceanGrid = new THREE.GridHelper(800, 80, 0x00ff66, 0x032210);
-oceanGrid.position.y = 0.2;
-oceanGrid.visible = false;
-oceanGroup.add(oceanGrid);
 
 // Flight Trajectory descent path line (neon green)
 const pathPoints = [
@@ -128,14 +123,10 @@ const targetRingGeom = new THREE.RingGeometry(4.0, 4.4, 32);
 const targetRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffaa, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
 export const targetRing = new THREE.Mesh(targetRingGeom, targetRingMat);
 targetRing.rotation.x = -Math.PI / 2;
-targetRing.position.set(20.0, 0.25, -65.0);
+targetRing.position.set(40.0, 7.01, -100.0);
 oceanGroup.add(targetRing);
 
-// Vertical laser beacon connecting rocket to its ground projection point
-const beaconGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -1, 0)]);
-const beaconMat = new THREE.LineBasicMaterial({ color: 0x00ff66, transparent: true, opacity: 0.65 });
-export const beaconLine = new THREE.Line(beaconGeom, beaconMat);
-scene.add(beaconLine);
+
 
 // Camera Initial Locking
 camera.position.copy(CONFIG.camera.initial.pos);
@@ -379,7 +370,7 @@ gltfLoader.load(CONFIG.assets.rocketModel, (gltf) => {
 gltfLoader.load(CONFIG.assets.monolithScene, (gltf) => {
   monolithScene = gltf.scene;
   monolithScene.scale.set(0.6, 0.6, 0.6);
-  monolithScene.position.set(0, 2.5, -45);
+  monolithScene.position.set(0, 7.0, -45);
   oceanGroup.add(monolithScene);
 });
 
@@ -436,20 +427,7 @@ function tick() {
     searchLight.target.position.set(rocketModel.position.x, rocketModel.position.y - 60.0, rocketModel.position.z);
   }
 
-  // Update vertical beacon laser line to project rocket's ground location
-  if (rocketModel && beaconLine) {
-    const rPos = rocketModel.position;
-    const targetY = (ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL") ? 0.2 : -15.0;
-    const points = [
-      rPos.clone(),
-      new THREE.Vector3(rPos.x, targetY, rPos.z)
-    ];
-    beaconLine.geometry.setFromPoints(points);
-    
-    // Only show beacon line during descent when rocket is visible
-    const isDescent = (ENGINE_STATE.currentScene === "REENTRY" || ENGINE_STATE.currentScene === "STORM" || ENGINE_STATE.currentScene === "LANDING");
-    beaconLine.visible = isDescent && rocketModel.visible;
-  }
+
 
   // Update visibility of flight path trajectory line, target ring, and searchlight
   if (trajectoryLine) {
@@ -718,9 +696,10 @@ if (copyBtn) {
     const cy = camera.position.y.toFixed(2);
     const cz = camera.position.z.toFixed(2);
     
-    const tx = orbitControls.target.x.toFixed(2);
-    const ty = orbitControls.target.y.toFixed(2);
-    const tz = orbitControls.target.z.toFixed(2);
+    const activeControls = window.activeControls || orbitControls;
+    const tx = activeControls.target.x.toFixed(2);
+    const ty = activeControls.target.y.toFixed(2);
+    const tz = activeControls.target.z.toFixed(2);
     
     const outputText = `--- EARTH LANDING POC V3 SETUP ---\n` +
                        `Rocket Position: x: ${rx}, y: ${ry}, z: ${rz}\n` +

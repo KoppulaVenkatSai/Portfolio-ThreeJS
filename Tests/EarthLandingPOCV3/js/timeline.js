@@ -310,7 +310,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     
     // Position rocket high up on the back-right corner
     if (rocket) {
-      rocket.position.set(20.0, 70.0, -65.0);
+      rocket.position.set(40.0, 70.0, -100.0);
       rocket.scale.set(0.65, 0.65, 0.65);
       rocket.rotation.set(0, -Math.PI / 4, 0);
       rocket.visible = true;
@@ -372,7 +372,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
 
   if (rocket) {
     tl.to(rocket.position, {
-      y: 2.9, // touchdown height
+      y: 7.4, // touchdown height (elevated by +4.5)
       duration: CONFIG.timeline.touchdownTime - CONFIG.timeline.rocketDescentStart, // 10.0s
       ease: "power1.out"
     }, CONFIG.timeline.rocketDescentStart);
@@ -397,7 +397,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 - 0.05; // don't go below water
-    controls.target.set(0, 2.5, -45.0); // target the monolith in center
+    controls.target.set(-0.74, 17.04, -74.29); // target the elevated coordinates
     window.activeControls = controls;
   }, CONFIG.timeline.manualControlTime); // 55.0s
 

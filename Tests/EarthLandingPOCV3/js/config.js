@@ -78,8 +78,9 @@ export const CONFIG = {
     },
     landing: {
       // Camera placement matching 1774209118934.png (looking up slightly/level, wide framing of monolith & rocket hover)
-      offsetPos: new THREE.Vector3(0.0, 8.0, 15.0),
-      offsetLook: new THREE.Vector3(0.0, 2.5, -45.0)
+      // Elevated by +4.5 units to match monolith/rocket base elevations
+      offsetPos: new THREE.Vector3(-0.74, 18.95, -36.13),
+      offsetLook: new THREE.Vector3(-0.74, 17.04, -74.29)
     }
   },
 

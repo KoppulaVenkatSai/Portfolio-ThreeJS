@@ -169,17 +169,21 @@ class CameraRigController {
       }
     } else if (sc === "LANDING") {
       this.stormDetachPos = null;
-      // Independent ocean descent and angle sweep (from 45 deg down looking at monolith, to level manual orbit)
+      // Independent ocean descent and angle sweep (from 45 deg down looking at monolith, to user custom viewport framing)
       const u = ENGINE_STATE.cameraDescentProgress;
-      const camY = 52.5 * (1 - u) + 6.0 * u;
-      const camZ = 5.0 * (1 - u) + 12.0 * u;
-      const lookY = 2.5 * (1 - u) + 3.5 * u;
+      const camX = 0.0 * (1 - u) - 0.74 * u;
+      const camY = 57.0 * (1 - u) + 18.95 * u; 
+      const camZ = -22.0 * (1 - u) - 36.13 * u;
       
-      this.setTarget(new THREE.Vector3(0, camY, camZ), new THREE.Vector3(0, lookY, -45.0));
+      const lookX = 0.0 * (1 - u) - 0.74 * u;
+      const lookY = 7.0 * (1 - u) + 17.04 * u; 
+      const lookZ = -72.0 * (1 - u) - 74.29 * u;
+      
+      this.setTarget(new THREE.Vector3(camX, camY, camZ), new THREE.Vector3(lookX, lookY, lookZ));
     } else if (sc === "MANUAL") {
       this.stormDetachPos = null;
-      // Level camera settled at the final position
-      this.setTarget(new THREE.Vector3(0, 6.0, 12.0), new THREE.Vector3(0, 3.5, -45.0));
+      // Level camera settled at the custom position configured by user in the UI (elevated by +4.5)
+      this.setTarget(new THREE.Vector3(-0.74, 18.95, -36.13), new THREE.Vector3(-0.74, 17.04, -74.29));
     } else {
       // Fallback: no rocket yet (pre-load) or unrecognised scene.
       // Always return smoothly to the config default position.

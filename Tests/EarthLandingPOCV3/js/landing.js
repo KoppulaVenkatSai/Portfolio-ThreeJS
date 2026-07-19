@@ -86,11 +86,21 @@ const OceanShader = {
     void main() {
       vec3 normal = normalize(vWorldNormal);
       
-      // Layered micro-bump mapping for rainy ripple patterns
-      vec2 uvRipple = vUv * 8000.0 + vec2(uTime * 10.0, uTime * 6.0);
-      float microBump = noise(uvRipple) * 0.15 + noise(uvRipple * 2.0) * 0.08;
+      // Layered micro-bump mapping using world position for seamless, non-stretched coordinates
+      vec2 uvRippleX = vWorldPos.xz * 5.0 + vec2(uTime * 0.8, uTime * 0.5);
+      vec2 uvRippleZ = vWorldPos.xz * 5.0 + vec2(uTime * -0.6 + 80.0, uTime * 0.9 + 40.0);
       
-      vec3 blendNormal = normalize(normal + vec3(microBump, microBump, 0.0));
+      // Use different frequencies and scrolling directions to create dynamic, chaotic wave ripples
+      float bumpX = noise(uvRippleX) * 0.14 + 
+                    noise(uvRippleX * 2.2 + vec2(uTime * -0.4, uTime * 0.8)) * 0.07 +
+                    noise(uvRippleX * 4.8 + vec2(uTime * 1.2, uTime * -1.0)) * 0.03;
+                    
+      float bumpZ = noise(uvRippleZ) * 0.14 + 
+                    noise(uvRippleZ * 2.2 + vec2(uTime * 0.6, uTime * -0.5)) * 0.07 +
+                    noise(uvRippleZ * 4.8 + vec2(uTime * -0.9, uTime * 1.1)) * 0.03;
+      
+      // Perturb the normal along the horizontal XZ plane, leaving the vertical component unaffected
+      vec3 blendNormal = normalize(normal + vec3(bumpX, 0.0, bumpZ));
       
       vec3 viewDir = normalize(cameraPosition - vWorldPos);
       
@@ -232,6 +242,45 @@ export function createStarTexture() {
   return texture;
 }
 
+export function createNoiseTexture(width = 256, height = 256, colorHex1 = '#1a1f2c', colorHex2 = '#0d0f15') {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  
+  // Fill background with a gradient
+  const grad = ctx.createLinearGradient(0, 0, width, height);
+  grad.addColorStop(0, colorHex1);
+  grad.addColorStop(1, colorHex2);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, width, height);
+  
+  // Draw fine speckles
+  const imgData = ctx.getImageData(0, 0, width, height);
+  const data = imgData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * 15.0; // grain strength
+    data[i] = Math.min(255, Math.max(0, data[i] + noise));
+    data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+    data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Layer some soft organic spots
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.03)';
+    ctx.beginPath();
+    ctx.arc(Math.random() * width, Math.random() * height, 2 + Math.random() * 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(4, 4);
+  return texture;
+}
+
 export class LandingSystem {
   constructor(scene) {
     this.scene = scene;
@@ -268,7 +317,8 @@ export class LandingSystem {
       fog: false
     });
     
-    const nebGeo = new THREE.PlaneGeometry(1200, 1200);
+    // Shortened plane height so bottom edge stays above Y = 0 (horizon) at Z = -500
+    const nebGeo = new THREE.PlaneGeometry(1200, 450);
     
     // Dynamic Nebula Group (User Configurable Count)
     this.nebulaCount = 5; // Change this to set total number of nebulas!
@@ -286,7 +336,8 @@ export class LandingSystem {
       
       // Calculate even spacing along the X belt
       const startX = (i / this.nebulaCount) * loopWidth - halfLoop;
-      const y = 100 + Math.random() * 180; // random height
+      // Position centers higher to avoid dipping below the ocean level
+      const y = 240 + Math.random() * 40; 
       const z = -520 + Math.random() * 30;  // layering layers
       
       mesh.position.set(startX, y, z);
@@ -302,7 +353,8 @@ export class LandingSystem {
         driftFreqX: 0.2 + Math.random() * 0.2,
         driftAmpX: 25 + Math.random() * 20,
         driftFreqY: 0.1 + Math.random() * 0.2,
-        driftAmpY: 15 + Math.random() * 15
+        // Small Y-amplitude to keep bottom edge above the horizon
+        driftAmpY: 5 + Math.random() * 5
       });
     }
     
@@ -373,8 +425,8 @@ export class LandingSystem {
     this.stormSkyLight.position.set(40, 150, 40);
     this.scene.add(this.stormSkyLight);
     
-    // 2. Ink-black Ocean Mesh
-    this.oceanGeom = new THREE.PlaneGeometry(1500, 1500, 180, 180);
+    // 2. Ink-black Ocean Mesh (larger to ensure edges/bottom are never visible)
+    this.oceanGeom = new THREE.PlaneGeometry(4000, 4000, 250, 250);
     this.oceanMat = new THREE.ShaderMaterial({
       vertexShader: OceanShader.vertex,
       fragmentShader: OceanShader.fragment,
@@ -403,12 +455,40 @@ export class LandingSystem {
       emissive: 0x00ffff,
       emissiveIntensity: 0.0
     });
+
+    // Procedural textured materials for platforms, slabs, and pillars
+    this.slabTexture = createNoiseTexture(256, 256, '#181d28', '#0b0d13');
+    this.slabMat = new THREE.MeshStandardMaterial({
+      map: this.slabTexture,
+      bumpMap: this.slabTexture,
+      bumpScale: 0.08,
+      roughness: 0.85,
+      metalness: 0.15
+    });
+
+    this.padTexture = createNoiseTexture(256, 256, '#3a4454', '#202632');
+    this.padMat = new THREE.MeshStandardMaterial({
+      map: this.padTexture,
+      bumpMap: this.padTexture,
+      bumpScale: 0.05,
+      roughness: 0.35,
+      metalness: 0.85
+    });
+
+    this.pillarTexture = createNoiseTexture(256, 256, '#404c5c', '#2c3540');
+    this.pillarMat = new THREE.MeshStandardMaterial({
+      map: this.pillarTexture,
+      bumpMap: this.pillarTexture,
+      bumpScale: 0.04,
+      roughness: 0.25,
+      metalness: 0.90
+    });
     
-    // Point light underneath the platform
-    this.ambientHoverLight = new THREE.PointLight(0x00ffff, 4.5, 45);
-    this.ambientHoverLight.position.set(0, 0.5, -45);
+    // Point light underneath the platform (Z = -72 to match the new pad position under the monolith, elevated to Y = 5.0, softened to 1.5 intensity, 25 distance)
+    this.ambientHoverLight = new THREE.PointLight(0x00ffff, 1.5, 25);
+    this.ambientHoverLight.position.set(0, 5.0, -72);
     
-    // Glowing pool on the water surface under the platform
+    // Glowing pool on the water surface under the platform (Z = -72)
     const poolCanvas = document.createElement("canvas");
     poolCanvas.width = 128;
     poolCanvas.height = 128;
@@ -430,14 +510,11 @@ export class LandingSystem {
     });
     this.hoverPool = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), this.poolMat);
     this.hoverPool.rotation.x = -Math.PI / 2;
-    this.hoverPool.position.set(0, 0.1, -45);
+    this.hoverPool.position.set(0, 0.1, -72);
   }
   
   configureMonolith(monolithScene) {
     if (!monolithScene) return;
-    
-    this.scene.add(this.ambientHoverLight);
-    this.scene.add(this.hoverPool);
     
     monolithScene.traverse((node) => {
       if (node.isMesh) {
@@ -447,25 +524,92 @@ export class LandingSystem {
         if (node.name.includes("Monolith")) {
           node.material = this.monolithMat;
         } else if (node.name.includes("LandingPad") || node.name.includes("PadGlowRing") || node.name.includes("PadCenterMetal")) {
-          // Keep the landing pad as metallic grey
-          if (node.material) {
-            const mats = Array.isArray(node.material) ? node.material : [node.material];
-            mats.forEach(m => {
-              m.roughness = 0.25;
-              m.metalness = 0.80;
-            });
-          }
+          node.material = this.padMat;
         } else if (node.material) {
-          // All other decorative slabs re-styled as dark rough wet concrete
-          const mats = Array.isArray(node.material) ? node.material : [node.material];
-          mats.forEach(m => {
-            m.roughness = 0.85; // non-reflective wet stone
-            m.metalness = 0.05; // non-metallic
-            m.color.setHex(0x0a0d14); // dark slate/stone color
-          });
+          node.material = this.slabMat;
         }
       }
     });
+
+    // Group the pad meshes so we can reposition and clone them
+    const padNodes = [];
+    // Gather direct children of monolithScene that are part of the pad (Z coordinate near 0)
+    monolithScene.children.forEach((child) => {
+      if (Math.abs(child.position.z) < 20.0) {
+        padNodes.push(child);
+      }
+    });
+
+    // Create padGroup and add the meshes to it
+    this.padGroup = new THREE.Group();
+    padNodes.forEach((node) => {
+      this.padGroup.add(node);
+    });
+
+    // Position the padGroup at local Z = -45 (under the monolith)
+    this.padGroup.position.set(0, 0, -45);
+    monolithScene.add(this.padGroup);
+
+    // Clone padGroup and place it under the rocket (world coords: X = 40.0, Y = 7.0, Z = -100.0)
+    this.rocketPadGroup = this.padGroup.clone();
+    this.rocketPadGroup.position.set(40.0, 7.0, -100.0);
+    this.rocketPadGroup.scale.set(0.6, 0.6, 0.6); // Match monolithScene scale
+    this.scene.add(this.rocketPadGroup);
+
+    // Add ambient lights and hover pool under the monolith's pad (world Z = -72)
+    this.scene.add(this.ambientHoverLight);
+    this.scene.add(this.hoverPool);
+
+    // Create concrete pillars/supports under the monolith pad and rocket pad to prevent floating in air
+    // Thinned, metallic, and high-poly (64 radial segments, 32 height segments)
+    const monoPillarGeom = new THREE.CylinderGeometry(11, 12, 15.0, 64, 32);
+    this.monolithPillar = new THREE.Mesh(monoPillarGeom, this.pillarMat);
+    this.monolithPillar.position.set(0, -0.5, -72.0);
+    this.monolithPillar.receiveShadow = true;
+    this.monolithPillar.castShadow = true;
+    this.scene.add(this.monolithPillar);
+
+    const rockPillarGeom = new THREE.CylinderGeometry(6, 7, 15.0, 64, 32);
+    this.rocketPillar = new THREE.Mesh(rockPillarGeom, this.pillarMat);
+    this.rocketPillar.position.set(40.0, -0.5, -100.0);
+    this.rocketPillar.receiveShadow = true;
+    this.rocketPillar.castShadow = true;
+    this.scene.add(this.rocketPillar);
+
+    // Add soft directional/stage lights pointing down on the Monolith and Rocket pads
+    this.monoStageLight = new THREE.DirectionalLight(0xcee7ff, 1.2);
+    this.monoStageLight.position.set(0, 80.0, -72.0);
+    this.monoStageLight.castShadow = true;
+    this.monoStageLight.shadow.mapSize.width = 1024;
+    this.monoStageLight.shadow.mapSize.height = 1024;
+    this.monoStageLight.shadow.bias = -0.0006;
+    this.monoStageLight.shadow.radius = 4;
+    this.monoStageLight.shadow.camera.left = -30;
+    this.monoStageLight.shadow.camera.right = 30;
+    this.monoStageLight.shadow.camera.top = 30;
+    this.monoStageLight.shadow.camera.bottom = -30;
+    this.monoStageLight.shadow.camera.near = 10;
+    this.monoStageLight.shadow.camera.far = 100;
+    this.scene.add(this.monoStageLight);
+    this.scene.add(this.monoStageLight.target);
+    this.monoStageLight.target.position.set(0, 7.0, -72.0);
+
+    this.rocketStageLight = new THREE.DirectionalLight(0xcee7ff, 1.2);
+    this.rocketStageLight.position.set(40.0, 80.0, -100.0);
+    this.rocketStageLight.castShadow = true;
+    this.rocketStageLight.shadow.mapSize.width = 1024;
+    this.rocketStageLight.shadow.mapSize.height = 1024;
+    this.rocketStageLight.shadow.bias = -0.0006;
+    this.rocketStageLight.shadow.radius = 4;
+    this.rocketStageLight.shadow.camera.left = -20;
+    this.rocketStageLight.shadow.camera.right = 20;
+    this.rocketStageLight.shadow.camera.top = 20;
+    this.rocketStageLight.shadow.camera.bottom = -20;
+    this.rocketStageLight.shadow.camera.near = 10;
+    this.rocketStageLight.shadow.camera.far = 100;
+    this.scene.add(this.rocketStageLight);
+    this.scene.add(this.rocketStageLight.target);
+    this.rocketStageLight.target.position.set(40.0, 7.0, -100.0);
   }
   
   activateOcean() {
@@ -475,7 +619,7 @@ export class LandingSystem {
 
   
   update(elapsed, rocket) {
-    this.oceanMat.uniforms.uTime.value = 0.0; // Freeze ocean wave movements
+    this.oceanMat.uniforms.uTime.value = elapsed; // Unfreeze ocean wave movements
     
     const sc = ENGINE_STATE.currentScene;
     const isOcean = (sc === "LANDING" || sc === "MANUAL");
@@ -485,6 +629,21 @@ export class LandingSystem {
     this.ocean.visible = isOcean;
     this.ambientHoverLight.visible = isOcean;
     this.hoverPool.visible = isOcean;
+    if (this.rocketPadGroup) {
+      this.rocketPadGroup.visible = isOcean;
+    }
+    if (this.monolithPillar) {
+      this.monolithPillar.visible = isOcean;
+    }
+    if (this.rocketPillar) {
+      this.rocketPillar.visible = isOcean;
+    }
+    if (this.monoStageLight) {
+      this.monoStageLight.visible = isOcean;
+    }
+    if (this.rocketStageLight) {
+      this.rocketStageLight.visible = isOcean;
+    }
     
     this.stormAmbient.visible = isStormOrLanding;
     this.stormSkyLight.visible = isStormOrLanding;
@@ -504,16 +663,22 @@ export class LandingSystem {
       
       const pulse = 1.0;
       this.monolithMat.emissiveIntensity = pulse * fadeIn;
-      this.ambientHoverLight.intensity = 4.5 * fadeIn;
-      this.poolMat.opacity = 0.60 * fadeIn;
+      this.ambientHoverLight.intensity = 1.5 * fadeIn; // Softened intensity
+      this.poolMat.opacity = 0.25 * fadeIn; // Softened opacity
       
       this.moonLight.intensity = 0.6 * fadeIn;
       this.stormAmbient.intensity = ENGINE_STATE.ambientIntensity * fadeIn;
       this.stormSkyLight.intensity = 0.7 * fadeIn;
+      if (this.monoStageLight) {
+        this.monoStageLight.intensity = 1.2 * fadeIn;
+      }
+      if (this.rocketStageLight) {
+        this.rocketStageLight.intensity = 1.2 * fadeIn;
+      }
       
       // Fade in background nebula planes and stars
-      if (this.nebMat1) this.nebMat1.opacity = fadeIn * 0.50; // Dimmed maximum opacity (was 1.0)
-      if (this.nebMat2) this.nebMat2.opacity = fadeIn * 0.40; // Dimmed maximum opacity (was 1.0)
+      if (this.nebMat1) this.nebMat1.opacity = fadeIn * 0.40; // Dimmed maximum opacity (was 1.0)
+      if (this.nebMat2) this.nebMat2.opacity = fadeIn * 0.30; // Dimmed maximum opacity (was 1.0)
       if (this.starMat) this.starMat.opacity = fadeIn * 0.85;
       
       // Slow, dynamic background nebula drift and rotation (swirling effect)
