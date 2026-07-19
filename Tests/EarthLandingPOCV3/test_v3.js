@@ -21,9 +21,21 @@ const TIME_SCALE = 4.0; // Set this to match CONFIG.timeScale in config.js
     console.error('PAGE ERROR:', err.stack || err.message);
   });
 
+  // Print all failed requests
+  page.on('requestfailed', request => {
+    console.error(`REQUEST FAILED: ${request.url()} - ${request.failure() ? request.failure().errorText : 'unknown error'}`);
+  });
+
+  // Print non-2xx responses
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      console.error(`HTTP ERROR ${response.status()}: ${response.url()}`);
+    }
+  });
+
   try {
     // 1. Navigate to the local server
-    await page.goto('http://localhost:5173/Tests/EarthLandingPOCV3/index.html');
+    await page.goto('http://localhost:5174/Tests/EarthLandingPOCV3/index.html');
     console.log("Navigated to page. Waiting for assets loader...");
 
     // Wait for the loader to hide (button becomes enabled)

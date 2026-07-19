@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CONFIG } from "./config.js";
 import { ENGINE_STATE } from "./state.js";
+import { MonolithManager } from "./monolith.js";
 
 // Ocean shader with Gerstner wave displacement and specularity
 const OceanShader = {
@@ -281,6 +282,313 @@ export function createNoiseTexture(width = 256, height = 256, colorHex1 = '#1a1f
   return texture;
 }
 
+export function createMonitorTexture(faceType) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 4096;
+  const ctx = canvas.getContext("2d");
+  
+  // Dark blue-black background
+  const bgGrad = ctx.createLinearGradient(0, 0, 0, 4096);
+  bgGrad.addColorStop(0, "#020306");
+  bgGrad.addColorStop(0.5, "#010204");
+  bgGrad.addColorStop(1, "#020306");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, 512, 4096);
+  
+  // Digital grid overlay
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.04)";
+  ctx.lineWidth = 1.0;
+  for (let x = 0; x < 512; x += 32) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 4096);
+    ctx.stroke();
+  }
+  for (let y = 0; y < 4096; y += 32) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(512, y);
+    ctx.stroke();
+  }
+  
+  // Circuit borders
+  ctx.save();
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = 3.0;
+  ctx.strokeStyle = "rgba(0, 240, 255, 0.85)";
+  ctx.shadowColor = "#00f0ff";
+  
+  ctx.beginPath();
+  ctx.moveTo(25, 80);
+  ctx.lineTo(25, 4016);
+  ctx.stroke();
+  
+  ctx.beginPath();
+  ctx.moveTo(487, 80);
+  ctx.lineTo(487, 4016);
+  ctx.stroke();
+  
+  // Left circuit nodes
+  ctx.beginPath();
+  ctx.moveTo(25, 1200);
+  ctx.lineTo(65, 1240);
+  ctx.lineTo(65, 1400);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(65, 1400, 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#00f0ff";
+  ctx.fill();
+
+  // Right circuit nodes
+  ctx.beginPath();
+  ctx.moveTo(487, 2400);
+  ctx.lineTo(447, 2440);
+  ctx.lineTo(447, 2600);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(447, 2600, 8, 0, Math.PI * 2);
+  ctx.fillStyle = "#00f0ff";
+  ctx.fill();
+  ctx.restore();
+
+  if (faceType === "face1") {
+    // VENKAT KOPPULA Personal Identity (Centered right in front of camera view)
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f0ff";
+    ctx.fillStyle = "#00f0ff";
+    ctx.font = 'bold 64px "Outfit", "Share Tech Mono", sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText("VENKAT", 256, 1750);
+    ctx.fillText("KOPPULA", 256, 1840);
+
+    ctx.strokeStyle = "rgba(0, 240, 255, 0.6)";
+    ctx.lineWidth = 4.0;
+    ctx.beginPath();
+    ctx.moveTo(70, 1900);
+    ctx.lineTo(442, 1900);
+    ctx.stroke();
+
+    // EMAIL Section
+    const emailY = 2200;
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = "#00f0ff";
+    ctx.shadowColor = "#00f0ff";
+    ctx.lineWidth = 4.0;
+    ctx.strokeRect(206, emailY - 100, 100, 70);
+    ctx.beginPath();
+    ctx.moveTo(206, emailY - 100);
+    ctx.lineTo(256, emailY - 55);
+    ctx.lineTo(306, emailY - 100);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("EMAIL:", 256, emailY + 10);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 24px "Share Tech Mono", monospace';
+    ctx.fillText("venky.koppula2003@gmail.com", 256, emailY + 50);
+
+    // CONTACT Section
+    const contactY = 2700;
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = "#00f0ff";
+    ctx.shadowColor = "#00f0ff";
+    ctx.lineWidth = 4.0;
+    ctx.strokeRect(216, contactY - 100, 80, 110);
+    ctx.strokeRect(226, contactY - 85, 60, 70);
+    ctx.beginPath();
+    ctx.arc(256, contactY - 5, 5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("CONTACT:", 256, contactY + 50);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 28px "Share Tech Mono", monospace';
+    ctx.fillText("+91 XXXXX XXXXX", 256, contactY + 95);
+
+    // ADDRESS Section
+    const addressY = 3200;
+    ctx.shadowBlur = 15;
+    ctx.strokeStyle = "#ff7043";
+    ctx.shadowColor = "#ff7043";
+    ctx.lineWidth = 4.0;
+    ctx.beginPath();
+    ctx.moveTo(256, addressY - 60);
+    ctx.bezierCurveTo(216, addressY - 120, 216, addressY - 180, 256, addressY - 180);
+    ctx.bezierCurveTo(296, addressY - 180, 296, addressY - 120, 256, addressY - 60);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(256, addressY - 130, 10, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff7043";
+    ctx.fill();
+
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("ADDRESS:", 256, addressY);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 28px "Share Tech Mono", monospace';
+    ctx.fillText("Hyderabad, India", 256, addressY + 45);
+
+  } else if (faceType === "face2") {
+    // THE JOURNEY Timeline
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f0ff";
+    ctx.fillStyle = "#00f0ff";
+    ctx.font = 'bold 52px "Outfit", "Share Tech Mono", sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText("THE JOURNEY", 256, 450);
+
+    ctx.strokeStyle = "rgba(0, 240, 255, 0.4)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(100, 650);
+    ctx.lineTo(100, 3600);
+    ctx.stroke();
+
+    const milestones = [
+      { y: 900, title: "SCHOOL ERA", dates: "2012 - 2020" },
+      { y: 1700, title: "COLLEGE ERA", subtitle: "(CBIT/UDH)", dates: "2020 - 2024" },
+      { y: 2500, title: "INDUSTRY ASCENT", subtitle: "(HEXAGON)", dates: "2024 - 2025" },
+      { y: 3300, title: "AI/ML PIVOT", dates: "2025 - PRESENT" }
+    ];
+
+    milestones.forEach((m) => {
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "#ffd700";
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath();
+      ctx.arc(100, m.y, 16, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255, 215, 0, 0.8)";
+      ctx.lineWidth = 3.0;
+      ctx.beginPath();
+      ctx.moveTo(100, m.y);
+      ctx.lineTo(140, m.y);
+      ctx.stroke();
+
+      ctx.textAlign = "left";
+      ctx.shadowColor = "#00f0ff";
+      ctx.fillStyle = "#00f0ff";
+      ctx.font = 'bold 32px "Share Tech Mono", monospace';
+      ctx.fillText(m.title, 160, m.y - 10);
+
+      if (m.subtitle) {
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowBlur = 0;
+        ctx.font = '24px "Share Tech Mono", monospace';
+        ctx.fillText(m.subtitle, 160, m.y + 20);
+        ctx.fillStyle = "#ffd700";
+        ctx.fillText(m.dates, 160, m.y + 50);
+      } else {
+        ctx.fillStyle = "#ffd700";
+        ctx.shadowBlur = 0;
+        ctx.font = '24px "Share Tech Mono", monospace';
+        ctx.fillText(m.dates, 160, m.y + 25);
+      }
+    });
+
+  } else if (faceType === "face3") {
+    // THE SYSTEMS CORE Tech stack
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f0ff";
+    ctx.fillStyle = "#00f0ff";
+    ctx.font = 'bold 52px "Outfit", "Share Tech Mono", sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText("SYSTEM CORE", 256, 450);
+
+    const tsY = 900;
+    ctx.shadowColor = "#ffd700";
+    ctx.fillStyle = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("TECH STACK", 256, tsY);
+
+    ctx.fillStyle = "#00f0ff";
+    ctx.shadowColor = "#00f0ff";
+    ctx.font = 'bold 30px "Share Tech Mono", monospace';
+    ctx.fillText("PYTHON // RUST // C++", 256, tsY + 80);
+    ctx.fillText("THREE.JS // WEBGL", 256, tsY + 140);
+    ctx.fillText("PYTORCH // CUDA", 256, tsY + 200);
+
+    const indY = 2200;
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("INDUSTRIAL EXPERTISE", 256, indY);
+
+    ctx.fillStyle = "#00f0ff";
+    ctx.shadowColor = "#00f0ff";
+    ctx.font = '28px "Share Tech Mono", monospace';
+    ctx.fillText("OIL REFINERIES", 256, indY + 70);
+    ctx.fillText("GAS TURBINES", 256, indY + 120);
+
+  } else if (faceType === "face4") {
+    // SYSTEM STATUS Telemetry Radar & Logs
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f0ff";
+    ctx.fillStyle = "#00f0ff";
+    ctx.font = 'bold 52px "Outfit", "Share Tech Mono", sans-serif';
+    ctx.textAlign = "center";
+    ctx.fillText("SYSTEM STATUS", 256, 450);
+
+    const paramY = 1200;
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("PARAMETERS", 256, paramY);
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowBlur = 0;
+    ctx.font = '26px "Share Tech Mono", monospace';
+    ctx.fillText("TEMP: 342.5 K", 100, paramY + 80);
+    ctx.fillText("PRESSURE: 1.02 ATM", 100, paramY + 140);
+    ctx.fillText("THRUST: 89.2%", 100, paramY + 200);
+    ctx.fillText("LOCK: SECURED", 100, paramY + 260);
+
+    const logY = 2400;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ffd700";
+    ctx.shadowColor = "#ffd700";
+    ctx.font = 'bold 36px "Share Tech Mono", monospace';
+    ctx.fillText("TELEMETRY LOGS", 256, logY);
+
+    const logLines = [
+      "> CONNECTING... OK",
+      "> SYSTEMS BALANCED",
+      "> DESCENT STABLE",
+      "> TOUCHDOWN READY",
+      "> STATUS: ACTIVE"
+    ];
+
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(0, 240, 255, 0.95)";
+    ctx.shadowColor = "#00f0ff";
+    ctx.shadowBlur = 6;
+    ctx.font = '24px "Share Tech Mono", monospace';
+    logLines.forEach((line, idx) => {
+      ctx.fillText(line, 60, logY + 60 + idx * 60);
+    });
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
 export class LandingSystem {
   constructor(scene) {
     this.scene = scene;
@@ -447,14 +755,9 @@ export class LandingSystem {
     this.ocean.rotation.x = -Math.PI / 2;
     this.ocean.receiveShadow = true;
     
-    // 3. Monolith Glow Shader Material
-    this.monolithMat = new THREE.MeshStandardMaterial({
-      color: 0x010204,
-      roughness: 0.06,
-      metalness: 0.98,
-      emissive: 0x00ffff,
-      emissiveIntensity: 0.0
-    });
+    // 3. Monolith Manager
+    this.monolithManager = new MonolithManager(this.scene);
+    this.monolithMat = this.monolithManager.monolithMat;
 
     // Procedural textured materials for platforms, slabs, and pillars
     this.slabTexture = createNoiseTexture(256, 256, '#181d28', '#0b0d13');
@@ -515,21 +818,7 @@ export class LandingSystem {
   
   configureMonolith(monolithScene) {
     if (!monolithScene) return;
-    
-    monolithScene.traverse((node) => {
-      if (node.isMesh) {
-        node.castShadow = true;
-        node.receiveShadow = true;
-        
-        if (node.name.includes("Monolith")) {
-          node.material = this.monolithMat;
-        } else if (node.name.includes("LandingPad") || node.name.includes("PadGlowRing") || node.name.includes("PadCenterMetal")) {
-          node.material = this.padMat;
-        } else if (node.material) {
-          node.material = this.slabMat;
-        }
-      }
-    });
+    this.monolithManager.configureMonolith(monolithScene);
 
     // Group the pad meshes so we can reposition and clone them
     const padNodes = [];
