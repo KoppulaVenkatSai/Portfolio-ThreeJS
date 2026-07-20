@@ -365,6 +365,14 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     ease: "power1.inOut"
   }, CONFIG.timeline.landingStart);
 
+  // Animate the monolith rising out of the subterranean ground (configurable in CONFIG.monolith)
+  ENGINE_STATE.monolithRiseProgress = 0.0;
+  tl.to(ENGINE_STATE, {
+    monolithRiseProgress: 1.0,
+    duration: (CONFIG.monolith && CONFIG.monolith.riseDuration) ? CONFIG.monolith.riseDuration : 10.0,
+    ease: (CONFIG.monolith && CONFIG.monolith.ease) ? CONFIG.monolith.ease : "power2.in"
+  }, CONFIG.timeline.landingStart + 0.5);
+
   // 6. BEAT 5: ROCKET CORNER LANDING (Starts at 55.0s, duration 10.0s)
   tl.add(() => {
     // Rocket begins descent

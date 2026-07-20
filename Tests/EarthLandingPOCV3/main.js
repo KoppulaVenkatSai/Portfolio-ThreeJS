@@ -241,9 +241,9 @@ function configureRocketModel(model) {
           rocketMaterials.push(mat);
           mat.metalness = 0.99;
           mat.roughness = 0.01;
-          if (mat.color) mat.color.setHex(0xffffff); // Pure white base for correct mirror reflections
+          if (mat.color) mat.color.setHex(0xaaaaaa); // Pure white base for correct mirror reflections
           mat.envMap = cubeRenderTarget.texture; // Enable real-time reflection
-          mat.envMapIntensity = 1.8; // Reduced specular reflection intensity (was 3.0)
+          mat.envMapIntensity = 0.35; // Softened environment reflection intensity
           mat.needsUpdate = true;
           
           // Inject custom diagnostic scan overlay
@@ -369,8 +369,11 @@ gltfLoader.load(CONFIG.assets.rocketModel, (gltf) => {
 
 gltfLoader.load(CONFIG.assets.monolithScene, (gltf) => {
   monolithScene = gltf.scene;
-  monolithScene.scale.set(0.6, 0.6, 0.6);
-  monolithScene.position.set(0, 7.0, -45);
+  const monolithSlider = document.getElementById("monolith-scale-slider");
+  const factor = monolithSlider ? parseFloat(monolithSlider.value) / 100 : 0.73;
+  const s = 0.6 * factor;
+  monolithScene.scale.set(s, s, s);
+  monolithScene.position.set(0, 7.0, -72.0 + s * 45.0);
   oceanGroup.add(monolithScene);
 });
 
@@ -475,6 +478,73 @@ function tick() {
   landingSystem.update(sequenceTime, rocketModel);
   if (stormSystem) {
     stormSystem.update(sequenceTime, delta, rocketModel, camera);
+  }
+
+  // Animate monolith rising from within the ground as the camera descends
+  if (monolithScene) {
+    const monolithSlider = document.getElementById("monolith-scale-slider");
+    const factor = monolithSlider ? parseFloat(monolithSlider.value) / 100 : 0.76;
+    const s = 0.6 * factor;
+    const baseZ = -72.0 + s * 45.0;
+    
+    // Smooth ascension calculation using CONFIG.monolith parameters
+    const isLandingPhase = (ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL");
+    const progress = isLandingPhase ? (ENGINE_STATE.monolithRiseProgress !== undefined ? ENGINE_STATE.monolithRiseProgress : 1.0) : 1.0;
+    const startDepth = (CONFIG.monolith && CONFIG.monolith.startDepth) ? CONFIG.monolith.startDepth : -45.0;
+    const currentY = 7.0 + startDepth * (1.0 - progress); // Starts at depth underground, ascends to Y = 7.0 ground surface
+    
+    monolithScene.scale.set(s, s, s);
+
+    // Pivot correction: Keep monolith center (0, 0, -45) anchored 100% in-place at world (0, currentY, -72.0)
+    const rotY = monolithScene.rotation.y;
+    const pivotOffset = s * 45.0;
+    const posX = pivotOffset * Math.sin(rotY);
+    const posZ = -72.0 + pivotOffset * Math.cos(rotY);
+    
+    monolithScene.position.set(posX, currentY, posZ);
+
+    // Synchronize base pillar rotation with monolith rotation
+    if (landingSystem && landingSystem.monolithPillar) {
+      landingSystem.monolithPillar.rotation.y = monolithScene.rotation.y;
+    }
+
+    // Update 3D-anchored spatial position and visibility for monolith rotation buttons
+    const rotContainer = document.getElementById("monolith-rotation-controls");
+    const leftBtn = document.getElementById("monolith-rotate-left");
+    const rightBtn = document.getElementById("monolith-rotate-right");
+
+    if (rotContainer && leftBtn && rightBtn) {
+      // Only show rotation buttons when in LANDING/MANUAL scene AND monolith is 100% fully risen
+      const isOceanScene = (ENGINE_STATE.currentScene === "LANDING" || ENGINE_STATE.currentScene === "MANUAL");
+      const isFullyRisen = isOceanScene && (ENGINE_STATE.monolithRiseProgress !== undefined && ENGINE_STATE.monolithRiseProgress >= 0.98);
+      
+      if (isFullyRisen) {
+        rotContainer.classList.add("visible");
+
+        // Static world positions right next to monolith flanks (X = ±13.0, Y = 14.0, Z = -72.0)
+        const vecLeft = new THREE.Vector3(-13.0, 14.0, -72.0);
+        const vecRight = new THREE.Vector3(13.0, 14.0, -72.0);
+
+        // Project 3D vector coordinates into camera viewport NDC
+        vecLeft.project(camera);
+        vecRight.project(camera);
+
+        // Convert NDC (-1 to +1) to CSS pixels
+        const lx = (vecLeft.x * 0.5 + 0.5) * window.innerWidth;
+        const ly = (-(vecLeft.y * 0.5) + 0.5) * window.innerHeight;
+
+        const rx = (vecRight.x * 0.5 + 0.5) * window.innerWidth;
+        const ry = (-(vecRight.y * 0.5) + 0.5) * window.innerHeight;
+
+        leftBtn.style.left = `${lx}px`;
+        leftBtn.style.top = `${ly}px`;
+
+        rightBtn.style.left = `${rx}px`;
+        rightBtn.style.top = `${ry}px`;
+      } else {
+        rotContainer.classList.remove("visible");
+      }
+    }
   }
   
   // Apply whiteout overlay opacity
@@ -633,11 +703,103 @@ if (ambientSlider) {
   });
 }
 
-// Initialize OrbitControls (active by default so the user can frame the camera)
+const monolithScaleSlider = document.getElementById("monolith-scale-slider");
+const monolithScaleVal = document.getElementById("monolith-scale-val");
+
+if (monolithScaleSlider) {
+  monolithScaleSlider.addEventListener("input", (e) => {
+    const value = e.target.value;
+    if (monolithScaleVal) monolithScaleVal.innerText = `${value}%`;
+    const factor = parseFloat(value) / 100;
+    if (monolithScene) {
+      const s = 0.6 * factor;
+      monolithScene.scale.set(s, s, s);
+      monolithScene.position.set(0, 7.0, -72.0 + s * 45.0);
+    }
+  });
+}
+
+const textBrightnessSlider = document.getElementById("text-brightness-slider");
+const textBrightnessVal = document.getElementById("text-brightness-val");
+
+if (textBrightnessSlider) {
+  textBrightnessSlider.addEventListener("input", (e) => {
+    const value = e.target.value;
+    if (textBrightnessVal) textBrightnessVal.innerText = `${value}%`;
+    const valFloat = parseFloat(value) / 100;
+    if (landingSystem && landingSystem.monolithManager) {
+      landingSystem.monolithManager.updateTextBrightness(valFloat);
+    }
+  });
+}
+
+const monolithBrightnessSlider = document.getElementById("monolith-brightness-slider");
+const monolithBrightnessVal = document.getElementById("monolith-brightness-val");
+
+if (monolithBrightnessSlider) {
+  monolithBrightnessSlider.addEventListener("input", (e) => {
+    const value = e.target.value;
+    if (monolithBrightnessVal) monolithBrightnessVal.innerText = `${value}%`;
+    const valFloat = parseFloat(value) / 100;
+    if (landingSystem) {
+      landingSystem.setMonolithLightIntensity(valFloat);
+    }
+  });
+}
+
+const textGlowSlider = document.getElementById("text-glow-slider");
+const textGlowVal = document.getElementById("text-glow-val");
+
+if (textGlowSlider) {
+  textGlowSlider.addEventListener("input", (e) => {
+    const value = e.target.value;
+    if (textGlowVal) textGlowVal.innerText = `${value}%`;
+    const valFloat = parseFloat(value) / 100;
+    if (landingSystem && landingSystem.monolithManager) {
+      landingSystem.monolithManager.updateTextGlow(valFloat);
+    }
+  });
+}
+
+// Monolith 90-degree Rotation Handlers
+let targetMonolithRotationY = 0;
+
+const rotateLeftBtn = document.getElementById("monolith-rotate-left");
+const rotateRightBtn = document.getElementById("monolith-rotate-right");
+
+if (rotateLeftBtn) {
+  rotateLeftBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!monolithScene) return;
+    targetMonolithRotationY -= Math.PI / 2;
+    gsap.to(monolithScene.rotation, {
+      y: targetMonolithRotationY,
+      duration: 0.85,
+      ease: "power2.out"
+    });
+  });
+}
+
+if (rotateRightBtn) {
+  rotateRightBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!monolithScene) return;
+    targetMonolithRotationY += Math.PI / 2;
+    gsap.to(monolithScene.rotation, {
+      y: targetMonolithRotationY,
+      duration: 0.85,
+      ease: "power2.out"
+    });
+  });
+}
+
+// Initialize OrbitControls (disabled so camera timeline control & monolith interactions operate cleanly without orbit drag interference)
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true;
 orbitControls.dampingFactor = 0.05;
-orbitControls.enabled = true;
+orbitControls.enabled = false;
 orbitControls.target.copy(CONFIG.camera.initial.look);
 window.activeControls = orbitControls;
 

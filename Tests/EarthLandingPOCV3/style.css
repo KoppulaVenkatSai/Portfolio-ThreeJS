@@ -576,4 +576,120 @@ body, html {
   box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
 }
 
+/* Sci-Fi Monolith Spatial 3D Rotation Controls (Angled Vector Arrows) */
+#monolith-rotation-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+  perspective: 1000px;
+}
+
+#monolith-rotation-controls.visible {
+  opacity: 1;
+}
+
+.monolith-rot-btn {
+  position: absolute;
+  pointer-events: auto;
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  cursor: pointer;
+  opacity: 0.60;
+  outline: none !important;
+  box-shadow: none !important;
+  transform-style: preserve-3d;
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.98);
+  transition: opacity 0.35s ease, transform 0.35s ease, filter 0.35s ease;
+  filter: drop-shadow(0 0 10px rgba(0, 247, 255, 0.50));
+}
+
+.rot-btn-right {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.98);
+  filter: drop-shadow(0 0 10px rgba(255, 224, 51, 0.50));
+}
+
+.monolith-rot-btn:hover {
+  opacity: 0.95;
+  transform: translate(-50%, -50%) rotateX(36deg) scale(1.04);
+  filter: drop-shadow(0 0 16px rgba(0, 247, 255, 0.80));
+}
+
+.rot-btn-right:hover {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(1.04);
+  filter: drop-shadow(0 0 16px rgba(255, 224, 51, 0.80));
+}
+
+.monolith-rot-btn:active {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.95);
+}
+
+.rot-btn-right:active {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.95);
+}
+
+.rot-arc-svg {
+  width: 120px;
+  height: 75px;
+  overflow: visible;
+}
+
+.rot-arc-bg {
+  fill: none;
+  stroke: rgba(0, 247, 255, 0.22);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 6;
+}
+
+.rot-arc-path {
+  fill: none;
+  stroke: url(#rotGradLeft);
+  stroke-width: 6.0;
+  stroke-linecap: round;
+  stroke-dasharray: 260;
+  stroke-dashoffset: 0;
+  animation: rotArcDash 2.4s linear infinite;
+}
+
+.rot-arc-right {
+  stroke: url(#rotGradRight);
+}
+
+@keyframes rotArcDash {
+  0% { stroke-dashoffset: 520; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.rot-head-poly {
+  fill: #00f7ff;
+  stroke: #ffffff;
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px #00f7ff);
+}
+.rot-head-right {
+  fill: #ffe033;
+  stroke: #ffffff;
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px #ffe033);
+}
+
+.rot-node-dot {
+  fill: #00f7ff;
+  animation: rotDotPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes rotDotPulse {
+  0% { r: 4px; opacity: 0.5; }
+  100% { r: 8px; opacity: 1.0; }
+}
+
 

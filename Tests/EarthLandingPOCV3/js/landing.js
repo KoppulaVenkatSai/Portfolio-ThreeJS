@@ -672,16 +672,16 @@ export class LandingSystem {
     this.starSize = 1.5;   // Point size (radiation intensity)
     this.lastTime = 0.0;
     
-    // Pick 4 random cluster center coordinates in the sky
+    // Pick 4 random cluster center coordinates at a balanced distance in the sky
     const clusterCenters = [];
     for (let c = 0; c < 4; c++) {
       const theta = 0.2 + Math.random() * (Math.PI / 2 - 0.3); // angle from vertical
       const phi = Math.random() * Math.PI; // horizontal angle
-      const dist = 420;
+      const dist = 620.0;
       clusterCenters.push({
         x: dist * Math.sin(theta) * Math.cos(phi),
-        y: Math.abs(dist * Math.cos(theta)),
-        z: -Math.abs(dist * Math.sin(theta) * Math.sin(phi)) - 100.0
+        y: Math.abs(dist * Math.cos(theta)) + 60.0,
+        z: -Math.abs(dist * Math.sin(theta) * Math.sin(phi)) - 320.0
       });
     }
     
@@ -697,29 +697,78 @@ export class LandingSystem {
         const dz = (Math.random() - 0.5 + Math.random() - 0.5) * spread;
         starPositions.push(center.x + dx, center.y + dy, center.z + dz);
       } else {
-        // Completely random background noise star
+        // Completely random background noise star at balanced distance
         const theta = Math.random() * Math.PI;
         const phi = Math.random() * Math.PI;
-        const dist = 380 + Math.random() * 100;
+        const dist = 580 + Math.random() * 160;
         const x = dist * Math.sin(theta) * Math.cos(phi);
-        const y = Math.abs(dist * Math.cos(theta)) + 20.0;
-        const z = -Math.abs(dist * Math.sin(theta) * Math.sin(phi)) - 100.0;
+        const y = Math.abs(dist * Math.cos(theta)) + 50.0;
+        const z = -Math.abs(dist * Math.sin(theta) * Math.sin(phi)) - 320.0;
         starPositions.push(x, y, z);
       }
     }
     
-    starGeom.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
+// GPU Twinkle Shader for dynamic star pulsing between dark and bright
+const TwinkleStarShader = {
+  vertex: `
+    attribute float aPhase;
+    attribute float aSpeed;
+    uniform float uTime;
+    uniform float uSize;
+    varying float vBrightness;
     
-    this.starMat = new THREE.PointsMaterial({
-      map: createStarTexture(),
-      color: 0xffffff,
-      size: this.starSize,
+    void main() {
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_Position = projectionMatrix * mvPosition;
+      
+      // Calculate twinkling oscillation (smooth pulsing between 0.15 dark and 1.0 bright)
+      float t = uTime * aSpeed + aPhase;
+      vBrightness = 0.15 + 0.85 * pow(0.5 + 0.5 * sin(t), 2.2);
+      
+      // Size attenuation based on depth and brightness
+      gl_PointSize = uSize * (350.0 / -mvPosition.z) * (0.7 + 0.3 * vBrightness);
+    }
+  `,
+  fragment: `
+    uniform sampler2D uTexture;
+    uniform vec3 uColor;
+    uniform float uOpacity;
+    varying float vBrightness;
+    
+    void main() {
+      vec4 texColor = texture2D(uTexture, gl_PointCoord);
+      if (texColor.a < 0.05) discard;
+      gl_FragColor = vec4(uColor * vBrightness, texColor.a * uOpacity * vBrightness);
+    }
+  `
+};
+
+    starGeom.setAttribute("position", new THREE.Float32BufferAttribute(starPositions, 3));
+
+    // Random phases and twinkling speeds for each star
+    const starPhases = new Float32Array(this.starCount);
+    const starSpeeds = new Float32Array(this.starCount);
+    for (let i = 0; i < this.starCount; i++) {
+      starPhases[i] = Math.random() * Math.PI * 2;
+      starSpeeds[i] = 0.25 + Math.random() * 0.75; // Slower, calmer twinkling speed
+    }
+    starGeom.setAttribute("aPhase", new THREE.BufferAttribute(starPhases, 1));
+    starGeom.setAttribute("aSpeed", new THREE.BufferAttribute(starSpeeds, 1));
+    
+    this.starMat = new THREE.ShaderMaterial({
+      vertexShader: TwinkleStarShader.vertex,
+      fragmentShader: TwinkleStarShader.fragment,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uSize: { value: this.starSize * 3.2 },
+        uTexture: { value: createStarTexture() },
+        uColor: { value: new THREE.Color(0xffffff) },
+        uOpacity: { value: 0.0 }
+      },
       transparent: true,
-      opacity: 0.0,
       blending: THREE.AdditiveBlending, // extra bright highlights
       depthWrite: false,
-      fog: false,
-      sizeAttenuation: true
+      fog: false
     });
     
     this.stars = new THREE.Points(starGeom, this.starMat);
@@ -769,13 +818,14 @@ export class LandingSystem {
       metalness: 0.15
     });
 
-    this.padTexture = createNoiseTexture(256, 256, '#3a4454', '#202632');
+    this.padTexture = createNoiseTexture(256, 256, '#171b21', '#0e1116');
     this.padMat = new THREE.MeshStandardMaterial({
+      color: 0x11161d, // Dark metallic slate base color
       map: this.padTexture,
       bumpMap: this.padTexture,
       bumpScale: 0.05,
-      roughness: 0.35,
-      metalness: 0.85
+      roughness: 0.55,
+      metalness: 0.35
     });
 
     this.pillarTexture = createNoiseTexture(256, 256, '#404c5c', '#2c3540');
@@ -882,23 +932,13 @@ export class LandingSystem {
     this.scene.add(this.monoStageLight);
     this.scene.add(this.monoStageLight.target);
     this.monoStageLight.target.position.set(0, 7.0, -72.0);
-
-    this.rocketStageLight = new THREE.DirectionalLight(0xcee7ff, 1.2);
-    this.rocketStageLight.position.set(40.0, 80.0, -100.0);
-    this.rocketStageLight.castShadow = true;
-    this.rocketStageLight.shadow.mapSize.width = 1024;
-    this.rocketStageLight.shadow.mapSize.height = 1024;
-    this.rocketStageLight.shadow.bias = -0.0006;
-    this.rocketStageLight.shadow.radius = 4;
-    this.rocketStageLight.shadow.camera.left = -20;
-    this.rocketStageLight.shadow.camera.right = 20;
-    this.rocketStageLight.shadow.camera.top = 20;
-    this.rocketStageLight.shadow.camera.bottom = -20;
-    this.rocketStageLight.shadow.camera.near = 10;
-    this.rocketStageLight.shadow.camera.far = 100;
-    this.scene.add(this.rocketStageLight);
-    this.scene.add(this.rocketStageLight.target);
-    this.rocketStageLight.target.position.set(40.0, 7.0, -100.0);
+  }
+  
+  setMonolithLightIntensity(intensityFactor) {
+    this.baseMonoStageLightIntensity = 1.2 * intensityFactor;
+    if (this.monoStageLight) {
+      this.monoStageLight.intensity = this.baseMonoStageLightIntensity * (ENGINE_STATE.landingFadeInProgress || 1.0);
+    }
   }
   
   activateOcean() {
@@ -930,9 +970,6 @@ export class LandingSystem {
     if (this.monoStageLight) {
       this.monoStageLight.visible = isOcean;
     }
-    if (this.rocketStageLight) {
-      this.rocketStageLight.visible = isOcean;
-    }
     
     this.stormAmbient.visible = isStormOrLanding;
     this.stormSkyLight.visible = isStormOrLanding;
@@ -959,16 +996,17 @@ export class LandingSystem {
       this.stormAmbient.intensity = ENGINE_STATE.ambientIntensity * fadeIn;
       this.stormSkyLight.intensity = 0.7 * fadeIn;
       if (this.monoStageLight) {
-        this.monoStageLight.intensity = 1.2 * fadeIn;
-      }
-      if (this.rocketStageLight) {
-        this.rocketStageLight.intensity = 1.2 * fadeIn;
+        const baseIntensity = this.baseMonoStageLightIntensity !== undefined ? this.baseMonoStageLightIntensity : 1.2;
+        this.monoStageLight.intensity = baseIntensity * fadeIn;
       }
       
       // Fade in background nebula planes and stars
       if (this.nebMat1) this.nebMat1.opacity = fadeIn * 0.40; // Dimmed maximum opacity (was 1.0)
       if (this.nebMat2) this.nebMat2.opacity = fadeIn * 0.30; // Dimmed maximum opacity (was 1.0)
-      if (this.starMat) this.starMat.opacity = fadeIn * 0.85;
+      if (this.starMat && this.starMat.uniforms) {
+        this.starMat.uniforms.uTime.value = elapsed;
+        this.starMat.uniforms.uOpacity.value = fadeIn * 0.85;
+      }
       
       // Slow, dynamic background nebula drift and rotation (swirling effect)
       const realTime = performance.now() * 0.001;

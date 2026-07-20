@@ -8,6 +8,13 @@ export const CONFIG = {
     monolithScene: new URL("../assets/MonolithScene.glb", import.meta.url).href
   },
   
+  // Monolith rise parameters (Change duration & start depth here!)
+  monolith: {
+    riseDuration: 8.5,  // Animation duration in seconds
+    startDepth: -23.0,   // Starting depth underground
+    ease: "power2.in"    // Ease-in animation curve
+  },
+  
   // Temporal Sequence Duration (in seconds)
   timeline: {
     warpPreFire: 0.0,

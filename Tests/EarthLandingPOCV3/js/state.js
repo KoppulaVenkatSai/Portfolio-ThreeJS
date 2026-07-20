@@ -19,6 +19,7 @@ export const ENGINE_STATE = {
   whiteoutOpacity: 0.0,
   cameraDescentProgress: 0.0,
   landingFadeInProgress: 0.0,
+  monolithRiseProgress: 0.0,
   
   // Transition hooks
   setScene(sceneName) {

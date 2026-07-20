@@ -35,6 +35,45 @@
   <!-- Storm lightning overlay -->
   <div id="storm-overlay"></div>
 
+  <!-- Sci-Fi Monolith 3D Curved Rotation Controls Overlay -->
+  <div id="monolith-rotation-controls">
+    <!-- Rotate Left Button -->
+    <button id="monolith-rotate-left" class="monolith-rot-btn rot-btn-left" title="Rotate Monolith 90° Left">
+      <svg class="rot-arc-svg" viewBox="0 0 160 120">
+        <defs>
+          <linearGradient id="rotGradLeft" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#00f7ff" stop-opacity="0.2" />
+            <stop offset="50%" stop-color="#00b0ff" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#00f7ff" stop-opacity="1" />
+          </linearGradient>
+        </defs>
+        <path d="M 25 90 A 65 48 0 0 1 135 35" class="rot-arc-bg" />
+        <path d="M 25 90 A 65 48 0 0 1 135 35" class="rot-arc-path rot-arc-left" />
+        <!-- Broader, precision-aligned chevron arrowhead sitting directly on top of arc line tip -->
+        <path d="M 152 24 L 126 16 L 134 34 L 120 44 Z" class="rot-head-poly rot-head-left" />
+        <circle cx="25" cy="90" r="5" class="rot-node-dot" />
+      </svg>
+    </button>
+
+    <!-- Rotate Right Button -->
+    <button id="monolith-rotate-right" class="monolith-rot-btn rot-btn-right" title="Rotate Monolith 90° Right">
+      <svg class="rot-arc-svg" viewBox="0 0 160 120">
+        <defs>
+          <linearGradient id="rotGradRight" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#ffe033" stop-opacity="0.2" />
+            <stop offset="50%" stop-color="#ff9d00" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#ffe033" stop-opacity="1" />
+          </linearGradient>
+        </defs>
+        <path d="M 135 90 A 65 48 0 0 0 25 35" class="rot-arc-bg" />
+        <path d="M 135 90 A 65 48 0 0 0 25 35" class="rot-arc-path rot-arc-right" />
+        <!-- Broader, precision-aligned chevron arrowhead sitting directly on top of arc line tip -->
+        <path d="M 8 24 L 34 16 L 26 34 L 40 44 Z" class="rot-head-poly rot-head-right" />
+        <circle cx="135" cy="90" r="5" class="rot-node-dot" />
+      </svg>
+    </button>
+  </div>
+
   <!-- Sci-Fi HUD HUD Telemetry Overlay -->
   <div id="hud-container">
     <!-- Unified Top HUD Status Bar -->
@@ -106,6 +145,30 @@
       <label for="ambient-slider">AMBIENT LIGHT</label>
       <input type="range" id="ambient-slider" min="0" max="200" value="60">
       <span id="ambient-val">60%</span>
+    </div>
+
+    <div class="settings-row">
+      <label for="monolith-scale-slider">MONOLITH SIZE</label>
+      <input type="range" id="monolith-scale-slider" min="10" max="300" value="76">
+      <span id="monolith-scale-val">76%</span>
+    </div>
+
+    <div class="settings-row">
+      <label for="text-brightness-slider">TEXT BRIGHTNESS</label>
+      <input type="range" id="text-brightness-slider" min="0" max="500" value="100">
+      <span id="text-brightness-val">100%</span>
+    </div>
+
+    <div class="settings-row">
+      <label for="monolith-brightness-slider">MONOLITH LIGHT</label>
+      <input type="range" id="monolith-brightness-slider" min="0" max="500" value="50">
+      <span id="monolith-brightness-val">50%</span>
+    </div>
+
+    <div class="settings-row">
+      <label for="text-glow-slider">TEXT GLOW</label>
+      <input type="range" id="text-glow-slider" min="0" max="300" value="100">
+      <span id="text-glow-val">100%</span>
     </div>
  
     <div class="settings-divider"></div>
