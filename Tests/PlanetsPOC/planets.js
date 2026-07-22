@@ -17,14 +17,26 @@ export function deformSphereToRock(geometry, roughnessAmt = 0.16) {
   const position = geometry.attributes.position;
   const tempV = new THREE.Vector3();
   
+  // Find max radius in geometry to scale displacement cleanly on outer vertices
+  let maxR = 0;
   for (let i = 0; i < position.count; i++) {
     tempV.fromBufferAttribute(position, i);
+    const r = tempV.length();
+    if (r > maxR) maxR = r;
+  }
+
+  for (let i = 0; i < position.count; i++) {
+    tempV.fromBufferAttribute(position, i);
+    const r = tempV.length();
     const dir = tempV.clone().normalize();
+    
+    // Taper displacement so inner shell surfaces stay smooth and don't penetrate inner layers
+    const radialFactor = maxR > 0 ? Math.pow(r / maxR, 2.0) : 1.0;
     
     const lowFreq = Math.sin(dir.x * 2.0) * Math.cos(dir.y * 2.0) * Math.sin(dir.z * 2.0);
     const highFreq = getRockyNoise(dir.x * 4.5, dir.y * 4.5, dir.z * 4.5) * 0.4;
     
-    const displacement = (lowFreq * 0.22 + highFreq * 0.12) * roughnessAmt * 4.5;
+    const displacement = (lowFreq * 0.22 + highFreq * 0.12) * roughnessAmt * 4.5 * radialFactor;
     tempV.addScaledVector(dir, displacement);
     position.setXYZ(i, tempV.x, tempV.y, tempV.z);
   }
@@ -249,8 +261,7 @@ export function buildPlanet1(scene) {
     bumpMap: gasTexture,
     bumpScale: 0.1,
     roughness: 0.8,
-    metalness: 0.2,
-    side: THREE.DoubleSide
+    metalness: 0.2
   });
 
   const outerMantleMat = new THREE.MeshStandardMaterial({
@@ -261,8 +272,7 @@ export function buildPlanet1(scene) {
     bumpMap: gasTexture,
     bumpScale: 0.12,
     roughness: 0.8,
-    metalness: 0.2,
-    side: THREE.DoubleSide
+    metalness: 0.2
   });
 
   const crustMat = new THREE.MeshStandardMaterial({
@@ -273,11 +283,10 @@ export function buildPlanet1(scene) {
     bumpMap: gasTexture,
     bumpScale: 0.16,
     roughness: 0.75,
-    metalness: 0.15,
-    side: THREE.DoubleSide
+    metalness: 0.15
   });
 
-  const coreGeo = new THREE.SphereGeometry(config.size * 0.28, 32, 32);
+  const coreGeo = new THREE.SphereGeometry(config.size * 0.22, 32, 32);
   const coreMesh = new THREE.Mesh(coreGeo, coreMat);
   coreMesh.castShadow = true;
   coreMesh.receiveShadow = true;
@@ -301,10 +310,10 @@ export function buildPlanet1(scene) {
       const tiltAxis = new THREE.Vector3(Math.sin(phiMid), 0, Math.cos(phiMid));
       const tiltAngle = -ySign * 0.2;
 
-      // --- Layer 2: Inner Mantle (Radius 0.28 to 0.52) ---
+      // --- Layer 2: Inner Mantle (Radius 0.27 to 0.49) ---
       const imHelper = new THREE.Group();
       group.add(imHelper);
-      const imGeo = createThickSphereSegment(config.size * 0.28, config.size * 0.52, phiStart, phiLength, thetaStart, thetaLength);
+      const imGeo = createThickSphereSegment(config.size * 0.27, config.size * 0.49, phiStart, phiLength, thetaStart, thetaLength);
       const normal = getGeometryCenterNormal(imGeo);
       deformSphereToRock(imGeo, 0.06);
       const imMesh = new THREE.Mesh(imGeo, innerMantleMat);
@@ -313,10 +322,10 @@ export function buildPlanet1(scene) {
       imHelper.add(imMesh);
       innerMantlePlates.push({ helper: imHelper, normal, tiltAxis, tiltAngle });
 
-      // --- Layer 3: Outer Mantle (Radius 0.52 to 0.76) ---
+      // --- Layer 3: Outer Mantle (Radius 0.52 to 0.73) ---
       const omHelper = new THREE.Group();
       group.add(omHelper);
-      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.76, phiStart, phiLength, thetaStart, thetaLength);
+      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.73, phiStart, phiLength, thetaStart, thetaLength);
       deformSphereToRock(omGeo, 0.08);
       const omMesh = new THREE.Mesh(omGeo, outerMantleMat);
       omMesh.castShadow = true;
@@ -379,8 +388,7 @@ export function buildPlanet2(scene) {
     bumpMap: industrialTexture,
     bumpScale: 0.1,
     roughness: 0.8,
-    metalness: 0.1,
-    side: THREE.DoubleSide
+    metalness: 0.1
   });
 
   const outerMantleMat = new THREE.MeshStandardMaterial({
@@ -391,8 +399,7 @@ export function buildPlanet2(scene) {
     bumpMap: industrialTexture,
     bumpScale: 0.12,
     roughness: 0.8,
-    metalness: 0.1,
-    side: THREE.DoubleSide
+    metalness: 0.1
   });
 
   const crustMat = new THREE.MeshStandardMaterial({
@@ -403,11 +410,10 @@ export function buildPlanet2(scene) {
     bumpMap: industrialTexture,
     bumpScale: 0.18,
     roughness: 0.75,
-    metalness: 0.12,
-    side: THREE.DoubleSide
+    metalness: 0.12
   });
   
-  const coreGeo = new THREE.SphereGeometry(config.size * 0.28, 32, 32);
+  const coreGeo = new THREE.SphereGeometry(config.size * 0.22, 32, 32);
   const coreMesh = new THREE.Mesh(coreGeo, coreMat);
   coreMesh.castShadow = true;
   coreMesh.receiveShadow = true;
@@ -431,10 +437,10 @@ export function buildPlanet2(scene) {
       const tiltAxis = new THREE.Vector3(Math.sin(phiMid), 0, Math.cos(phiMid));
       const tiltAngle = -ySign * 0.2;
 
-      // Layer 2: Inner Mantle (Radius 0.28 to 0.52)
+      // Layer 2: Inner Mantle (Radius 0.27 to 0.49)
       const imHelper = new THREE.Group();
       group.add(imHelper);
-      const imGeo = createThickSphereSegment(config.size * 0.28, config.size * 0.52, phiStart, phiLength, thetaStart, thetaLength);
+      const imGeo = createThickSphereSegment(config.size * 0.27, config.size * 0.49, phiStart, phiLength, thetaStart, thetaLength);
       const normal = getGeometryCenterNormal(imGeo);
       deformSphereToRock(imGeo, 0.08);
       const imMesh = new THREE.Mesh(imGeo, innerMantleMat);
@@ -443,10 +449,10 @@ export function buildPlanet2(scene) {
       imHelper.add(imMesh);
       innerMantlePlates.push({ helper: imHelper, normal, tiltAxis, tiltAngle });
 
-      // Layer 3: Outer Mantle (Radius 0.52 to 0.76)
+      // Layer 3: Outer Mantle (Radius 0.52 to 0.73)
       const omHelper = new THREE.Group();
       group.add(omHelper);
-      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.76, phiStart, phiLength, thetaStart, thetaLength);
+      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.73, phiStart, phiLength, thetaStart, thetaLength);
       deformSphereToRock(omGeo, 0.09);
       const omMesh = new THREE.Mesh(omGeo, outerMantleMat);
       omMesh.castShadow = true;
@@ -509,8 +515,7 @@ export function buildPlanet3(scene) {
     bumpMap: crystalTexture,
     bumpScale: 0.1,
     roughness: 0.75,
-    metalness: 0.15,
-    side: THREE.DoubleSide
+    metalness: 0.15
   });
 
   const outerMantleMat = new THREE.MeshStandardMaterial({
@@ -521,8 +526,7 @@ export function buildPlanet3(scene) {
     bumpMap: crystalTexture,
     bumpScale: 0.1,
     roughness: 0.75,
-    metalness: 0.15,
-    side: THREE.DoubleSide
+    metalness: 0.15
   });
 
   const shardMat = new THREE.MeshStandardMaterial({
@@ -533,11 +537,10 @@ export function buildPlanet3(scene) {
     bumpMap: crystalTexture,
     bumpScale: 0.14,
     roughness: 0.7,
-    metalness: 0.2,
-    side: THREE.DoubleSide
+    metalness: 0.2
   });
   
-  const coreGeo = new THREE.SphereGeometry(config.size * 0.28, 32, 32);
+  const coreGeo = new THREE.SphereGeometry(config.size * 0.22, 32, 32);
   const coreMesh = new THREE.Mesh(coreGeo, coreMat);
   coreMesh.castShadow = true;
   coreMesh.receiveShadow = true;
@@ -561,10 +564,10 @@ export function buildPlanet3(scene) {
       const tiltAxis = new THREE.Vector3(Math.sin(phiMid), 0, Math.cos(phiMid));
       const tiltAngle = -ySign * 0.2;
 
-      // Layer 2: Inner Mantle (Radius 0.28 to 0.52)
+      // Layer 2: Inner Mantle (Radius 0.27 to 0.49)
       const imHelper = new THREE.Group();
       group.add(imHelper);
-      const imGeo = createThickSphereSegment(config.size * 0.28, config.size * 0.52, phiStart, phiLength, thetaStart, thetaLength);
+      const imGeo = createThickSphereSegment(config.size * 0.27, config.size * 0.49, phiStart, phiLength, thetaStart, thetaLength);
       const normal = getGeometryCenterNormal(imGeo);
       deformSphereToRock(imGeo, 0.07);
       const imMesh = new THREE.Mesh(imGeo, innerMantleMat);
@@ -573,10 +576,10 @@ export function buildPlanet3(scene) {
       imHelper.add(imMesh);
       innerMantlePlates.push({ helper: imHelper, normal, tiltAxis, tiltAngle });
 
-      // Layer 3: Outer Mantle (Radius 0.52 to 0.76)
+      // Layer 3: Outer Mantle (Radius 0.52 to 0.73)
       const omHelper = new THREE.Group();
       group.add(omHelper);
-      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.76, phiStart, phiLength, thetaStart, thetaLength);
+      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.73, phiStart, phiLength, thetaStart, thetaLength);
       deformSphereToRock(omGeo, 0.07);
       const omMesh = new THREE.Mesh(omGeo, outerMantleMat);
       omMesh.castShadow = true;

@@ -228,3 +228,51 @@ export function createBinaryRingTexture() {
   texture.repeat.set(1, 1);
   return texture;
 }
+
+export function createCurvedTextTexture(text, colorHexStr) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, 1024, 512);
+
+  const cx = 512;
+  const cy = 410;
+  const radius = 280;
+
+  // Draw bold, extra-large, ultra-crisp curved text
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.font = '900 68px "Share Tech Mono", "JetBrains Mono", sans-serif, monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const anglePerChar = 0.13;
+  const totalAngle = (text.length - 1) * anglePerChar;
+  const startAngle = -Math.PI / 2 - totalAngle / 2;
+
+  for (let i = 0; i < text.length; i++) {
+    const angle = startAngle + i * anglePerChar;
+    ctx.save();
+    ctx.rotate(angle + Math.PI / 2);
+    ctx.translate(0, -radius);
+    
+    // Heavy dark backdrop outline for high-contrast legibility
+    ctx.strokeStyle = '#010308';
+    ctx.lineWidth = 12.0;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(text[i], 0, 0);
+    
+    // Bright crisp text fill
+    ctx.fillStyle = colorHexStr;
+    ctx.fillText(text[i], 0, 0);
+    ctx.restore();
+  }
+
+  ctx.restore();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  return texture;
+}

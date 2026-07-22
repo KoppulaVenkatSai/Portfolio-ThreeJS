@@ -10,7 +10,8 @@ import {
   createNebulaTexture, 
   createCircleTexture, 
   createBinaryRingTexture,
-  createCharTexture
+  createCharTexture,
+  createCurvedTextTexture
 } from './textures.js';
 import { 
   createOrbitRing, 
@@ -221,43 +222,37 @@ const starMat = new THREE.ShaderMaterial({
 const starPoints = new THREE.Points(starGeom, starMat);
 scene.add(starPoints);
 
-// Interstellar Nebulae Group
+// ==========================================
+// DYNAMIC 6-NEBULA DEEP BACKGROUND SYSTEM
+// ==========================================
 const nebulaGroup = new THREE.Group();
+nebulaGroup.renderOrder = -100;
 window.nebulaGroup = nebulaGroup;
 scene.add(nebulaGroup);
 
-const nebMat1 = new THREE.MeshBasicMaterial({
-  map: createNebulaTexture('rgba(20, 100, 240, 0.32)', 'rgba(5, 12, 40, 0)'),
-  transparent: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-  side: THREE.DoubleSide
+const nebulaConfigs = [
+  { localOffset: { x: -90, y: 55, z: -280 }, c1: 'rgba(20, 140, 255, 0.38)', c2: 'rgba(5, 18, 55, 0)', size: 420, freq: { x: 0.20, y: 0.25 }, amp: { x: 30, y: 20 }, rotSpeed: 0.0004 },
+  { localOffset: { x: 95, y: -45, z: -300 }, c1: 'rgba(170, 40, 220, 0.32)', c2: 'rgba(18, 4, 35, 0)', size: 450, freq: { x: 0.16, y: 0.22 }, amp: { x: 35, y: 25 }, rotSpeed: -0.0003 },
+  { localOffset: { x: -110, y: -50, z: -320 }, c1: 'rgba(0, 220, 190, 0.28)', c2: 'rgba(2, 28, 28, 0)', size: 440, freq: { x: 0.14, y: 0.19 }, amp: { x: 32, y: 22 }, rotSpeed: 0.0005 },
+  { localOffset: { x: 105, y: 60, z: -290 }, c1: 'rgba(255, 100, 30, 0.26)', c2: 'rgba(32, 10, 3, 0)', size: 430, freq: { x: 0.18, y: 0.15 }, amp: { x: 28, y: 24 }, rotSpeed: -0.0004 },
+  { localOffset: { x: 0, y: 70, z: -340 }, c1: 'rgba(110, 20, 250, 0.30)', c2: 'rgba(14, 2, 40, 0)', size: 480, freq: { x: 0.12, y: 0.17 }, amp: { x: 35, y: 18 }, rotSpeed: 0.0003 },
+  { localOffset: { x: 0, y: -75, z: -350 }, c1: 'rgba(240, 190, 40, 0.24)', c2: 'rgba(30, 22, 3, 0)', size: 460, freq: { x: 0.15, y: 0.21 }, amp: { x: 40, y: 22 }, rotSpeed: -0.0005 }
+];
+
+const nebulaeList = nebulaConfigs.map((cfg) => {
+  const mat = new THREE.MeshBasicMaterial({
+    map: createNebulaTexture(cfg.c1, cfg.c2),
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide
+  });
+  const geo = new THREE.PlaneGeometry(cfg.size, cfg.size);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.renderOrder = -100;
+  nebulaGroup.add(mesh);
+  return { mesh, ...cfg };
 });
-
-const nebMat2 = new THREE.MeshBasicMaterial({
-  map: createNebulaTexture('rgba(140, 40, 180, 0.26)', 'rgba(12, 3, 24, 0)'),
-  transparent: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-  side: THREE.DoubleSide
-});
-
-const nebGeo = new THREE.PlaneGeometry(420, 420);
-
-const nebMesh1 = new THREE.Mesh(nebGeo, nebMat1);
-nebMesh1.position.set(-80, -30, -180);
-nebMesh1.lookAt(0, 0, 0);
-nebulaGroup.add(nebMesh1);
-
-const nebMesh2 = new THREE.Mesh(nebGeo, nebMat2);
-nebMesh2.position.set(90, 50, -210);
-nebMesh2.lookAt(0, 0, 0);
-nebulaGroup.add(nebMesh2);
-
-const nebMesh3 = new THREE.Mesh(nebGeo, nebMat1);
-nebMesh3.position.set(-20, 90, -250);
-nebMesh3.lookAt(0, 0, 0);
-nebulaGroup.add(nebMesh3);
 
 // ==========================================
 // CENTRAL DATA SUN (CINEMATIC GLOW)
@@ -330,7 +325,7 @@ ringData.forEach((r) => {
 });
 
 // Floating character-based data wind particles
-const sPartCount = 36; // Increased by 2x (was 18)
+const sPartCount = 36;
 const sunParticlesGroup = new THREE.Group();
 const sunParticlesList = [];
 
@@ -348,7 +343,6 @@ const spriteMaterials = glyphTextures.map(tex => new THREE.SpriteMaterial({
 for (let i = 0; i < sPartCount; i++) {
   const theta = Math.random() * Math.PI * 2;
   const phi = Math.acos((Math.random() * 2) - 1);
-  // Distribute particles across their full path on start so they don't all emerge from the center together
   const r = 0.5 + Math.random() * 15.5;
   
   // Assign a random glyph material
@@ -393,9 +387,11 @@ Object.keys(planetObjects).forEach((key) => {
   planetObjects[key].startAngleOffset = Math.random() * Math.PI * 2;
 });
 
-// Add Fresnel Glow Exosphere overlays to each planet mesh group
+// Add Fresnel Glow Exosphere overlays & Holographic Curved Hover Labels to each planet group
 Object.keys(planetObjects).forEach((key) => {
   const p = planetObjects[key];
+  const data = PROJECTS_DATA[key];
+  const colorHex = key === 'planet1' ? '#00e5ff' : (key === 'planet2' ? '#ff6600' : '#d044ff');
   
   // Exosphere glow slightly larger than crust outer bounds
   const glowGeo = new THREE.SphereGeometry(p.config.size * 1.06, 32, 32);
@@ -415,6 +411,38 @@ Object.keys(planetObjects).forEach((key) => {
   const glowMesh = new THREE.Mesh(glowGeo, glowMat);
   p.group.add(glowMesh);
   p.glowMaterial = glowMat;
+
+  // Create Holographic Curved Text Title Label Mesh along top rim of planet sphere
+  const labelTex = createCurvedTextTexture(data.title, colorHex);
+  const labelGeo = new THREE.PlaneGeometry(p.config.size * 6.2, p.config.size * 3.1);
+  const labelMat = new THREE.MeshBasicMaterial({
+    map: labelTex,
+    transparent: true,
+    opacity: 0.0, // Invisible until hovered
+    depthTest: false, // Prevents planet geometry occlusion
+    depthWrite: false,
+    blending: THREE.NormalBlending, // Normal blending prevents UnrealBloom distortion
+    side: THREE.DoubleSide
+  });
+
+  const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+  labelMesh.renderOrder = 100;
+  scene.add(labelMesh); // Added to scene so it does NOT spin with p.group.rotation.y
+  p.hoverLabelMaterial = labelMat;
+  p.hoverLabelMesh = labelMesh;
+});
+
+// Refresh curved text textures once web fonts finish loading
+document.fonts.ready.then(() => {
+  Object.keys(planetObjects).forEach((key) => {
+    const p = planetObjects[key];
+    const data = PROJECTS_DATA[key];
+    const colorHex = key === 'planet1' ? '#00e5ff' : (key === 'planet2' ? '#ff6600' : '#d044ff');
+    if (p.hoverLabelMesh) {
+      p.hoverLabelMesh.material.map = createCurvedTextTexture(data.title, colorHex);
+      p.hoverLabelMesh.material.map.needsUpdate = true;
+    }
+  });
 });
 
 // Add dynamic lighting headlight
@@ -424,14 +452,15 @@ camera.add(headlight);
 scene.add(camera);
 
 // Shared Lights
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.1); // Initialize to 0.1
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
 scene.add(ambientLight);
 
 const sunLight = new THREE.PointLight(0xffecd9, 10.0, 250, 0.85);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
-sunLight.shadow.bias = -0.001;
+sunLight.shadow.bias = -0.0005;
+sunLight.shadow.normalBias = 0.03;
 scene.add(sunLight);
 
 const rimLight = new THREE.DirectionalLight(0x0044cc, 0.25); // Initialize to 0.25
@@ -442,9 +471,10 @@ scene.add(rimLight);
 const laserGroup = new THREE.Group();
 scene.add(laserGroup);
 
-const innerBeamGeo = new THREE.CylinderGeometry(0.18, 0.18, 1, 16, 1, true);
+const innerBeamGeo = new THREE.CylinderGeometry(0.07, 0.07, 1, 16, 1, true);
+innerBeamGeo.translate(0, 0.5, 0); // Base pivot at Sun center (0,0,0)
 const innerBeamMat = new THREE.MeshBasicMaterial({
-  color: 0x00eaff,
+  color: 0xffea00, // Bright intense yellow
   transparent: true,
   opacity: 0.0,
   side: THREE.DoubleSide,
@@ -452,11 +482,13 @@ const innerBeamMat = new THREE.MeshBasicMaterial({
   depthWrite: false
 });
 const innerBeam = new THREE.Mesh(innerBeamGeo, innerBeamMat);
+innerBeam.renderOrder = 50;
 laserGroup.add(innerBeam);
 
-const outerBeamGeo = new THREE.CylinderGeometry(0.45, 0.45, 1, 16, 1, true);
+const outerBeamGeo = new THREE.CylinderGeometry(0.20, 0.20, 1, 16, 1, true);
+outerBeamGeo.translate(0, 0.5, 0); // Base pivot at Sun center (0,0,0)
 const outerBeamMat = new THREE.MeshBasicMaterial({
-  color: 0x0088ff,
+  color: 0xffa800, // Warm golden amber glow
   transparent: true,
   opacity: 0.0,
   side: THREE.DoubleSide,
@@ -464,6 +496,7 @@ const outerBeamMat = new THREE.MeshBasicMaterial({
   depthWrite: false
 });
 const outerBeam = new THREE.Mesh(outerBeamGeo, outerBeamMat);
+outerBeam.renderOrder = 49;
 laserGroup.add(outerBeam);
 
 // ==========================================
@@ -472,7 +505,7 @@ laserGroup.add(outerBeam);
 const gridCoordVal = document.getElementById('hud-grid-coord');
 const activeFocusVal = document.getElementById('hud-active-focus');
 
-const dataBladeEl = document.getElementById('data-blade');
+const dataHudOverlayEl = document.getElementById('data-hud-overlay');
 const dataTitle = document.getElementById('project-title');
 const dataClassification = document.getElementById('project-classification');
 const dataUsecase = document.getElementById('project-usecase');
@@ -487,6 +520,23 @@ document.getElementById('close-blade-btn').addEventListener('click', () => {
   triggerReset();
 });
 
+// Settings Console Drawer Toggle Logic
+const consoleToggleBtn = document.getElementById('console-toggle-btn');
+const closeConsoleBtn = document.getElementById('close-console-btn');
+const debugPanelEl = document.getElementById('debug-panel');
+
+if (consoleToggleBtn && debugPanelEl) {
+  consoleToggleBtn.addEventListener('click', () => {
+    debugPanelEl.classList.toggle('closed');
+  });
+}
+
+if (closeConsoleBtn && debugPanelEl) {
+  closeConsoleBtn.addEventListener('click', () => {
+    debugPanelEl.classList.add('closed');
+  });
+}
+
 // ==========================================
 // INTERACTIVE RAYCASTING (HOVER/CLICK FOCUS)
 // ==========================================
@@ -496,6 +546,16 @@ const mouse = new THREE.Vector2();
 let hoveredPlanetId = null;
 let activeFocusPlanetId = null;
 let isTransitioningFocus = false;
+let hudOpenTimer = null;
+
+// Global keyboard shortcuts (Escape key resets focused view)
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === 'Esc') {
+    if (activeFocusPlanetId) {
+      triggerReset();
+    }
+  }
+});
 
 // Track mouse position on screen
 window.addEventListener('mousemove', (e) => {
@@ -518,11 +578,16 @@ window.addEventListener('resize', () => {
 window.addEventListener('click', (e) => {
   if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#debug-panel') || e.target.closest('#data-blade')) return;
 
-  raycaster.setFromCamera(mouse, camera);
+  const clickMouse = new THREE.Vector2(
+    (e.clientX / window.innerWidth) * 2 - 1,
+    -(e.clientY / window.innerHeight) * 2 + 1
+  );
+  raycaster.setFromCamera(clickMouse, camera);
   const intersects = [];
   
   Object.keys(planetObjects).forEach((key) => {
-    const hits = raycaster.intersectObject(planetObjects[key].coreMesh);
+    // Recursively intersect against entire planet group (crust, mantle, core)
+    const hits = raycaster.intersectObject(planetObjects[key].group, true);
     if (hits.length > 0) intersects.push({ id: key, distance: hits[0].distance });
   });
 
@@ -550,7 +615,8 @@ function checkHover() {
   const intersects = [];
   
   Object.keys(planetObjects).forEach((key) => {
-    const hits = raycaster.intersectObject(planetObjects[key].coreMesh);
+    // Recursively intersect against entire planet group (crust, mantle, core)
+    const hits = raycaster.intersectObject(planetObjects[key].group, true);
     if (hits.length > 0) intersects.push({ id: key, distance: hits[0].distance });
   });
 
@@ -581,6 +647,23 @@ function triggerHover(planetId) {
       overwrite: 'auto'
     });
   }
+
+  if (planet.hoverLabelMaterial) {
+    gsap.to(planet.hoverLabelMaterial, {
+      opacity: 1.0,
+      duration: 0.3,
+      overwrite: 'auto'
+    });
+  }
+
+  // Ensure label elevation is at normal position in non-exploded view
+  if (!activeFocusPlanetId || activeFocusPlanetId !== planetId) {
+    gsap.to(planet, {
+      currentYOffset: planet.config.size * 0.55,
+      duration: 0.4,
+      overwrite: 'auto'
+    });
+  }
   
   gsap.to(orbitRingsMap[planetId].material, {
     opacity: 0.7,
@@ -605,6 +688,14 @@ function triggerHoverEnd(planetId) {
   if (planet.glowMaterial) {
     gsap.to(planet.glowMaterial.uniforms.opacity, {
       value: 0.0,
+      duration: 0.3,
+      overwrite: 'auto'
+    });
+  }
+
+  if (planet.hoverLabelMaterial) {
+    gsap.to(planet.hoverLabelMaterial, {
+      opacity: 0.0,
       duration: 0.3,
       overwrite: 'auto'
     });
@@ -643,7 +734,13 @@ function triggerExplode(planetId) {
     span.innerText = tech;
     dataTechBadges.appendChild(span);
   });
-  dataBladeEl.classList.add('open');
+  
+  if (hudOpenTimer) clearTimeout(hudOpenTimer);
+  hudOpenTimer = setTimeout(() => {
+    if (dataHudOverlayEl && activeFocusPlanetId === planetId) {
+      dataHudOverlayEl.classList.remove('closed');
+    }
+  }, 600);
   
   // Camera focus animation transition triggered in the animate loop
   isTransitioningFocus = true;
@@ -705,14 +802,21 @@ function triggerExplode(planetId) {
     });
   });
 
-  // Align holographic scan line beam
-  laserGroup.position.set(0, 0, 0);
-  laserGroup.scale.set(1, planetWorldPos.length(), 1);
-  laserGroup.lookAt(planetWorldPos);
-  laserGroup.rotateX(Math.PI / 2);
-  
-  gsap.to(innerBeam.material, { opacity: 0.95, duration: 0.4 });
-  gsap.to(outerBeam.material, { opacity: 0.75, duration: 0.4 });
+  // Keep title text visible and smoothly shift position upward clear of exploding plates
+  if (planet.hoverLabelMaterial) {
+    gsap.to(planet.hoverLabelMaterial, { opacity: 1.0, duration: 0.4, overwrite: 'auto' });
+  }
+  if (planet.currentYOffset === undefined) planet.currentYOffset = planet.config.size * 0.95;
+  gsap.to(planet, {
+    currentYOffset: planet.config.size * 0.7,
+    duration: 1.2,
+    ease: 'power3.out',
+    overwrite: 'auto'
+  });
+
+  // Fade in holographic scan line beam
+  gsap.to(innerBeam.material, { opacity: 0.95, duration: 0.4, overwrite: 'auto' });
+  gsap.to(outerBeam.material, { opacity: 0.75, duration: 0.4, overwrite: 'auto' });
   
   updateDebugButtonState(planetId, 'explode');
 }
@@ -726,7 +830,8 @@ function triggerReset() {
   isTransitioningFocus = false;
   activeFocusVal.innerText = "NONE";
   
-  dataBladeEl.classList.remove('open');
+  if (hudOpenTimer) clearTimeout(hudOpenTimer);
+  if (dataHudOverlayEl) dataHudOverlayEl.classList.add('closed');
   
   gsap.to(controls.target, {
     x: 0, y: 0, z: 0,
@@ -791,6 +896,18 @@ function triggerReset() {
   
   gsap.to(innerBeam.material, { opacity: 0, duration: 0.4 });
   gsap.to(outerBeam.material, { opacity: 0, duration: 0.4 });
+
+  gsap.to(planet, {
+    currentYOffset: planet.config.size * 0.55,
+    duration: 0.8,
+    ease: 'power2.out',
+    overwrite: 'auto',
+    onComplete: () => {
+      if (hoveredPlanetId !== planetId && planet.hoverLabelMaterial) {
+        gsap.to(planet.hoverLabelMaterial, { opacity: 0.0, duration: 0.3 });
+      }
+    }
+  });
   
   updateDebugButtonState(planetId, 'orbit');
 }
@@ -900,9 +1017,24 @@ function animate() {
   starPoints.rotation.y = time * 0.008;
   starPoints.rotation.x = time * 0.003;
   starPoints.rotation.z = time * 0.002;
-  if (window.nebulaGroup) {
-    window.nebulaGroup.rotation.z = time * 0.0003;
-    window.nebulaGroup.rotation.y = time * 0.0001;
+  if (nebulaeList) {
+    const phaseStep = (Math.PI * 2) / nebulaeList.length;
+    nebulaeList.forEach((neb, index) => {
+      // Ensure all nebulae billboard flat facing camera lens
+      neb.mesh.quaternion.copy(camera.quaternion);
+
+      // Deep camera-local background positioning (guarantees zero foreground clipping)
+      const localX = neb.localOffset.x + Math.sin(time * neb.freq.x) * neb.amp.x;
+      const localY = neb.localOffset.y + Math.cos(time * neb.freq.y) * neb.amp.y;
+      const localPos = new THREE.Vector3(localX, localY, neb.localOffset.z);
+      neb.mesh.position.copy(localPos.applyMatrix4(camera.matrixWorld));
+      neb.mesh.rotation.z += neb.rotSpeed;
+
+      // Dynamic visibility cycling: strictly bounds active on-screen nebulae between min 3 and max 4
+      const rawScore = Math.sin(time * 0.10 + index * phaseStep);
+      const visibilityRamp = Math.max(0, Math.min(1, (rawScore + 0.08) / 0.48));
+      neb.mesh.material.opacity = visibilityRamp;
+    });
   }
   
   const pulseFactor = 1.0 + Math.sin(time * 2.2) * 0.03;
@@ -923,7 +1055,7 @@ function animate() {
     p.sprite.position.add(p.direction);
     
     const dist = p.sprite.position.length();
-    if (dist > 16.0) { // Double the travel distance (was 8.0)
+    if (dist > 16.0) {
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos((Math.random() * 2) - 1);
       const r = 2.0;
@@ -963,11 +1095,31 @@ function animate() {
     
     // Slow planetary rotation of the entire unified group (core + chunks)
     p.group.rotation.y += 0.0035;
+
+    // Copy planet world position & elevate curved hover label ABOVE planet top pole
+    if (p.hoverLabelMesh) {
+      const worldPos = new THREE.Vector3();
+      p.group.getWorldPosition(worldPos);
+      
+      const labelPos = worldPos.clone();
+      const yOffset = p.currentYOffset !== undefined ? p.currentYOffset : (p.config.size * 0.55);
+      labelPos.y += yOffset;
+
+      p.hoverLabelMesh.position.copy(labelPos);
+      p.hoverLabelMesh.quaternion.copy(camera.quaternion);
+    }
   });
 
   if (activePlanet) {
     const newPlanetPos = new THREE.Vector3();
     activePlanet.group.getWorldPosition(newPlanetPos);
+    
+    // Continuously align laser beam from Sun (0,0,0) to active planet position as it orbits
+    const beamLength = newPlanetPos.length();
+    laserGroup.position.set(0, 0, 0);
+    laserGroup.scale.set(1, beamLength, 1);
+    laserGroup.lookAt(newPlanetPos);
+    laserGroup.rotateX(Math.PI / 2);
     
     // Calculate the displacement from orbit & sway movement
     const displacement = new THREE.Vector3().subVectors(newPlanetPos, oldPlanetPos);

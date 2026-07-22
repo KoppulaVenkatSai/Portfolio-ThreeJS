@@ -273,31 +273,216 @@ body {
   box-shadow: inset 0 0 5px rgba(0, 243, 255, 0.05);
 }
 
-/* Debug / State Control Console */
-#debug-panel {
+/* Top-Middle Sci-Fi Settings Toggle Button */
+.console-toggle-btn {
   position: absolute;
-  bottom: 20px;
-  left: 20px;
-  z-index: 10;
-  background: rgba(5, 7, 15, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  background: rgba(6, 10, 22, 0.85);
+  border: 1px solid rgba(0, 243, 255, 0.35);
+  color: var(--color-cyan);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 8px 16px;
   border-radius: 4px;
-  padding: 15px;
-  width: 280px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.15);
+  transition: all 0.25s ease;
+}
+
+.console-toggle-btn:hover {
+  background: rgba(0, 243, 255, 0.2);
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 22px rgba(0, 243, 255, 0.45);
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.gear-icon {
+  transition: transform 0.4s ease;
+}
+
+.console-toggle-btn:hover .gear-icon {
+  transform: rotate(90deg);
+}
+
+/* Debug / State Control Console Drawer (Top-Middle) */
+#debug-panel.console-drawer {
+  position: absolute;
+  top: 65px;
+  left: 50%;
+  transform: translateX(-50%) translateY(0);
+  z-index: 25;
+  background: rgba(5, 7, 18, 0.92);
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  border-radius: 6px;
+  padding: 16px;
+  width: 310px;
+  max-height: calc(100vh - 95px);
+  overflow-y: auto;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.85), 0 0 20px rgba(0, 243, 255, 0.15);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+  opacity: 1;
+  visibility: visible;
 }
 
-.debug-header {
+#debug-panel.console-drawer.closed {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(-10px);
+  pointer-events: none;
+}
+
+/* 4-Corner Emerging HUD Data Panels Overlay */
+#data-hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.hud-panel-card {
+  position: absolute;
+  width: 320px;
+  background: rgba(6, 10, 22, 0.72);
+  border: 1px solid rgba(0, 243, 255, 0.25);
+  border-radius: 6px;
+  padding: 18px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(0, 243, 255, 0.05);
+  pointer-events: auto;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease, visibility 0.5s ease;
+  transform-origin: center center;
+}
+
+/* 4 Near-Center Corner Locations */
+.hud-panel-card.top-left {
+  top: 12%;
+  left: 12%;
+}
+
+.hud-panel-card.top-right {
+  top: 12%;
+  right: 12%;
+}
+
+.hud-panel-card.bottom-left {
+  bottom: 12%;
+  left: 12%;
+}
+
+.hud-panel-card.bottom-right {
+  bottom: 12%;
+  right: 12%;
+}
+
+/* Emerging & Collapsing to/from viewport center (50vw, 50vh) */
+#data-hud-overlay.closed .hud-panel-card.top-left {
+  transform: translate(calc(50vw - 12vw - 160px), calc(50vh - 12vh - 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#data-hud-overlay.closed .hud-panel-card.top-right {
+  transform: translate(calc(-50vw + 12vw + 160px), calc(50vh - 12vh - 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#data-hud-overlay.closed .hud-panel-card.bottom-left {
+  transform: translate(calc(50vw - 12vw - 160px), calc(-50vh + 12vh + 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#data-hud-overlay.closed .hud-panel-card.bottom-right {
+  transform: translate(calc(-50vw + 12vw + 160px), calc(-50vh + 12vh + 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Staggered card emergence delays when opening */
+#data-hud-overlay:not(.closed) .hud-panel-card.top-left {
+  transition-delay: 0.0s;
+}
+#data-hud-overlay:not(.closed) .hud-panel-card.top-right {
+  transition-delay: 0.12s;
+}
+#data-hud-overlay:not(.closed) .hud-panel-card.bottom-left {
+  transition-delay: 0.24s;
+}
+#data-hud-overlay:not(.closed) .hud-panel-card.bottom-right {
+  transition-delay: 0.36s;
+}
+
+#data-hud-overlay.closed .hud-panel-card {
+  transition-delay: 0s !important;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 243, 255, 0.18);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-corner-tag {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.1em;
+}
+
+.hud-project-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+}
+
+.console-close-btn {
+  background: transparent;
+  border: none;
   color: var(--color-text-secondary);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  padding-bottom: 6px;
+  font-size: 18px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.console-close-btn:hover {
+  color: #ff4444;
+}
+
+.telemetry-block {
+  background: rgba(0, 243, 255, 0.04);
+  border: 1px solid rgba(0, 243, 255, 0.15);
+  border-radius: 4px;
+  padding: 10px;
   letter-spacing: 0.1em;
   font-weight: bold;
 }
