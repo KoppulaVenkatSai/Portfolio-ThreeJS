@@ -381,9 +381,7 @@ function startSequence() {
   orbitControls.enabled = false;
   window.activeControls = null;
   if (cinematicTimeline) {
-    // Debug Mode: Seek with suppressEvents=false so all preceding setup callbacks run, then play
-    cinematicTimeline.seek(CONFIG.timeline.cameraChaseStart - 0.1, false);
-    cinematicTimeline.play();
+    cinematicTimeline.play(0);
   }
 }
 
