@@ -1,0 +1,181 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #02040a;
+  font-family: 'Outfit', sans-serif;
+  color: #f8fafc;
+}
+
+#webgl-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  display: block;
+}
+
+/* HUD Glassmorphism UI */
+#hud-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+}
+
+.hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+}
+
+.hud-tag {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.hud-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  padding: 8px 16px;
+  border-radius: 6px;
+  color: #4ade80;
+  backdrop-filter: blur(8px);
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #22c55e;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #22c55e;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+/* Controls Panel & Blast Off Button */
+#controls-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+#blast-off-btn {
+  pointer-events: auto;
+  position: relative;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(3, 105, 161, 0.4));
+  border: 1px solid #38bdf8;
+  border-radius: 12px;
+  padding: 16px 48px;
+  color: #ffffff;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.3), inset 0 0 15px rgba(56, 189, 248, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+}
+
+#blast-off-btn:hover {
+  transform: translateY(-2px) scale(1.04);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.4), rgba(3, 105, 161, 0.6));
+  border-color: #7dd3fc;
+  box-shadow: 0 0 40px rgba(56, 189, 248, 0.6), inset 0 0 25px rgba(56, 189, 248, 0.4);
+}
+
+#blast-off-btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.btn-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+}
+
+.btn-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: #7dd3fc;
+  opacity: 0.8;
+}
+
+/* Footer HUD */
+.hud-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.hud-info {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  padding: 6px 14px;
+  border-radius: 6px;
+  backdrop-filter: blur(8px);
+}
+
+.hud-info span {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+#toggle-orbit-btn {
+  pointer-events: auto;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  transition: all 0.2s;
+  backdrop-filter: blur(8px);
+}
+
+#toggle-orbit-btn:hover {
+  color: #ffffff;
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.9);
+}

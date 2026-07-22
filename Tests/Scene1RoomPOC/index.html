@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scene 1: Space Station Room POC</title>
+  <link rel="stylesheet" href="./style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- HUD Overlay -->
+  <div id="hud-container">
+    <div class="hud-header">
+      <div class="hud-tag">STATION INTERIOR // MODULE 01</div>
+      <div class="hud-status"><span class="pulse-dot"></span> SYSTEMS READY</div>
+    </div>
+
+    <!-- Center Control Panel -->
+    <div id="controls-panel">
+      <button id="blast-off-btn">
+        <span class="btn-glow"></span>
+        <span class="btn-text">BLAST OFF</span>
+        <span class="btn-sub">INITIATE DEPARTURE</span>
+      </button>
+    </div>
+
+    <!-- Navigation / Debug Controls -->
+    <div class="hud-footer">
+      <div class="hud-info">CAMERA: <span id="cam-status">INTERIOR_VIEW</span></div>
+      <button id="toggle-orbit-btn">TOGGLE FREE CAM</button>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
