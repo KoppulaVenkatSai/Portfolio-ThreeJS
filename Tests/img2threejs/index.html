@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procedural Space Station - img2threejs Showcase</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #05070a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e6ed;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(15, 20, 28, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 20px;
+            width: 320px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+        }
+        h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #00d9ff;
+        }
+        p.subtitle {
+            font-size: 0.82rem;
+            color: #8a99ad;
+            margin-bottom: 16px;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        button {
+            background: #1e2633;
+            border: 1px solid #344256;
+            color: #d0dbe8;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.82rem;
+            transition: all 0.2s ease;
+        }
+        button:hover {
+            background: #0088cc;
+            border-color: #00aaff;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 170, 255, 0.4);
+        }
+        .controls-info {
+            font-size: 0.78rem;
+            line-height: 1.4;
+            color: #728196;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 12px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2rem;
+            color: #00d9ff;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Initializing Procedural Space Station...</div>
+    <div id="canvas-container"></div>
+
+    <div id="ui-panel">
+        <h1>Procedural Space Station</h1>
+        <p class="subtitle">Code-only Three.js model generated via img2threejs pipeline</p>
+
+        <div class="btn-group">
+            <button id="btn-perspective">Perspective View</button>
+            <button id="btn-front">Front View</button>
+            <button id="btn-top">Top View</button>
+            <button id="btn-bottom">Bottom View</button>
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-rotate">Toggle Rotation</button>
+            <button id="btn-wireframe">Toggle Wireframe</button>
+        </div>
+
+        <div class="controls-info">
+            • <b>Orbit</b>: Left Click + Drag<br>
+            • <b>Pan</b>: Right Click + Drag<br>
+            • <b>Zoom</b>: Scroll Wheel
+        </div>
+    </div>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
