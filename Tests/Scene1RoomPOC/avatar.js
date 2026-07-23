@@ -4,177 +4,232 @@ import gsap from 'gsap';
 export class TechAvatar {
   constructor() {
     this.group = new THREE.Group();
-    this.group.name = "TechAvatarGroup";
+    this.group.name = "VenkatAvatarGroup";
 
-    // Materials
-    this.suitMaterial = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.3,
-      metalness: 0.7,
-      envMapIntensity: 1.0
+    // Palette matching 1774207987450.png
+    this.skinMat = new THREE.MeshStandardMaterial({
+      color: 0xe5aa85,
+      roughness: 0.65,
+      metalness: 0.05
     });
 
-    this.accentMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0ea5e9,
-      roughness: 0.2,
-      metalness: 0.8
+    this.hairMat = new THREE.MeshStandardMaterial({
+      color: 0x18181b,
+      roughness: 0.9,
+      metalness: 0.1
     });
 
-    this.visorMaterial = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      roughness: 0.1,
-      metalness: 0.9,
-      emissive: 0x38bdf8,
-      emissiveIntensity: 0.75
+    this.jacketMat = new THREE.MeshStandardMaterial({
+      color: 0x475569, // Olive/grey bomber jacket
+      roughness: 0.6,
+      metalness: 0.15
     });
 
-    this.jointMaterial = new THREE.MeshStandardMaterial({
+    this.tshirtMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b, // Dark navy/black t-shirt
+      roughness: 0.8,
+      metalness: 0.05
+    });
+
+    this.pantsMat = new THREE.MeshStandardMaterial({
+      color: 0x334155, // Slate grey cargo pants
+      roughness: 0.7,
+      metalness: 0.1
+    });
+
+    this.bootsMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
       roughness: 0.5,
-      metalness: 0.5
+      metalness: 0.2
     });
 
-    this.glowMaterial = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      transparent: true,
-      opacity: 0.6
-    });
+    this.eyeMat = new THREE.MeshBasicMaterial({ color: 0x09090b });
+    this.mouthMat = new THREE.MeshBasicMaterial({ color: 0x881337 });
 
     this.buildBody();
     this.setupWavingAnimation();
   }
 
   buildBody() {
-    // 1. Torso / Suit Chest
-    const torsoGeom = new THREE.CylinderGeometry(0.35, 0.25, 0.8, 16);
-    const torso = new THREE.Mesh(torsoGeom, this.suitMaterial);
-    torso.position.y = 0.8;
-    this.group.add(torso);
+    // 1. Head & Hair
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 1.65, 0);
 
-    // Chest Emblem / Reactor Core
-    const coreGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16);
-    coreGeom.rotateX(Math.PI / 2);
-    const core = new THREE.Mesh(coreGeom, this.visorMaterial);
-    core.position.set(0, 0.95, 0.26);
-    this.group.add(core);
+    const headGeom = new THREE.SphereGeometry(0.24, 24, 24);
+    headGeom.scale(1, 1.15, 1);
+    const head = new THREE.Mesh(headGeom, this.skinMat);
+    headGroup.add(head);
 
-    // 2. Helmet & Visor
-    const helmetGeom = new THREE.SphereGeometry(0.32, 24, 24);
-    const helmet = new THREE.Mesh(helmetGeom, this.suitMaterial);
-    helmet.position.y = 1.45;
-    this.group.add(helmet);
+    // Short Black Hair (Stylized hair helmet/tufts)
+    const hairGeom = new THREE.SphereGeometry(0.255, 24, 24, 0, Math.PI * 2, 0, Math.PI / 1.7);
+    const hairBase = new THREE.Mesh(hairGeom, this.hairMat);
+    hairBase.position.set(0, 0.04, -0.02);
+    hairBase.rotation.x = -0.2;
+    headGroup.add(hairBase);
 
-    // Visor (Front Curved Shield)
-    const visorGeom = new THREE.SphereGeometry(0.28, 24, 24, 0, Math.PI, 0, Math.PI / 1.5);
-    visorGeom.rotateY(-Math.PI / 2);
-    visorGeom.rotateX(-Math.PI / 8);
-    const visor = new THREE.Mesh(visorGeom, this.visorMaterial);
-    visor.position.set(0, 1.46, 0.08);
-    this.group.add(visor);
+    // Front Hair Sweep / Fringe
+    const fringeGeom = new THREE.ConeGeometry(0.12, 0.22, 12);
+    fringeGeom.rotateX(1.2);
+    fringeGeom.rotateZ(-0.4);
+    const fringe = new THREE.Mesh(fringeGeom, this.hairMat);
+    fringe.position.set(-0.06, 0.22, 0.18);
+    headGroup.add(fringe);
 
-    // Antenna Emitters
-    const antGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.25, 8);
-    const antLeft = new THREE.Mesh(antGeom, this.accentMaterial);
-    antLeft.position.set(-0.34, 1.6, 0);
-    antLeft.rotation.z = Math.PI / 6;
-    this.group.add(antLeft);
+    // Eyes
+    const eyeGeom = new THREE.SphereGeometry(0.028, 12, 12);
+    const eyeLeft = new THREE.Mesh(eyeGeom, this.eyeMat);
+    eyeLeft.position.set(-0.085, 0.03, 0.21);
+    headGroup.add(eyeLeft);
 
-    const antRight = new THREE.Mesh(antGeom, this.accentMaterial);
-    antRight.position.set(0.34, 1.6, 0);
-    antRight.rotation.z = -Math.PI / 6;
-    this.group.add(antRight);
+    const eyeRight = new THREE.Mesh(eyeGeom, this.eyeMat);
+    eyeRight.position.set(0.085, 0.03, 0.21);
+    headGroup.add(eyeRight);
 
-    // 3. Backpack / Life Support Unit
-    const packGeom = new THREE.BoxGeometry(0.5, 0.6, 0.25);
-    const pack = new THREE.Mesh(packGeom, this.suitMaterial);
-    pack.position.set(0, 0.9, -0.28);
-    this.group.add(pack);
+    // Eyebrows
+    const browGeom = new THREE.BoxGeometry(0.06, 0.012, 0.01);
+    const browL = new THREE.Mesh(browGeom, this.hairMat);
+    browL.position.set(-0.085, 0.08, 0.22);
+    browL.rotation.z = -0.1;
+    headGroup.add(browL);
 
-    // 4. Left Arm (Idle Resting Side)
-    const armLeftGroup = new THREE.Group();
-    armLeftGroup.position.set(-0.42, 1.1, 0);
+    const browR = new THREE.Mesh(browGeom, this.hairMat);
+    browR.position.set(0.085, 0.08, 0.22);
+    browR.rotation.z = 0.1;
+    headGroup.add(browR);
 
-    const shoulderL = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), this.jointMaterial);
-    armLeftGroup.add(shoulderL);
+    // Smile
+    const mouthGeom = new THREE.TorusGeometry(0.04, 0.008, 8, 16, Math.PI);
+    const mouth = new THREE.Mesh(mouthGeom, this.mouthMat);
+    mouth.position.set(0, -0.08, 0.21);
+    mouth.rotation.x = Math.PI;
+    headGroup.add(mouth);
 
-    const bicepL = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.4, 12), this.suitMaterial);
-    bicepL.position.y = -0.2;
-    armLeftGroup.add(bicepL);
+    this.group.add(headGroup);
 
-    const forearmL = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.35, 12), this.accentMaterial);
-    forearmL.position.set(0, -0.5, 0.05);
-    forearmL.rotation.x = -Math.PI / 8;
-    armLeftGroup.add(forearmL);
+    // 2. Neck & Torso
+    const neckGeom = new THREE.CylinderGeometry(0.08, 0.09, 0.12, 16);
+    const neck = new THREE.Mesh(neckGeom, this.skinMat);
+    neck.position.set(0, 1.38, 0);
+    this.group.add(neck);
 
-    this.group.add(armLeftGroup);
+    // T-Shirt Inner Chest
+    const tshirtGeom = new THREE.CylinderGeometry(0.24, 0.2, 0.65, 16);
+    const tshirt = new THREE.Mesh(tshirtGeom, this.tshirtMat);
+    tshirt.position.set(0, 0.98, 0);
+    this.group.add(tshirt);
 
-    // 5. Right Arm (Waving Arm with Pivots)
-    this.shoulderRightPivot = new THREE.Group();
-    this.shoulderRightPivot.position.set(0.42, 1.15, 0);
+    // Zipped Bomber Jacket (Outer shell)
+    const jacketGeom = new THREE.CylinderGeometry(0.27, 0.23, 0.66, 16, 1, false, 0.2, Math.PI * 1.8);
+    const jacket = new THREE.Mesh(jacketGeom, this.jacketMat);
+    jacket.position.set(0, 0.98, 0);
+    this.group.add(jacket);
 
-    const shoulderR = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 12), this.jointMaterial);
-    this.shoulderRightPivot.add(shoulderR);
+    // Jacket Collar
+    const collarGeom = new THREE.TorusGeometry(0.22, 0.04, 12, 16);
+    const collar = new THREE.Mesh(collarGeom, this.jacketMat);
+    collar.position.set(0, 1.32, 0);
+    collar.rotation.x = Math.PI / 2;
+    this.group.add(collar);
 
-    // Upper Arm raised up and outwards
-    const bicepR = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.38, 12), this.suitMaterial);
-    bicepR.position.set(0.15, 0.15, 0);
-    bicepR.rotation.z = -Math.PI / 3;
-    this.shoulderRightPivot.add(bicepR);
+    // 3. Left Arm (Relaxed at side)
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.32, 1.25, 0);
 
-    // Forearm & Hand Pivot
-    this.forearmRightPivot = new THREE.Group();
-    this.forearmRightPivot.position.set(0.3, 0.3, 0);
+    const bicepL = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.38, 12), this.jacketMat);
+    bicepL.position.y = -0.19;
+    leftArmGroup.add(bicepL);
 
-    const forearmR = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.35, 12), this.accentMaterial);
-    forearmR.position.y = 0.18;
-    this.forearmRightPivot.add(forearmR);
+    const forearmL = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.35, 12), this.skinMat);
+    forearmL.position.set(0, -0.5, 0.02);
+    forearmL.rotation.x = -0.1;
+    leftArmGroup.add(forearmL);
 
-    // Hand / Glove
-    const handR = new THREE.Mesh(new THREE.SphereGeometry(0.08, 12, 12), this.visorMaterial);
-    handR.position.y = 0.38;
-    this.forearmRightPivot.add(handR);
+    this.group.add(leftArmGroup);
 
-    this.shoulderRightPivot.add(this.forearmRightPivot);
-    this.group.add(this.shoulderRightPivot);
+    // 4. Right Arm (Waving Arm matching 1774207987450.png!)
+    this.rightShoulderPivot = new THREE.Group();
+    this.rightShoulderPivot.position.set(0.32, 1.25, 0);
 
-    // 6. Legs
-    const legGeom = new THREE.CylinderGeometry(0.1, 0.08, 0.7, 12);
+    // Upper arm raised high & angled out
+    const bicepR = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.065, 0.38, 12), this.jacketMat);
+    bicepR.position.set(0.12, 0.14, 0);
+    bicepR.rotation.z = -Math.PI / 2.8;
+    this.rightShoulderPivot.add(bicepR);
 
-    const legLeft = new THREE.Mesh(legGeom, this.suitMaterial);
-    legLeft.position.set(-0.18, 0.35, 0);
-    this.group.add(legLeft);
+    // Elbow & Forearm Pivot
+    this.rightForearmPivot = new THREE.Group();
+    this.rightForearmPivot.position.set(0.28, 0.28, 0);
 
-    const legRight = new THREE.Mesh(legGeom, this.suitMaterial);
-    legRight.position.set(0.18, 0.35, 0);
-    this.group.add(legRight);
+    const forearmR = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.055, 0.36, 12), this.skinMat);
+    forearmR.position.set(0.02, 0.18, 0.02);
+    forearmR.rotation.z = 0.15;
+    this.rightForearmPivot.add(forearmR);
 
-    // Scale & Initial Orientation
-    this.group.scale.set(1.5, 1.5, 1.5);
+    // Open Waving Hand with Fingers
+    const handGroup = new THREE.Group();
+    handGroup.position.set(0.04, 0.38, 0.02);
+
+    const palmGeom = new THREE.BoxGeometry(0.11, 0.12, 0.03);
+    const palm = new THREE.Mesh(palmGeom, this.skinMat);
+    handGroup.add(palm);
+
+    // 4 Open Fingers
+    for (let f = 0; f < 4; f++) {
+      const fingerGeom = new THREE.CylinderGeometry(0.012, 0.01, 0.08, 8);
+      const finger = new THREE.Mesh(fingerGeom, this.skinMat);
+      finger.position.set(-0.038 + f * 0.025, 0.09, 0);
+      handGroup.add(finger);
+    }
+    // Thumb
+    const thumbGeom = new THREE.CylinderGeometry(0.013, 0.011, 0.07, 8);
+    const thumb = new THREE.Mesh(thumbGeom, this.skinMat);
+    thumb.position.set(-0.06, 0.02, 0);
+    thumb.rotation.z = Math.PI / 3;
+    handGroup.add(thumb);
+
+    this.rightForearmPivot.add(handGroup);
+    this.rightShoulderPivot.add(this.rightForearmPivot);
+    this.group.add(this.rightShoulderPivot);
+
+    // 5. Legs & Boots
+    const legLeftGroup = new THREE.Group();
+    legLeftGroup.position.set(-0.14, 0.65, 0);
+    const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.65, 12), this.pantsMat);
+    legL.position.y = -0.325;
+    legLeftGroup.add(legL);
+    const bootL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.2), this.bootsMat);
+    bootL.position.set(0, -0.68, 0.04);
+    legLeftGroup.add(bootL);
+    this.group.add(legLeftGroup);
+
+    const legRightGroup = new THREE.Group();
+    legRightGroup.position.set(0.14, 0.65, 0);
+    const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.08, 0.65, 12), this.pantsMat);
+    legR.position.y = -0.325;
+    legRightGroup.add(legR);
+    const bootR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.2), this.bootsMat);
+    bootR.position.set(0, -0.68, 0.04);
+    legRightGroup.add(bootR);
+    this.group.add(legRightGroup);
+
+    // Scale to appropriate proportions
+    this.group.scale.set(1.4, 1.4, 1.4);
   }
 
   setupWavingAnimation() {
-    // Wave forearm back and forth continuously
-    gsap.to(this.forearmRightPivot.rotation, {
-      z: 0.45,
-      duration: 0.5,
+    // Wave hand & forearm back and forth continuously
+    gsap.to(this.rightForearmPivot.rotation, {
+      z: 0.35,
+      duration: 0.45,
       repeat: -1,
       yoyo: true,
       ease: "sine.inOut"
     });
 
-    // Subtle torso floating up and down
+    // Subtle idle body breathing sway
     gsap.to(this.group.position, {
-      y: 0.08,
-      duration: 2.0,
-      repeat: -1,
-      yoyo: true,
-      ease: "sine.inOut"
-    });
-
-    // Subtle head tilt wave
-    gsap.to(this.group.rotation, {
-      y: 0.1,
-      duration: 3.0,
+      y: '+=0.04',
+      duration: 2.2,
       repeat: -1,
       yoyo: true,
       ease: "sine.inOut"
@@ -182,9 +237,6 @@ export class TechAvatar {
   }
 
   update(time) {
-    // Pulsing visor intensity
-    if (this.visorMaterial) {
-      this.visorMaterial.emissiveIntensity = 0.65 + Math.sin(time * 3.0) * 0.2;
-    }
+    // Micro updates if needed
   }
 }

@@ -5,31 +5,143 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scene 1: Space Station Room POC</title>
   <link rel="stylesheet" href="./style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
 </head>
 <body>
   <canvas id="webgl-canvas"></canvas>
+
+  <!-- Preloader Screen -->
+  <div id="loader-screen">
+    <div class="loader-matrix">
+      <div class="loader-title">SYSTEM INITIALIZATION // SCENE 01</div>
+      <div class="loader-bar-bg">
+        <div id="loader-bar"></div>
+      </div>
+      <div id="loader-status">Preloading WebGL and assets...</div>
+    </div>
+  </div>
 
   <!-- HUD Overlay -->
   <div id="hud-container">
     <div class="hud-header">
       <div class="hud-tag">STATION INTERIOR // MODULE 01</div>
-      <div class="hud-status"><span class="pulse-dot"></span> SYSTEMS READY</div>
+      <div class="hud-right-actions">
+        <div class="hud-status"><span class="pulse-dot"></span> SYSTEMS READY</div>
+        <button id="settings-toggle-btn" class="icon-btn" title="Toggle Inspector Controls">⚙️</button>
+      </div>
     </div>
 
-    <!-- Center Control Panel -->
-    <div id="controls-panel">
-      <button id="blast-off-btn">
-        <span class="btn-glow"></span>
-        <span class="btn-text">BLAST OFF</span>
-        <span class="btn-sub">INITIATE DEPARTURE</span>
-      </button>
+    <!-- Inspector Controls Accordion Panel (Hidden by default until ⚙️ clicked) -->
+    <div id="camera-inspector" class="inspector-hidden">
+      
+      <!-- Accordion 1: Camera & Bloom Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>CAMERA_&_BLOOM_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="info-row">
+            <span class="label">CAM POS:</span>
+            <span class="value" id="cam-pos-val">0.00, 0.00, 0.00</span>
+          </div>
+          <div class="info-row">
+            <span class="label">LOOK TARGET:</span>
+            <span class="value" id="cam-target-val">0.00, 0.00, 0.00</span>
+          </div>
+
+          <div class="slider-row" style="margin-top: 8px;">
+            <label>BLOOM STRENGTH: <span id="bloom-strength-val">0.40</span></label>
+            <input type="range" id="bloom-strength-slider" min="0.0" max="4.0" step="0.05" value="0.40">
+          </div>
+          <div class="slider-row">
+            <label>BLOOM THRESHOLD: <span id="bloom-threshold-val">0.96</span></label>
+            <input type="range" id="bloom-threshold-slider" min="0.0" max="1.0" step="0.01" value="0.96">
+          </div>
+
+          <div class="inspector-controls">
+            <button class="control-btn" id="toggle-orbit-btn">ENABLE FREE CAM</button>
+            <button class="control-btn copy-btn" id="copy-cam-btn">📋 COPY CAM POS & TARGET</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 2: 3D Text Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>3D_NAME_TEXT_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SIZE / SCALE: <span id="text-scale-val">1.45</span></label>
+            <input type="range" id="text-scale-slider" min="0.2" max="3.0" step="0.05" value="1.45">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="text-x-val">36.00</span></label>
+            <input type="range" id="text-x-slider" min="20" max="50" step="0.1" value="36.00">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="text-y-val">0.40</span></label>
+            <input type="range" id="text-y-slider" min="-3" max="3" step="0.05" value="0.40">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="text-z-val">9.40</span></label>
+            <input type="range" id="text-z-slider" min="-10" max="20" step="0.1" value="9.40">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="text-roty-val">3.05</span></label>
+            <input type="range" id="text-roty-slider" min="0" max="6.28" step="0.05" value="3.05">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-text-btn">📋 COPY TEXT POS & ROTATION</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 3: BLAST OFF Lid Text Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>BLAST_OFF_LID_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SIZE / SCALE: <span id="lid-scale-val">1.60</span></label>
+            <input type="range" id="lid-scale-slider" min="0.2" max="3.0" step="0.05" value="1.60">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="lid-x-val">37.50</span></label>
+            <input type="range" id="lid-x-slider" min="30.0" max="45.0" step="0.05" value="37.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="lid-y-val">-2.55</span></label>
+            <input type="range" id="lid-y-slider" min="-5.0" max="2.0" step="0.05" value="-2.55">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="lid-z-val">7.35</span></label>
+            <input type="range" id="lid-z-slider" min="0.0" max="15.0" step="0.05" value="7.35">
+          </div>
+          <div class="slider-row">
+            <label>ROT X: <span id="lid-rotx-val">-0.04</span></label>
+            <input type="range" id="lid-rotx-slider" min="-3.14" max="3.14" step="0.02" value="-0.04">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="lid-roty-val">3.15</span></label>
+            <input type="range" id="lid-roty-slider" min="0.0" max="6.28" step="0.05" value="3.15">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-lid-btn">📋 COPY LID TEXT TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="copy-toast">COPIED TO CLIPBOARD & CONSOLE!</div>
     </div>
 
     <!-- Navigation / Debug Controls -->
     <div class="hud-footer">
-      <div class="hud-info">CAMERA: <span id="cam-status">INTERIOR_VIEW</span></div>
-      <button id="toggle-orbit-btn">TOGGLE FREE CAM</button>
+      <div class="hud-info">STATUS: <span id="cam-status">INTERIOR_VIEW</span></div>
     </div>
   </div>
 
