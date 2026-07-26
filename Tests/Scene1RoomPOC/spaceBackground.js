@@ -84,7 +84,7 @@ export function createNebulaTexture(color1, color2) {
   return texture;
 }
 
-// GPU Twinkle Shader for dynamic star pulsing (matching EarthLandingPOCV3)
+// GPU Twinkle & Drift Shader for dynamic star movement and pulsing
 const TwinkleStarShader = {
   vertex: `
     attribute float aPhase;
@@ -94,10 +94,16 @@ const TwinkleStarShader = {
     varying float vBrightness;
     
     void main() {
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vec3 pos = position;
+      // Ultra-subtle slow drift (reduced from 12.0 amplitude down to 0.4)
+      pos.x += sin(uTime * 0.4 + aPhase) * 3.0;
+      pos.y += cos(uTime * 0.015 + aPhase * 1.3) * 0.4;
+      pos.z += sin(uTime * 0.01 + aPhase * 0.7) * 0.3;
+
+      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
       gl_Position = projectionMatrix * mvPosition;
       
-      // Calculate twinkling oscillation (sharp pulsing between 0.05 dark and 1.0 bright)
+      // Calculate twinkling oscillation
       float t = uTime * aSpeed + aPhase;
       vBrightness = 0.05 + 0.95 * pow(0.5 + 0.5 * sin(t), 3.0);
       
@@ -132,45 +138,117 @@ export class SpaceCosmosBackground {
   }
 
   buildStarfield() {
-    this.starCount = 6500;
-    const positions = new Float32Array(this.starCount * 3);
-    const starPhases = new Float32Array(this.starCount);
-    const starSpeeds = new Float32Array(this.starCount);
-
-    // Center of the spherical star field (Space Station origin)
     const cx = 37.5;
     const cy = 0.0;
     const cz = 0.0;
 
-    for (let i = 0; i < this.starCount; i++) {
-      // Distribute stars in a far outer sphere around the space station
+    // 1. RANDOM DISTANT STARS (3,000 Stars, Smaller Size 2.2)
+    this.randomStarCount = 3000;
+    const posRandom = new Float32Array(this.randomStarCount * 3);
+    const phaseRandom = new Float32Array(this.randomStarCount);
+    const speedRandom = new Float32Array(this.randomStarCount);
+
+    for (let i = 0; i < this.randomStarCount; i++) {
       const u = Math.random();
       const v = Math.random();
       const theta = u * 2.0 * Math.PI;
       const phi = Math.acos(2.0 * v - 1.0);
-      const r = 1400 + Math.random() * 1600; // Distant outer space sphere (1400 - 3000 units)
+      const r = 380 + Math.random() * 320;
 
-      positions[i * 3] = cx + r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = cy + r * Math.sin(phi) * Math.sin(theta);
-      positions[i * 3 + 2] = cz + r * Math.cos(phi);
+      posRandom[i * 3] = cx + r * Math.sin(phi) * Math.cos(theta);
+      posRandom[i * 3 + 1] = cy + r * Math.sin(phi) * Math.sin(theta);
+      posRandom[i * 3 + 2] = cz + r * Math.cos(phi);
 
-      starPhases[i] = Math.random() * Math.PI * 2;
-      starSpeeds[i] = 1.2 + Math.random() * 2.5; // Rapid vivid twinkling speed
+      phaseRandom[i] = Math.random() * Math.PI * 2;
+      speedRandom[i] = 0.12 + Math.random() * 0.38;
     }
 
-    const starGeom = new THREE.BufferGeometry();
-    starGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    starGeom.setAttribute("aPhase", new THREE.BufferAttribute(starPhases, 1));
-    starGeom.setAttribute("aSpeed", new THREE.BufferAttribute(starSpeeds, 1));
+    const randomGeom = new THREE.BufferGeometry();
+    randomGeom.setAttribute("position", new THREE.BufferAttribute(posRandom, 3));
+    randomGeom.setAttribute("aPhase", new THREE.BufferAttribute(phaseRandom, 1));
+    randomGeom.setAttribute("aSpeed", new THREE.BufferAttribute(speedRandom, 1));
 
     this.starMat = new THREE.ShaderMaterial({
       vertexShader: TwinkleStarShader.vertex,
       fragmentShader: TwinkleStarShader.fragment,
       uniforms: {
         uTime: { value: 0.0 },
-        uSize: { value: 3.5 }, // Small, sharp, distant stars
+        uSize: { value: 2.2 },
         uTexture: { value: createStarTexture() },
         uColor: { value: new THREE.Color(0xffffff) },
+        uOpacity: { value: 0.95 }
+      },
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    this.stars = new THREE.Points(randomGeom, this.starMat);
+    this.group.add(this.stars);
+
+    // 2. SPARSE STAR CLUSTERS (3,000 total stars divided into 6 to 9 random sparse clusters)
+    this.buildRandomStarClusters(cx, cy, cz);
+  }
+
+  buildRandomStarClusters(cx, cy, cz) {
+    this.clusterStarTotal = 3000;
+    // Pick at least 6 and at most 9 clusters randomly
+    const numClusters = Math.floor(Math.random() * 4) + 6; // 6, 7, 8, or 9
+    const starsPerCluster = Math.floor(this.clusterStarTotal / numClusters);
+
+    const posClusters = new Float32Array(this.clusterStarTotal * 3);
+    const phaseClusters = new Float32Array(this.clusterStarTotal);
+    const speedClusters = new Float32Array(this.clusterStarTotal);
+
+    let idx = 0;
+
+    for (let c = 0; c < numClusters; c++) {
+      // Pick a random cluster center in space
+      const cu = Math.random();
+      const cv = Math.random();
+      const cTheta = cu * 2.0 * Math.PI;
+      const cPhi = Math.acos(2.0 * cv - 1.0);
+      const cDist = 380 + Math.random() * 260;
+
+      const clusterX = cx + cDist * Math.sin(cPhi) * Math.cos(cTheta);
+      const clusterY = cy + cDist * Math.sin(cPhi) * Math.sin(cTheta);
+      const clusterZ = cz + cDist * Math.cos(cPhi);
+
+      // Sparse, wider cluster spread
+      const clusterSpread = 90.0 + Math.random() * 110.0;
+
+      const countThisCluster = (c === numClusters - 1) ? (this.clusterStarTotal - idx) : starsPerCluster;
+
+      for (let i = 0; i < countThisCluster; i++) {
+        // Sparse linear-quadratic distribution for wide cluster spreading
+        const radius = Math.pow(Math.random(), 1.4) * clusterSpread;
+        const theta = Math.random() * Math.PI * 2.0;
+        const phi = Math.acos(2.0 * Math.random() - 1.0);
+
+        posClusters[idx * 3] = clusterX + radius * Math.sin(phi) * Math.cos(theta);
+        posClusters[idx * 3 + 1] = clusterY + radius * Math.sin(phi) * Math.sin(theta);
+        posClusters[idx * 3 + 2] = clusterZ + radius * Math.cos(phi);
+
+        phaseClusters[idx] = Math.random() * Math.PI * 2;
+        speedClusters[idx] = 0.10 + Math.random() * 0.35;
+
+        idx++;
+      }
+    }
+
+    const clusterGeom = new THREE.BufferGeometry();
+    clusterGeom.setAttribute("position", new THREE.BufferAttribute(posClusters, 3));
+    clusterGeom.setAttribute("aPhase", new THREE.BufferAttribute(phaseClusters, 1));
+    clusterGeom.setAttribute("aSpeed", new THREE.BufferAttribute(speedClusters, 1));
+
+    this.clusterMat = new THREE.ShaderMaterial({
+      vertexShader: TwinkleStarShader.vertex,
+      fragmentShader: TwinkleStarShader.fragment,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uSize: { value: 2.2 },
+        uTexture: { value: createStarTexture() },
+        uColor: { value: new THREE.Color(0xe0f2fe) },
         uOpacity: { value: 1.0 }
       },
       transparent: true,
@@ -178,8 +256,8 @@ export class SpaceCosmosBackground {
       depthWrite: false
     });
 
-    this.stars = new THREE.Points(starGeom, this.starMat);
-    this.group.add(this.stars);
+    this.clusterStars = new THREE.Points(clusterGeom, this.clusterMat);
+    this.group.add(this.clusterStars);
   }
 
   buildNebulaClouds() {
@@ -241,6 +319,19 @@ export class SpaceCosmosBackground {
   update(time) {
     if (this.starMat && this.starMat.uniforms.uTime) {
       this.starMat.uniforms.uTime.value = time;
+    }
+    if (this.clusterMat && this.clusterMat.uniforms.uTime) {
+      this.clusterMat.uniforms.uTime.value = time;
+    }
+
+    // Gentle orbital drifting rotation for star fields
+    if (this.stars) {
+      this.stars.rotation.y = time * 0.003;
+      this.stars.rotation.x = Math.sin(time * 0.002) * 0.007;
+    }
+    if (this.clusterStars) {
+      this.clusterStars.rotation.y = time * 0.00003;
+      this.clusterStars.rotation.z = Math.cos(time * 0.00007) * 0.00003;
     }
 
     // Dynamic swirling and floating drift for nebulae clouds

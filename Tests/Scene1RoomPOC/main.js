@@ -16,28 +16,30 @@ const canvas = document.getElementById('webgl-canvas');
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x02040a);
 
-const camera = new THREE.PerspectiveCamera(54, window.innerWidth / window.innerHeight, 0.1, 2000);
+// Optimized FOV and Near/Far planes (0.5 to 800) to eliminate z-fighting depth precision loss
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 800);
 
 const renderer = new THREE.WebGLRenderer({
   canvas: canvas,
   antialias: true,
-  powerPreference: 'high-performance'
+  powerPreference: 'high-performance',
+  logarithmicDepthBuffer: true
 });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.25;
 
 // Post-Processing Composer & Bloom (Selective Threshold)
 const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(scene, camera);
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  0.4,  // Bloom Strength (0.4)
+  0.45, // Bloom Strength
   0.5,  // Bloom Radius
-  0.96  // Bloom Threshold (0.96)
+  0.92  // Bloom Threshold
 );
 composer.addPass(renderPass);
 composer.addPass(bloomPass);
@@ -80,13 +82,13 @@ loadingManager.onError = (url) => {
 };
 
 // ==========================================
-// 3. CAMERA POSITIONS (User Configured Coordinates)
+// 3. CAMERA POSITIONS (Refined & Balanced Composition)
 // ==========================================
-// SCENE 1 CAMERA COORDINATES
-const INTERIOR_CAM_POS = new THREE.Vector3(41.31, -0.37, -7.14);
-const INTERIOR_LOOK_TARGET = new THREE.Vector3(36.37, -0.49, 1.56);
+// SCENE 1 CAMERA COORDINATES - Centered room framing with portal ring framing the right
+const INTERIOR_CAM_POS = new THREE.Vector3(39.80, 0.10, -6.80);
+const INTERIOR_LOOK_TARGET = new THREE.Vector3(36.20, -0.40, 2.80);
 
-// BLAST OFF EXTERIOR TARGET CAMERA COORDINATES (User Configured)
+// BLAST OFF EXTERIOR TARGET CAMERA COORDINATES
 const EXTERIOR_CAM_POS = new THREE.Vector3(-12.68, 29.89, 78.14);
 const EXTERIOR_LOOK_TARGET = new THREE.Vector3(14.65, 23.30, 17.59);
 
@@ -95,25 +97,30 @@ camera.position.copy(INTERIOR_CAM_POS);
 camera.lookAt(currentLookTarget);
 controls.target.copy(INTERIOR_LOOK_TARGET);
 
+// Expose triggerBlastOff on window for testing & automated triggers
+window.triggerBlastOff = triggerBlastOff;
+
 // ==========================================
-// 4. LIGHTING SETUP
+// 4. LIGHTING SETUP (Atmospheric & Smooth Shadowing)
 // ==========================================
-const ambientLight = new THREE.AmbientLight(0x38bdf8, 0.7);
+const ambientLight = new THREE.AmbientLight(0x1d3557, 1.2);
 scene.add(ambientLight);
 
-const hemisphereLight = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.9);
+const hemisphereLight = new THREE.HemisphereLight(0x38bdf8, 0x090d16, 1.1);
 scene.add(hemisphereLight);
 
-const sunLight = new THREE.DirectionalLight(0xfff7ed, 2.2);
-sunLight.position.set(40.0, -50.0, 60.0);
+const sunLight = new THREE.DirectionalLight(0xfff7ed, 2.5);
+sunLight.position.set(45.0, 30.0, 60.0);
 sunLight.castShadow = true;
+
+// Shadow map camera optimization to remove shadow acne and flickering
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 scene.add(sunLight);
 
-// Cabin fill light
+// Cabin fill light (overhead at Y = 5.0 to prevent horizontal glare across window)
 const cabinLight = new THREE.PointLight(0x38bdf8, 1.8, 20.0);
-cabinLight.position.set(37.5, -1.0, 2.0);
+cabinLight.position.set(37.5, 5.0, 2.0);
 scene.add(cabinLight);
 
 // Red glowing button light
@@ -133,23 +140,53 @@ function drawBlastOffLidCanvas(ctx) {
   ctx.clearRect(0, 0, 1024, 512);
 
   ctx.save();
-  ctx.translate(512, 256);
-  ctx.scale(0.80, 1.65); // Ultra-tall condensed font transform
+
+  const text = "BLAST OFF";
+  const letters = text.split('');
+  const total = letters.length;
+
+  const startX = 260;
+  const endX = 780;
+  const topY = 65; // Fixed top horizontal line for all letters
 
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'top';
 
-  // Intense orange-red glow halo
-  ctx.shadowColor = '#ff0000ff';
-  ctx.shadowBlur = 30;
-  ctx.fillStyle = '#ff1900ff';
-  ctx.font = 'bold 185px "Bebas Neue", "Oswald", "Anton", sans-serif';
-  ctx.fillText('BLAST OFF', 0, 0);
+  for (let i = 0; i < total; i++) {
+    const letter = letters[i];
+    if (letter === ' ') continue;
 
-  // Bright yellow core highlight
-  ctx.shadowBlur = 10;
-  ctx.fillStyle = '#ff3c00ff';
-  ctx.fillText('BLAST OFF', 0, 0);
+    const t = i / (total - 1);
+    // Scale tapering: Left is 1.30x scale, tapering smaller to 0.80x on the right
+    const scaleY = 1.75 * (1.30 - t * 0.50);
+    const scaleX = 0.85 * (1.20 - t * 0.38);
+
+    const x = startX + t * (endX - startX);
+
+    ctx.save();
+    ctx.translate(x, topY);
+    ctx.scale(scaleX, scaleY);
+
+    // Create vertical gradient: Top half bright yellow (#ffea00), bottom half deep fiery orange (#d92600)
+    const textGradient = ctx.createLinearGradient(0, 0, 0, 160);
+    textGradient.addColorStop(0.0, '#ffea00'); // Top half: bright yellow core
+    textGradient.addColorStop(0.4, '#ff7700ff'); // Mid transition: warm orange
+    textGradient.addColorStop(1.0, '#ff2a00ff'); // Bottom half: deep rich orange
+
+    // Intense orange-red glow halo
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 35;
+    ctx.fillStyle = textGradient;
+    ctx.font = 'bold 160px "Bebas Neue", "Oswald", "Anton", sans-serif';
+    ctx.fillText(letter, 0, 0);
+
+    // Bright core highlight with vertical gradient
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = textGradient;
+    ctx.fillText(letter, 0, 0);
+
+    ctx.restore();
+  }
 
   ctx.restore();
 }
@@ -164,6 +201,8 @@ function createBlastOffLidTexture() {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
 
   // Re-draw canvas once web fonts finish loading for 100% font consistency
   if (document.fonts) {
@@ -242,42 +281,43 @@ gltfLoader.load(
         const matName = node.material.name || '';
         const nodeName = node.name || '';
 
+        if (nodeName.includes('Cabin_Light_Strip') || nodeName.includes('Light_Strip')) {
+          node.visible = false;
+        }
+
         if (matName === 'Hull_Light') {
-          node.material.color.setHex(0x475569);
-          node.material.roughness = 0.45;
-          node.material.metalness = 0.7;
+          node.material.color.setHex(0x64748b);
+          node.material.roughness = 0.35;
+          node.material.metalness = 0.8;
         } else if (matName === 'Hull_Dark') {
           node.material.color.setHex(0x1e293b);
-          node.material.roughness = 0.5;
-          node.material.metalness = 0.8;
+          node.material.roughness = 0.4;
+          node.material.metalness = 0.85;
         } else if (matName === 'Rocket_Silver') {
-          node.material.color.setHex(0xc0cdaf);
-          node.material.roughness = 0.15;
-          node.material.metalness = 0.9;
+          node.material.color.setHex(0xe2e8f0);
+          node.material.roughness = 0.18;
+          node.material.metalness = 0.95;
         } else if (matName === 'Gantry_Copper' || nodeName.includes('Window_Inner_Frame') || nodeName.includes('Window_Frame')) {
           node.material = new THREE.MeshStandardMaterial({
-            color: 0x0f2b5c, // Deep metallic dark blue
-            roughness: 0.3,
-            metalness: 0.85
+            color: 0x0f2b5c,
+            roughness: 0.25,
+            metalness: 0.90
           });
         } else if (matName === 'Window_Glass_Mat' || nodeName.includes('Window_Glass')) {
           node.material.transparent = true;
-          node.material.opacity = 0.18;
+          node.material.opacity = 0.22;
           node.material.color.setHex(0x38bdf8);
-          node.material.roughness = 0.05;
-          node.material.metalness = 0.1;
+          node.material.roughness = 0.02;
+          node.material.metalness = 0.2;
         }
 
-        // Reflective Dark Blue Metallic Material for Button Casing (Matching window border with higher reflectivity)
-        const buttonCasingMaterial = new THREE.MeshStandardMaterial({
-          color: 0x0f2b5c, // Metallic dark blue matching window border
-          metalness: 0.95, // High metallic reflectivity
-          roughness: 0.1,  // Smooth reflective finish
-          envMapIntensity: 1.0
-        });
-
         if (nodeName.includes('Button_Lid') || nodeName.includes('Button_Base') || nodeName.includes('Button_Bezel') || nodeName.includes('Button_Hinge') || nodeName.includes('Button_Screw') || nodeName.includes('Button_Indicator')) {
-          node.material = buttonCasingMaterial;
+          node.material = new THREE.MeshStandardMaterial({
+            color: 0x0f2b5c,
+            metalness: 0.95,
+            roughness: 0.1,
+            envMapIntensity: 1.0
+          });
           clickableObjects.push(node);
         }
 
@@ -286,49 +326,44 @@ gltfLoader.load(
             map: consoleScreenTexture,
             emissiveMap: consoleScreenTexture,
             emissive: new THREE.Color(0x38bdf8),
-            emissiveIntensity: 1.2
+            emissiveIntensity: 1.4
           });
         }
         if (nodeName.includes('Button_Cylinder')) {
           buttonCylinderMesh = node;
           node.material = new THREE.MeshStandardMaterial({
-            color: 0xff0000, // Vibrant saturated physical red
-            emissive: 0xff0011, // High HDR red emissive
-            emissiveIntensity: 1.8, // Normal resting emissive intensity (not hovered)
+            color: 0xff0000,
+            emissive: 0xff0011,
+            emissiveIntensity: 1.8,
             roughness: 0.1,
             metalness: 0.2
           });
           clickableObjects.push(node);
         }
-
-        if (nodeName.includes('Button_Lid') || nodeName.includes('Button_Base') || nodeName.includes('Button_Bezel')) {
-          clickableObjects.push(node);
-        }
-
-        if (nodeName.includes('Console_Screen')) {
-          node.material = new THREE.MeshStandardMaterial({
-            map: consoleScreenTexture,
-            emissiveMap: consoleScreenTexture,
-            emissive: new THREE.Color(0x38bdf8),
-            emissiveIntensity: 1.2
-          });
-        }
       }
     });
 
-    // Create 3D Screen Overlay directly on Button Lid so "BLAST OFF" is 100% visible
+    // Create 3D Screen Overlay directly on Button Lid with depthTest: false to eliminate black clipping box
     const lidOverlayGeom = new THREE.PlaneGeometry(1.5, 0.85);
     const lidOverlayMat = new THREE.MeshBasicMaterial({
       map: blastOffLidTexture,
       transparent: true,
+      depthTest: false,  // Prevents black geometry clipping
+      depthWrite: false, // Prevents depth buffer z-fighting
       side: THREE.DoubleSide
     });
     lidOverlayMesh = new THREE.Mesh(lidOverlayGeom, lidOverlayMat);
+    lidOverlayMesh.renderOrder = 999;
     // BLAST OFF LID SCREEN TRANSFORM
-    lidOverlayMesh.position.set(37.50, -2.55, 7.35);
+    lidOverlayMesh.position.set(37.50, -2.75, 7.35);
     lidOverlayMesh.rotation.set(-0.04, 3.15, 0);
     lidOverlayMesh.scale.set(2.30, 2.30, 2.30);
     scene.add(lidOverlayMesh);
+
+    // Dedicated Rocket Launchpad Accent Light outside window
+    const rocketLight = new THREE.PointLight(0x38bdf8, 3.5, 45.0);
+    rocketLight.position.set(20.0, 5.0, 18.0);
+    scene.add(rocketLight);
 
     lightsToRemove.forEach((light) => {
       if (light.parent) light.parent.remove(light);
@@ -347,7 +382,7 @@ gltfLoader.load(
 // ==========================================
 const cursiveTextInstance = new CursiveNeonText(() => {
   // 3D TEXT POSITION, ROTATION & SCALE
-  cursiveTextInstance.group.position.set(36.00, 0.40, 9.40);
+  cursiveTextInstance.group.position.set(35.10, 0.40, 9.40);
   cursiveTextInstance.group.rotation.set(0, 3.05, 0);
   cursiveTextInstance.group.scale.set(1.45, 1.45, 1.45);
 });
@@ -390,6 +425,9 @@ window.addEventListener('mousemove', (event) => {
 });
 
 window.addEventListener('click', (event) => {
+  // Ignore clicks on HUD/UI overlays
+  if (event.target.closest('#hud-container') || event.target.closest('#camera-inspector') || event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT') return;
+
   if (isTransitioning || clickableObjects.length === 0) return;
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -417,10 +455,17 @@ window.addEventListener('click', (event) => {
 // 10. BLAST OFF CAMERA PULL-OUT TRANSITION
 // ==========================================
 let isTransitioning = false;
+window.isTransitioning = isTransitioning;
 
 function triggerBlastOff() {
-  if (isTransitioning) return;
+  if (window.isTransitioning && isTransitioning) return;
   isTransitioning = true;
+  window.isTransitioning = true;
+
+  // Disable free cam controls during blast off transition so GSAP can animate camera freely
+  controls.enabled = false;
+  const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
+  if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'ENABLE FREE CAM';
 
   const camStatus = document.getElementById('cam-status');
   if (camStatus) camStatus.innerText = 'LAUNCH_SEQUENCE_ACTIVE';
@@ -437,7 +482,12 @@ function triggerBlastOff() {
     y: EXTERIOR_CAM_POS.y,
     z: EXTERIOR_CAM_POS.z,
     duration: 3.8,
-    ease: 'power3.inOut'
+    ease: 'power3.inOut',
+    onUpdate: () => {
+      camera.lookAt(currentLookTarget);
+      if (controls) controls.target.copy(currentLookTarget);
+      console.log(`[BLAST OFF TRANSITION] Cam Pos: (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`);
+    }
   }, 0);
 
   timeline.to(currentLookTarget, {
@@ -447,11 +497,25 @@ function triggerBlastOff() {
     duration: 3.8,
     ease: 'power3.inOut',
     onUpdate: () => {
-      if (!controls.enabled) {
-        camera.lookAt(currentLookTarget);
-      }
+      camera.lookAt(currentLookTarget);
+      controls.target.copy(currentLookTarget);
     }
   }, 0);
+
+  // Instant text removal as the camera passes through the glass window at 1.2s
+  if (cursiveTextInstance && cursiveTextInstance.textMaterial) {
+    timeline.to(cursiveTextInstance.textMaterial, {
+      opacity: 0,
+      duration: 0.01
+    }, 1.3);
+  }
+
+  if (lidOverlayMesh && lidOverlayMesh.material) {
+    timeline.to(lidOverlayMesh.material, {
+      opacity: 0,
+      duration: 0.01
+    }, 1.3);
+  }
 
   timeline.to(bloomPass, {
     strength: 1.2,

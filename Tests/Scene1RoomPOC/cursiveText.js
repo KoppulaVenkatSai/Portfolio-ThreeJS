@@ -21,7 +21,9 @@ export class CursiveNeonText {
       emissiveIntensity: 6.0,
       roughness: 0.1,  // Smooth specular metallic sheen
       metalness: 0.95, // Ultra-high metallic reflectivity
-      envMapIntensity: 2.0
+      envMapIntensity: 2.0,
+      transparent: true,
+      opacity: 1.0
     });
 
     this.buildText();
