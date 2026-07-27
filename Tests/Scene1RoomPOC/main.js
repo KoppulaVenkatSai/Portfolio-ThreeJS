@@ -8,6 +8,7 @@ import gsap from 'gsap';
 
 import { CursiveNeonText } from './cursiveText.js';
 import { SpaceCosmosBackground } from './spaceBackground.js';
+import { TechAvatar } from './avatar.js';
 
 // ==========================================
 // 1. SCENE & RENDERER SETUP
@@ -101,15 +102,15 @@ controls.target.copy(INTERIOR_LOOK_TARGET);
 window.triggerBlastOff = triggerBlastOff;
 
 // ==========================================
-// 4. LIGHTING SETUP (Atmospheric & Smooth Shadowing)
+// 4. LIGHTING SETUP (Atmospheric & Soft Cabin Interior)
 // ==========================================
 const ambientLight = new THREE.AmbientLight(0x1d3557, 1.2);
 scene.add(ambientLight);
 
-const hemisphereLight = new THREE.HemisphereLight(0x38bdf8, 0x090d16, 1.1);
+const hemisphereLight = new THREE.HemisphereLight(0x38bdf8, 0x090d16, 0.3);
 scene.add(hemisphereLight);
 
-const sunLight = new THREE.DirectionalLight(0xfff7ed, 2.5);
+const sunLight = new THREE.DirectionalLight(0xfff7ed, 1.5);
 sunLight.position.set(45.0, 30.0, 60.0);
 sunLight.castShadow = true;
 
@@ -118,8 +119,8 @@ sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
 scene.add(sunLight);
 
-// Cabin fill light (overhead at Y = 5.0 to prevent horizontal glare across window)
-const cabinLight = new THREE.PointLight(0x38bdf8, 1.8, 20.0);
+// Cabin fill light (soft overhead cabin illumination)
+const cabinLight = new THREE.PointLight(0x38bdf8, 1.4, 20.0);
 cabinLight.position.set(37.5, 5.0, 2.0);
 scene.add(cabinLight);
 
@@ -395,6 +396,21 @@ gsap.to(cursiveTextInstance.floatGroup.position, {
   yoyo: true,
   ease: 'sine.inOut'
 });
+
+// ==========================================
+// 8.5 3D AVATAR ("Venky Avatar")
+// ==========================================
+const techAvatarInstance = new TechAvatar();
+// Positioned inside cabin room on the right side of control console
+techAvatarInstance.group.position.set(32.95, -5.50, 1.10);
+techAvatarInstance.group.rotation.set(0.00, 2.04, 0.00);
+techAvatarInstance.group.scale.set(7.70, 7.70, 7.70);
+scene.add(techAvatarInstance.group);
+
+// Dedicated soft cream/peach fill/key light on Avatar to prevent facial blowout
+const avatarLight = new THREE.PointLight(0xffdab9, 0.85, 15.0);
+avatarLight.position.set(36.0, 1.5, -2.0);
+scene.add(avatarLight);
 
 // ==========================================
 // 9. RAYCASTING INTERACTION ON 3D MODEL BUTTON
@@ -773,6 +789,98 @@ lidOverlayMesh.scale.set(${scale}, ${scale}, ${scale});`;
   }
 });
 
+// ==========================================
+// 15. AVATAR MODEL SLIDER HANDLERS
+// ==========================================
+const avatarScaleSlider = document.getElementById('avatar-scale-slider');
+const avatarXSlider = document.getElementById('avatar-x-slider');
+const avatarYSlider = document.getElementById('avatar-y-slider');
+const avatarZSlider = document.getElementById('avatar-z-slider');
+const avatarRotXSlider = document.getElementById('avatar-rotx-slider');
+const avatarRotYSlider = document.getElementById('avatar-roty-slider');
+const avatarRotZSlider = document.getElementById('avatar-rotz-slider');
+
+const avatarScaleVal = document.getElementById('avatar-scale-val');
+const avatarXVal = document.getElementById('avatar-x-val');
+const avatarYVal = document.getElementById('avatar-y-val');
+const avatarZVal = document.getElementById('avatar-z-val');
+const avatarRotXVal = document.getElementById('avatar-rotx-val');
+const avatarRotYVal = document.getElementById('avatar-roty-val');
+const avatarRotZVal = document.getElementById('avatar-rotz-val');
+const copyAvatarBtn = document.getElementById('copy-avatar-btn');
+
+function updateAvatarTransformFromSliders() {
+  if (!techAvatarInstance || !techAvatarInstance.group) return;
+  const scale = parseFloat(avatarScaleSlider.value);
+  const x = parseFloat(avatarXSlider.value);
+  const y = parseFloat(avatarYSlider.value);
+  const z = parseFloat(avatarZSlider.value);
+  const rotX = parseFloat(avatarRotXSlider.value);
+  const rotY = parseFloat(avatarRotYSlider.value);
+  const rotZ = parseFloat(avatarRotZSlider.value);
+
+  techAvatarInstance.group.scale.set(scale, scale, scale);
+  techAvatarInstance.group.position.set(x, y, z);
+  techAvatarInstance.group.rotation.set(rotX, rotY, rotZ);
+
+  if (avatarScaleVal) avatarScaleVal.innerText = scale.toFixed(2);
+  if (avatarXVal) avatarXVal.innerText = x.toFixed(2);
+  if (avatarYVal) avatarYVal.innerText = y.toFixed(2);
+  if (avatarZVal) avatarZVal.innerText = z.toFixed(2);
+  if (avatarRotXVal) avatarRotXVal.innerText = rotX.toFixed(2);
+  if (avatarRotYVal) avatarRotYVal.innerText = rotY.toFixed(2);
+  if (avatarRotZVal) avatarRotZVal.innerText = rotZ.toFixed(2);
+}
+
+avatarScaleSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+avatarXSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+avatarYSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+avatarZSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+avatarRotXSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+avatarRotYSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+avatarRotZSlider?.addEventListener('input', updateAvatarTransformFromSliders);
+
+const avatarSkinPicker = document.getElementById('avatar-skin-picker');
+avatarSkinPicker?.addEventListener('input', () => {
+  if (techAvatarInstance && techAvatarInstance.setSkinColor) {
+    techAvatarInstance.setSkinColor(avatarSkinPicker.value);
+  }
+});
+
+copyAvatarBtn?.addEventListener('click', () => {
+  if (!techAvatarInstance || !techAvatarInstance.group) return;
+  const scale = techAvatarInstance.group.scale.x.toFixed(2);
+  const posX = techAvatarInstance.group.position.x.toFixed(2);
+  const posY = techAvatarInstance.group.position.y.toFixed(2);
+  const posZ = techAvatarInstance.group.position.z.toFixed(2);
+  const rotX = techAvatarInstance.group.rotation.x.toFixed(2);
+  const rotY = techAvatarInstance.group.rotation.y.toFixed(2);
+  const rotZ = techAvatarInstance.group.rotation.z.toFixed(2);
+
+  const codeSnippet = `// AVATAR MODEL TRANSFORM
+techAvatarInstance.group.position.set(${posX}, ${posY}, ${posZ});
+techAvatarInstance.group.rotation.set(${rotX}, ${rotY}, ${rotZ});
+techAvatarInstance.group.scale.set(${scale}, ${scale}, ${scale});`;
+
+  navigator.clipboard.writeText(codeSnippet).then(() => {
+    console.log('[AVATAR INSPECTOR] Coordinates copied to clipboard:\n' + codeSnippet);
+  }).catch(() => {
+    console.warn('[AVATAR INSPECTOR] Clipboard blocked, see console log below:');
+  });
+
+  console.log('\n==========================================');
+  console.log('📌 COPIED AVATAR TRANSFORM:');
+  console.log(codeSnippet);
+  console.log('==========================================\n');
+
+  if (copyToast) {
+    copyToast.style.display = 'block';
+    setTimeout(() => {
+      copyToast.style.display = 'none';
+    }, 2500);
+  }
+});
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -788,8 +896,12 @@ const clock = new THREE.Clock();
 function animate() {
   requestAnimationFrame(animate);
 
+  const delta = clock.getDelta();
   const elapsedTime = clock.getElapsedTime();
   cosmosBackground.update(elapsedTime);
+  if (techAvatarInstance && techAvatarInstance.update) {
+    techAvatarInstance.update(delta);
+  }
 
   if (controls.enabled) {
     controls.update();

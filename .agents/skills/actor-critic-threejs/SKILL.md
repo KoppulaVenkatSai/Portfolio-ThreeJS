@@ -5,6 +5,9 @@ description: Run an iterative Actor-Critic evaluation loop for Three.js/WebGL sc
 
 # Actor-Critic Three.js Scene Refinement Skill
 
+> [!IMPORTANT]
+> **Trigger-Based Execution Rule**: Do NOT run the Playwright Critic audit script (`critic_audit.mjs`) automatically after routine code edits. ONLY run visual snapshot / Critic audits when the user explicitly requests it using phrases such as **"use critic"**, **"critic audit"**, **"run visual audit"**, or similar explicit directives.
+
 An iterative multi-agent simulation workflow combining a **Critic** (visual & code auditor) and an **Actor** (WebGL/Three.js developer) to systematically diagnose and polish 3D WebGL web applications.
 
 ---

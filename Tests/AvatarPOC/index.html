@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Venkat 3D Character Avatar Showcase - AvatarPOC</title>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- WebGL Rendering Canvas -->
+  <canvas id="avatar-webgl-canvas"></canvas>
+
+  <!-- Top Navigation & HUD Header -->
+  <header class="hud-header">
+    <div class="hud-badge">AVATAR POC // SHOWCASE</div>
+    <h1 class="hud-title">3D Stylized Procedural Character</h1>
+    <p class="hud-subtitle">Procedural Three.js avatar generated via img2threejs pipeline</p>
+  </header>
+
+  <!-- Interactive Control Panel & View Angle Switcher -->
+  <div class="hud-controls">
+    <div class="control-group">
+      <span class="control-label">Camera Presets:</span>
+      <div class="btn-grid">
+        <button id="cam-full-btn" class="hud-btn active">Full Body</button>
+        <button id="cam-portrait-btn" class="hud-btn">Portrait</button>
+        <button id="cam-watch-btn" class="hud-btn">Smartwatch</button>
+        <button id="cam-shoes-btn" class="hud-btn">Shoes</button>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <span class="control-label">Turntable Rotation:</span>
+      <button id="toggle-turntable-btn" class="hud-btn highlight">Auto Rotate: ON</button>
+    </div>
+  </div>
+
+  <!-- Status Bar Footer -->
+  <footer class="hud-footer">
+    <div class="status-indicator">
+      <span class="status-dot"></span>
+      <span id="status-text">SYSTEM READY // 60 FPS</span>
+    </div>
+    <div class="hud-hint">Use mouse to drag, orbit, and scroll to zoom</div>
+  </footer>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

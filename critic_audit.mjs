@@ -22,7 +22,7 @@ async function audit() {
   console.log('Navigating to http://localhost:5173/Tests/Scene1RoomPOC/index.html...');
   await page.goto('http://localhost:5173/Tests/Scene1RoomPOC/index.html');
 
-  await page.waitForTimeout(3500);
+  await page.waitForTimeout(5000);
   const screenshot1 = path.resolve(videoDir, '01_initial_view.png');
   await page.screenshot({ path: screenshot1 });
   console.log(`Saved screenshot: ${screenshot1}`);

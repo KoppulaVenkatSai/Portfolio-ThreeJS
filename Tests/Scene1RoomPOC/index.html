@@ -136,6 +136,51 @@
         </div>
       </div>
 
+      <!-- Accordion 4: AVATAR Model Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>AVATAR_MODEL_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SCALE: <span id="avatar-scale-val">7.70</span></label>
+            <input type="range" id="avatar-scale-slider" min="0.5" max="15.0" step="0.05" value="7.70">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="avatar-x-val">32.95</span></label>
+            <input type="range" id="avatar-x-slider" min="20.0" max="50.0" step="0.05" value="32.95">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="avatar-y-val">-5.50</span></label>
+            <input type="range" id="avatar-y-slider" min="-10.0" max="5.0" step="0.05" value="-5.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="avatar-z-val">1.10</span></label>
+            <input type="range" id="avatar-z-slider" min="-10.0" max="20.0" step="0.05" value="1.10">
+          </div>
+          <div class="slider-row">
+            <label>ROT X: <span id="avatar-rotx-val">0.00</span></label>
+            <input type="range" id="avatar-rotx-slider" min="-3.14" max="3.14" step="0.02" value="0.00">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="avatar-roty-val">2.04</span></label>
+            <input type="range" id="avatar-roty-slider" min="-3.14" max="6.28" step="0.02" value="2.04">
+          </div>
+          <div class="slider-row">
+            <label>ROT Z: <span id="avatar-rotz-val">0.00</span></label>
+            <input type="range" id="avatar-rotz-slider" min="-3.14" max="3.14" step="0.02" value="0.00">
+          </div>
+          <div class="slider-row" style="margin-top: 6px;">
+            <label>SKIN / FACE COLOR:</label>
+            <input type="color" id="avatar-skin-picker" value="#ffdbac" style="width: 100%; height: 28px; border: none; cursor: pointer; background: transparent;">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-avatar-btn">📋 COPY AVATAR TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
       <div id="copy-toast">COPIED TO CLIPBOARD & CONSOLE!</div>
     </div>
 
