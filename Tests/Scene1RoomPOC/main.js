@@ -9,6 +9,7 @@ import gsap from 'gsap';
 import { CursiveNeonText } from './cursiveText.js';
 import { SpaceCosmosBackground } from './spaceBackground.js';
 import { TechAvatar } from './avatar.js';
+import { HologramScreen } from './hologramScreen.js';
 
 // ==========================================
 // 1. SCENE & RENDERER SETUP
@@ -413,6 +414,17 @@ avatarLight.position.set(36.0, 1.5, -2.0);
 scene.add(avatarLight);
 
 // ==========================================
+// 8.6 3D HOLOGRAPHIC SELECTION SCREEN (SCENE 2)
+// ==========================================
+const hologramScreenInstance = new HologramScreen();
+// Framed in front of space station viewing target when camera halts at EXTERIOR_CAM_POS
+hologramScreenInstance.group.position.set(-11.50, 30.60, 70.30);
+hologramScreenInstance.group.rotation.set(0.10, -0.30, 0.02);
+hologramScreenInstance.group.scale.set(0.25, 0.25, 0.25);
+hologramScreenInstance.group.visible = false;
+scene.add(hologramScreenInstance.group);
+
+// ==========================================
 // 9. RAYCASTING INTERACTION ON 3D MODEL BUTTON
 // ==========================================
 // Raycasting mouse initialized offscreen (-9999, -9999) so default (0,0) center screen does not trigger false hover on initial load
@@ -423,6 +435,25 @@ window.addEventListener('mousemove', (event) => {
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
+  // Scene 2 Hologram Screen Hover Handling
+  if (hologramScreenInstance && hologramScreenInstance.isVisible) {
+    raycaster.setFromCamera(mouse, camera);
+    const holoIntersects = raycaster.intersectObject(hologramScreenInstance.screenMesh);
+    if (holoIntersects.length > 0) {
+      document.body.style.cursor = 'pointer';
+      const uv = holoIntersects[0].uv;
+      if (uv.x < 0.5) {
+        hologramScreenInstance.setHoverTarget(1); // Target A (Koppula System)
+      } else {
+        hologramScreenInstance.setHoverTarget(2); // Target B (Origin Planet)
+      }
+      return;
+    } else {
+      hologramScreenInstance.setHoverTarget(0);
+    }
+  }
+
+  // Scene 1 Blast Off Button Hover Handling
   if (clickableObjects.length > 0) {
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(clickableObjects, true);
@@ -444,9 +475,31 @@ window.addEventListener('click', (event) => {
   // Ignore clicks on HUD/UI overlays
   if (event.target.closest('#hud-container') || event.target.closest('#camera-inspector') || event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT') return;
 
-  if (isTransitioning || clickableObjects.length === 0) return;
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  // Scene 2 Hologram Selection Click Handling
+  if (hologramScreenInstance && hologramScreenInstance.isVisible) {
+    raycaster.setFromCamera(mouse, camera);
+    const holoIntersects = raycaster.intersectObject(hologramScreenInstance.screenMesh);
+    if (holoIntersects.length > 0) {
+      const uv = holoIntersects[0].uv;
+      const camStatus = document.getElementById('cam-status');
+      if (uv.x < 0.5) {
+        console.log('[SCENE 2] TARGET A SELECTED: Koppula System (Projects Solar System)');
+        if (camStatus) camStatus.innerText = 'WARP_INITIATED // TARGET: KOPPULA_SYSTEM';
+        alert('🚀 [WARP SEQUENCE INITIATED]\nTarget A Selected: Koppula System (Projects Solar System)');
+      } else {
+        console.log('[SCENE 2] TARGET B SELECTED: Origin Planet (About Me Home Base)');
+        if (camStatus) camStatus.innerText = 'DE_ORBIT_INITIATED // TARGET: ORIGIN_PLANET';
+        alert('🌍 [DE-ORBIT SEQUENCE INITIATED]\nTarget B Selected: Origin Planet (About Me Home Base)');
+      }
+      return;
+    }
+  }
+
+  // Scene 1 Blast Off Button Click Handling
+  if (isTransitioning || clickableObjects.length === 0) return;
 
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(clickableObjects, true);
@@ -489,7 +542,10 @@ function triggerBlastOff() {
   const timeline = gsap.timeline({
     onComplete: () => {
       if (camStatus) camStatus.innerText = 'EXTERIOR_VIEW // DESTINATION_SELECTION_READY';
-      console.log('[SCENE 1] Blast Off pullout complete!');
+      console.log('[SCENE 1] Blast Off pullout complete! Projecting Hologram Screen...');
+      if (hologramScreenInstance) {
+        hologramScreenInstance.fadeIn(1.2);
+      }
     }
   });
 
@@ -530,6 +586,19 @@ function triggerBlastOff() {
     timeline.to(lidOverlayMesh.material, {
       opacity: 0,
       duration: 0.01
+    }, 1.3);
+  }
+
+  // Hide Avatar model and its dedicated key light as camera exits window
+  if (techAvatarInstance && techAvatarInstance.group) {
+    timeline.set(techAvatarInstance.group, {
+      visible: false
+    }, 1.3);
+  }
+
+  if (avatarLight) {
+    timeline.set(avatarLight, {
+      visible: false
     }, 1.3);
   }
 
@@ -881,6 +950,102 @@ techAvatarInstance.group.scale.set(${scale}, ${scale}, ${scale});`;
   }
 });
 
+// ==========================================
+// 16. HOLOGRAM SCREEN SLIDER HANDLERS
+// ==========================================
+const hologramScaleSlider = document.getElementById('hologram-scale-slider');
+const hologramXSlider = document.getElementById('hologram-x-slider');
+const hologramYSlider = document.getElementById('hologram-y-slider');
+const hologramZSlider = document.getElementById('hologram-z-slider');
+const hologramRotXSlider = document.getElementById('hologram-rotx-slider');
+const hologramRotYSlider = document.getElementById('hologram-roty-slider');
+const hologramRotZSlider = document.getElementById('hologram-rotz-slider');
+
+const hologramScaleVal = document.getElementById('hologram-scale-val');
+const hologramXVal = document.getElementById('hologram-x-val');
+const hologramYVal = document.getElementById('hologram-y-val');
+const hologramZVal = document.getElementById('hologram-z-val');
+const hologramRotXVal = document.getElementById('hologram-rotx-val');
+const hologramRotYVal = document.getElementById('hologram-roty-val');
+const hologramRotZVal = document.getElementById('hologram-rotz-val');
+
+const toggleHologramVisBtn = document.getElementById('toggle-hologram-vis-btn');
+const copyHologramBtn = document.getElementById('copy-hologram-btn');
+
+function updateHologramTransformFromSliders() {
+  if (!hologramScreenInstance || !hologramScreenInstance.group) return;
+  const scale = parseFloat(hologramScaleSlider.value);
+  const x = parseFloat(hologramXSlider.value);
+  const y = parseFloat(hologramYSlider.value);
+  const z = parseFloat(hologramZSlider.value);
+  const rotX = parseFloat(hologramRotXSlider.value);
+  const rotY = parseFloat(hologramRotYSlider.value);
+  const rotZ = parseFloat(hologramRotZSlider.value);
+
+  hologramScreenInstance.group.scale.set(scale, scale, scale);
+  hologramScreenInstance.group.position.set(x, y, z);
+  hologramScreenInstance.group.rotation.set(rotX, rotY, rotZ);
+
+  if (hologramScaleVal) hologramScaleVal.innerText = scale.toFixed(2);
+  if (hologramXVal) hologramXVal.innerText = x.toFixed(2);
+  if (hologramYVal) hologramYVal.innerText = y.toFixed(2);
+  if (hologramZVal) hologramZVal.innerText = z.toFixed(2);
+  if (hologramRotXVal) hologramRotXVal.innerText = rotX.toFixed(2);
+  if (hologramRotYVal) hologramRotYVal.innerText = rotY.toFixed(2);
+  if (hologramRotZVal) hologramRotZVal.innerText = rotZ.toFixed(2);
+}
+
+hologramScaleSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramXSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramYSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramZSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramRotXSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramRotYSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramRotZSlider?.addEventListener('input', updateHologramTransformFromSliders);
+
+toggleHologramVisBtn?.addEventListener('click', () => {
+  if (!hologramScreenInstance) return;
+  if (hologramScreenInstance.isVisible) {
+    hologramScreenInstance.fadeOut(0.4);
+  } else {
+    hologramScreenInstance.fadeIn(0.4);
+  }
+});
+
+copyHologramBtn?.addEventListener('click', () => {
+  if (!hologramScreenInstance || !hologramScreenInstance.group) return;
+  const scale = hologramScreenInstance.group.scale.x.toFixed(2);
+  const posX = hologramScreenInstance.group.position.x.toFixed(2);
+  const posY = hologramScreenInstance.group.position.y.toFixed(2);
+  const posZ = hologramScreenInstance.group.position.z.toFixed(2);
+  const rotX = hologramScreenInstance.group.rotation.x.toFixed(2);
+  const rotY = hologramScreenInstance.group.rotation.y.toFixed(2);
+  const rotZ = hologramScreenInstance.group.rotation.z.toFixed(2);
+
+  const codeSnippet = `// HOLOGRAM SCREEN TRANSFORM
+hologramScreenInstance.group.position.set(${posX}, ${posY}, ${posZ});
+hologramScreenInstance.group.rotation.set(${rotX}, ${rotY}, ${rotZ});
+hologramScreenInstance.group.scale.set(${scale}, ${scale}, ${scale});`;
+
+  navigator.clipboard.writeText(codeSnippet).then(() => {
+    console.log('[HOLOGRAM INSPECTOR] Coordinates copied to clipboard:\n' + codeSnippet);
+  }).catch(() => {
+    console.warn('[HOLOGRAM INSPECTOR] Clipboard blocked, see console log below:');
+  });
+
+  console.log('\n==========================================');
+  console.log('📌 COPIED HOLOGRAM SCREEN TRANSFORM:');
+  console.log(codeSnippet);
+  console.log('==========================================\n');
+
+  if (copyToast) {
+    copyToast.style.display = 'block';
+    setTimeout(() => {
+      copyToast.style.display = 'none';
+    }, 2500);
+  }
+});
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -901,6 +1066,9 @@ function animate() {
   cosmosBackground.update(elapsedTime);
   if (techAvatarInstance && techAvatarInstance.update) {
     techAvatarInstance.update(delta);
+  }
+  if (hologramScreenInstance && hologramScreenInstance.update) {
+    hologramScreenInstance.update(elapsedTime);
   }
 
   if (controls.enabled) {
