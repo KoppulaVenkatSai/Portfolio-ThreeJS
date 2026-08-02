@@ -41,6 +41,13 @@ export class HologramScreen {
 
     // Initial render of canvas UI
     this.renderCanvasUI();
+
+    // Re-render canvas UI automatically as soon as custom web fonts ("Bebas Neue") finish loading
+    if (document.fonts) {
+      document.fonts.ready.then(() => {
+        this.renderCanvasUI();
+      });
+    }
   }
 
   initCanvas() {
@@ -54,6 +61,7 @@ export class HologramScreen {
     const ctx = this.ctx;
     const w = this.canvasWidth;
     const h = this.canvasHeight;
+    const hoverBright = this.hoverBrightness !== undefined ? this.hoverBrightness : 1.0;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -82,22 +90,22 @@ export class HologramScreen {
 
     // Target A Card (Left - Projects System)
     const isHoverA = this.hoverTarget === 1;
-    ctx.fillStyle = isHoverA ? 'rgba(56, 189, 248, 0.25)' : 'rgba(15, 23, 42, 0.65)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
     ctx.fillRect(40, 90, 450, 350);
 
-    ctx.strokeStyle = isHoverA ? '#00f0ff' : 'rgba(56, 189, 248, 0.5)';
-    ctx.lineWidth = isHoverA ? 4 : 2;
+    ctx.strokeStyle = isHoverA ? '#00f0ff' : 'rgba(56, 189, 248, 0.30)';
+    ctx.lineWidth = isHoverA ? 3 : 2;
     ctx.strokeRect(40, 90, 450, 350);
 
-    if (isHoverA) {
+    if (isHoverA && hoverBright > 0) {
       ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = Math.round(25 * hoverBright);
     } else {
       ctx.shadowBlur = 0;
     }
 
     // Target A Text & Graphics
-    ctx.fillStyle = isHoverA ? '#ffffff' : '#38bdf8';
+    ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 30px "Bebas Neue", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('TARGET A: KOPPULA SYSTEM', 265, 130);
@@ -149,22 +157,22 @@ export class HologramScreen {
 
     // Target B Card (Right - Origin Planet / About Me)
     const isHoverB = this.hoverTarget === 2;
-    ctx.fillStyle = isHoverB ? 'rgba(56, 189, 248, 0.25)' : 'rgba(15, 23, 42, 0.65)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
     ctx.fillRect(534, 90, 450, 350);
 
-    ctx.strokeStyle = isHoverB ? '#00f0ff' : 'rgba(56, 189, 248, 0.5)';
-    ctx.lineWidth = isHoverB ? 4 : 2;
+    ctx.strokeStyle = isHoverB ? '#00f0ff' : 'rgba(56, 189, 248, 0.30)';
+    ctx.lineWidth = isHoverB ? 3 : 2;
     ctx.strokeRect(534, 90, 450, 350);
 
-    if (isHoverB) {
+    if (isHoverB && hoverBright > 0) {
       ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = 20;
+      ctx.shadowBlur = Math.round(25 * hoverBright);
     } else {
       ctx.shadowBlur = 0;
     }
 
     // Target B Text & Graphics
-    ctx.fillStyle = isHoverB ? '#ffffff' : '#38bdf8';
+    ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 30px "Bebas Neue", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('TARGET B: ORIGIN PLANET', 759, 130);
@@ -270,11 +278,33 @@ export class HologramScreen {
     this.group.add(this.beamMesh);
   }
 
+  setBeamTransform(scaleXZ, scaleY, posY, rotX) {
+    if (this.beamMesh) {
+      this.beamMesh.scale.set(scaleXZ, scaleY, scaleXZ);
+      this.beamMesh.position.y = posY;
+      this.beamMesh.rotation.x = rotX;
+    }
+  }
+
+  setBeamProps(opacity, rayDensity, raySpeed) {
+    if (this.beamMat) {
+      this.beamMat.uniforms.uBeamOpacity.value = opacity;
+      this.beamMat.uniforms.uRayDensity.value = rayDensity;
+      this.beamMat.uniforms.uRaySpeed.value = raySpeed;
+    }
+  }
+
   setHoverTarget(targetId) {
     if (this.hoverTarget !== targetId) {
       this.hoverTarget = targetId;
       this.hologramMat.uniforms.uHoverTarget.value = targetId;
       this.renderCanvasUI();
+    }
+  }
+
+  setHoverBrightness(val) {
+    if (this.hologramMat) {
+      this.hologramMat.uniforms.uHoverBrightness.value = val;
     }
   }
 

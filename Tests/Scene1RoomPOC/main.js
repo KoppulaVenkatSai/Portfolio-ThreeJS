@@ -264,6 +264,12 @@ let buttonCylinderMesh = null;
 let lidOverlayMesh = null;
 const clickableObjects = [];
 
+const collarLeftNodes = [];
+const collarRightNodes = [];
+const collarFrontNodes = [];
+const collarBackNodes = [];
+const rocketPadNodes = [];
+
 gltfLoader.load(
   '../../assets/FinalSpaceStationModel.glb',
   (gltf) => {
@@ -275,6 +281,13 @@ gltfLoader.load(
       if (node.isLight) {
         lightsToRemove.push(node);
       }
+
+      const nodeName = node.name || '';
+      if (nodeName.includes('Collar_Left')) collarLeftNodes.push(node);
+      if (nodeName.includes('Collar_Right')) collarRightNodes.push(node);
+      if (nodeName.includes('Collar_Front')) collarFrontNodes.push(node);
+      if (nodeName.includes('Collar_Back')) collarBackNodes.push(node);
+      if (nodeName.includes('Docking_Platform') || nodeName.includes('Exterior_Docking_Collar')) rocketPadNodes.push(node);
 
       if (node.isMesh && node.material) {
         node.castShadow = true;
@@ -295,10 +308,12 @@ gltfLoader.load(
           node.material.color.setHex(0x1e293b);
           node.material.roughness = 0.4;
           node.material.metalness = 0.85;
-        } else if (matName === 'Rocket_Silver') {
-          node.material.color.setHex(0xe2e8f0);
-          node.material.roughness = 0.18;
-          node.material.metalness = 0.95;
+        } else if (matName === 'Rocket_Silver' || matName.toLowerCase().includes('rocket') || nodeName.toLowerCase().includes('rocket')) {
+          node.material.color.setHex(0xaaaaaa); // Chrome silver base for reflections from EarthLandingPOCV3
+          node.material.metalness = 0.99;
+          node.material.roughness = 0.01;
+          node.material.envMapIntensity = 0.35;
+          node.material.needsUpdate = true;
         } else if (matName === 'Gantry_Copper' || nodeName.includes('Window_Inner_Frame') || nodeName.includes('Window_Frame')) {
           node.material = new THREE.MeshStandardMaterial({
             color: 0x0f2b5c,
@@ -347,17 +362,25 @@ gltfLoader.load(
 
     // Create 3D Screen Overlay directly on Button Lid with depthTest: false to eliminate black clipping box
     const lidOverlayGeom = new THREE.PlaneGeometry(1.5, 0.85);
-    const lidOverlayMat = new THREE.MeshBasicMaterial({
+    const lidOverlayMat = new THREE.MeshStandardMaterial({
       map: blastOffLidTexture,
+      emissiveMap: blastOffLidTexture,
+      emissive: new THREE.Color(0xff4400),
+      emissiveIntensity: 0.5,
       transparent: true,
-      depthTest: false,  // Prevents black geometry clipping
-      depthWrite: false, // Prevents depth buffer z-fighting
+      opacity: 0.52,
+      roughness: 0.55,
+      metalness: 0.35,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+      depthTest: true,
+      depthWrite: false,
       side: THREE.DoubleSide
     });
     lidOverlayMesh = new THREE.Mesh(lidOverlayGeom, lidOverlayMat);
-    lidOverlayMesh.renderOrder = 999;
     // BLAST OFF LID SCREEN TRANSFORM
-    lidOverlayMesh.position.set(37.50, -2.75, 7.35);
+    lidOverlayMesh.position.set(37.50, -2.75, 7.34);
     lidOverlayMesh.rotation.set(-0.04, 3.15, 0);
     lidOverlayMesh.scale.set(2.30, 2.30, 2.30);
     scene.add(lidOverlayMesh);
@@ -421,6 +444,12 @@ const hologramScreenInstance = new HologramScreen();
 hologramScreenInstance.group.position.set(-11.50, 30.60, 70.30);
 hologramScreenInstance.group.rotation.set(0.10, -0.30, 0.02);
 hologramScreenInstance.group.scale.set(0.25, 0.25, 0.25);
+
+// PROJECTOR CONE TRANSFORM & PROPERTIES (LOCKED IN)
+hologramScreenInstance.setBeamTransform(1.00, 0.70, -2.20, 0.21);
+hologramScreenInstance.setBeamProps(0.28, 60, 0.50);
+hologramScreenInstance.setHoverBrightness(0.0);
+
 hologramScreenInstance.group.visible = false;
 scene.add(hologramScreenInstance.group);
 
@@ -484,16 +513,8 @@ window.addEventListener('click', (event) => {
     const holoIntersects = raycaster.intersectObject(hologramScreenInstance.screenMesh);
     if (holoIntersects.length > 0) {
       const uv = holoIntersects[0].uv;
-      const camStatus = document.getElementById('cam-status');
-      if (uv.x < 0.5) {
-        console.log('[SCENE 2] TARGET A SELECTED: Koppula System (Projects Solar System)');
-        if (camStatus) camStatus.innerText = 'WARP_INITIATED // TARGET: KOPPULA_SYSTEM';
-        alert('🚀 [WARP SEQUENCE INITIATED]\nTarget A Selected: Koppula System (Projects Solar System)');
-      } else {
-        console.log('[SCENE 2] TARGET B SELECTED: Origin Planet (About Me Home Base)');
-        if (camStatus) camStatus.innerText = 'DE_ORBIT_INITIATED // TARGET: ORIGIN_PLANET';
-        alert('🌍 [DE-ORBIT SEQUENCE INITIATED]\nTarget B Selected: Origin Planet (About Me Home Base)');
-      }
+      const targetName = uv.x < 0.5 ? 'TARGET A: KOPPULA SYSTEM' : 'TARGET B: ORIGIN PLANET';
+      triggerDestinationTransition(targetName);
       return;
     }
   }
@@ -541,6 +562,8 @@ function triggerBlastOff() {
 
   const timeline = gsap.timeline({
     onComplete: () => {
+      isTransitioning = false;
+      window.isTransitioning = false;
       if (camStatus) camStatus.innerText = 'EXTERIOR_VIEW // DESTINATION_SELECTION_READY';
       console.log('[SCENE 1] Blast Off pullout complete! Projecting Hologram Screen...');
       if (hologramScreenInstance) {
@@ -609,6 +632,97 @@ function triggerBlastOff() {
     repeat: 1,
     ease: 'sine.inOut'
   }, 1.0);
+}
+
+// ==========================================
+// 10.5 DESTINATION SELECTION TRANSITION (SCENE 2 CLICK SEQUENCE)
+// ==========================================
+function triggerDestinationTransition(targetName = 'TARGET A: KOPPULA SYSTEM') {
+  window.triggerDestinationTransition = triggerDestinationTransition;
+  if (window.isTransitioning || isTransitioning) return;
+  isTransitioning = true;
+  window.isTransitioning = true;
+
+  controls.enabled = false;
+  const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
+  if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'ENABLE FREE CAM';
+
+  const camStatus = document.getElementById('cam-status');
+  if (camStatus) camStatus.innerText = `DESTINATION_LOCKED // ${targetName}`;
+
+  console.log(`[DESTINATION SELECTION] Initiating sequence for ${targetName}...`);
+
+  const tl = gsap.timeline({
+    onComplete: () => {
+      // Step 4: After steps 1-3 complete, move camera to specified interior view
+      console.log('[DESTINATION SELECTION] Steps 1-3 complete. Moving camera to interior view...');
+
+      const INTERIOR_CAM_POS = new THREE.Vector3(38.88, -7.64, 32.98);
+      const INTERIOR_LOOK_TARGET = new THREE.Vector3(46.73, 20.65, 31.94);
+
+      const camTl = gsap.timeline({
+        onComplete: () => {
+          isTransitioning = false;
+          window.isTransitioning = false;
+          controls.enabled = true;
+          if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'DISABLE FREE CAM';
+          if (camStatus) camStatus.innerText = 'DESTINATION_ARRIVED';
+          console.log('[DESTINATION SELECTION] Sequence complete!');
+        }
+      });
+
+      camTl.to(camera.position, {
+        x: INTERIOR_CAM_POS.x,
+        y: INTERIOR_CAM_POS.y,
+        z: INTERIOR_CAM_POS.z,
+        duration: 2.5,
+        ease: 'power2.inOut'
+      }, 0);
+
+      camTl.to(currentLookTarget, {
+        x: INTERIOR_LOOK_TARGET.x,
+        y: INTERIOR_LOOK_TARGET.y,
+        z: INTERIOR_LOOK_TARGET.z,
+        duration: 2.5,
+        ease: 'power2.inOut',
+        onUpdate: () => {
+          controls.target.copy(currentLookTarget);
+        }
+      }, 0);
+    }
+  });
+
+  // Step 1: Decrease opacity of hologram to 0 (simultaneous)
+  if (hologramScreenInstance) {
+    hologramScreenInstance.fadeOut(1.8);
+  }
+
+  // Step 2: Reduce ALL lights to minimum (mainly ambient lighting) (simultaneous)
+  if (ambientLight) tl.to(ambientLight, { intensity: 0.02, duration: 1.8, ease: 'power2.inOut' }, 0);
+  if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.01, duration: 1.8, ease: 'power2.inOut' }, 0);
+  if (sunLight) tl.to(sunLight, { intensity: 0.02, duration: 1.8, ease: 'power2.inOut' }, 0);
+  if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
+  if (buttonRedLight) tl.to(buttonRedLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
+  if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
+  if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
+
+  // Step 3: Retract gantry hands (collars) inside gantry & remove rocket pad downward (simultaneous)
+  collarLeftNodes.forEach(node => {
+    tl.to(node.position, { x: '-=15.0', duration: 1.8, ease: 'power2.inOut' }, 0);
+  });
+  collarRightNodes.forEach(node => {
+    tl.to(node.position, { x: '+=15.0', duration: 1.8, ease: 'power2.inOut' }, 0);
+  });
+  collarFrontNodes.forEach(node => {
+    tl.to(node.position, { z: '+=15.0', duration: 1.8, ease: 'power2.inOut' }, 0);
+  });
+  collarBackNodes.forEach(node => {
+    tl.to(node.position, { z: '-=15.0', duration: 1.8, ease: 'power2.inOut' }, 0);
+  });
+
+  rocketPadNodes.forEach(node => {
+    tl.to(node.position, { y: '-=25.0', duration: 1.8, ease: 'power2.inOut' }, 0);
+  });
 }
 
 // ==========================================
@@ -960,6 +1074,7 @@ const hologramZSlider = document.getElementById('hologram-z-slider');
 const hologramRotXSlider = document.getElementById('hologram-rotx-slider');
 const hologramRotYSlider = document.getElementById('hologram-roty-slider');
 const hologramRotZSlider = document.getElementById('hologram-rotz-slider');
+const hologramHoverBrightSlider = document.getElementById('hologram-hoverbright-slider');
 
 const hologramScaleVal = document.getElementById('hologram-scale-val');
 const hologramXVal = document.getElementById('hologram-x-val');
@@ -968,6 +1083,7 @@ const hologramZVal = document.getElementById('hologram-z-val');
 const hologramRotXVal = document.getElementById('hologram-rotx-val');
 const hologramRotYVal = document.getElementById('hologram-roty-val');
 const hologramRotZVal = document.getElementById('hologram-rotz-val');
+const hologramHoverBrightVal = document.getElementById('hologram-hoverbright-val');
 
 const toggleHologramVisBtn = document.getElementById('toggle-hologram-vis-btn');
 const copyHologramBtn = document.getElementById('copy-hologram-btn');
@@ -981,10 +1097,12 @@ function updateHologramTransformFromSliders() {
   const rotX = parseFloat(hologramRotXSlider.value);
   const rotY = parseFloat(hologramRotYSlider.value);
   const rotZ = parseFloat(hologramRotZSlider.value);
+  const hoverBright = parseFloat(hologramHoverBrightSlider?.value || 1.0);
 
   hologramScreenInstance.group.scale.set(scale, scale, scale);
   hologramScreenInstance.group.position.set(x, y, z);
   hologramScreenInstance.group.rotation.set(rotX, rotY, rotZ);
+  hologramScreenInstance.setHoverBrightness(hoverBright);
 
   if (hologramScaleVal) hologramScaleVal.innerText = scale.toFixed(2);
   if (hologramXVal) hologramXVal.innerText = x.toFixed(2);
@@ -993,6 +1111,7 @@ function updateHologramTransformFromSliders() {
   if (hologramRotXVal) hologramRotXVal.innerText = rotX.toFixed(2);
   if (hologramRotYVal) hologramRotYVal.innerText = rotY.toFixed(2);
   if (hologramRotZVal) hologramRotZVal.innerText = rotZ.toFixed(2);
+  if (hologramHoverBrightVal) hologramHoverBrightVal.innerText = hoverBright.toFixed(2);
 }
 
 hologramScaleSlider?.addEventListener('input', updateHologramTransformFromSliders);
@@ -1002,6 +1121,7 @@ hologramZSlider?.addEventListener('input', updateHologramTransformFromSliders);
 hologramRotXSlider?.addEventListener('input', updateHologramTransformFromSliders);
 hologramRotYSlider?.addEventListener('input', updateHologramTransformFromSliders);
 hologramRotZSlider?.addEventListener('input', updateHologramTransformFromSliders);
+hologramHoverBrightSlider?.addEventListener('input', updateHologramTransformFromSliders);
 
 toggleHologramVisBtn?.addEventListener('click', () => {
   if (!hologramScreenInstance) return;
@@ -1035,6 +1155,91 @@ hologramScreenInstance.group.scale.set(${scale}, ${scale}, ${scale});`;
 
   console.log('\n==========================================');
   console.log('📌 COPIED HOLOGRAM SCREEN TRANSFORM:');
+  console.log(codeSnippet);
+  console.log('==========================================\n');
+
+  if (copyToast) {
+    copyToast.style.display = 'block';
+    setTimeout(() => {
+      copyToast.style.display = 'none';
+    }, 2500);
+  }
+});
+
+// ==========================================
+// 17. PROJECTOR CONE SLIDER HANDLERS
+// ==========================================
+const coneScaleYSlider = document.getElementById('cone-scaley-slider');
+const coneScaleXZSlider = document.getElementById('cone-scalexz-slider');
+const conePosYSlider = document.getElementById('cone-posy-slider');
+const coneRotXSlider = document.getElementById('cone-rotx-slider');
+const coneOpacitySlider = document.getElementById('cone-opacity-slider');
+const coneDensitySlider = document.getElementById('cone-density-slider');
+const coneSpeedSlider = document.getElementById('cone-speed-slider');
+
+const coneScaleYVal = document.getElementById('cone-scaley-val');
+const coneScaleXZVal = document.getElementById('cone-scalexz-val');
+const conePosYVal = document.getElementById('cone-posy-val');
+const coneRotXVal = document.getElementById('cone-rotx-val');
+const coneOpacityVal = document.getElementById('cone-opacity-val');
+const coneDensityVal = document.getElementById('cone-density-val');
+const coneSpeedVal = document.getElementById('cone-speed-val');
+
+const copyConeBtn = document.getElementById('copy-cone-btn');
+
+function updateConeFromSliders() {
+  if (!hologramScreenInstance) return;
+
+  const scaleY = parseFloat(coneScaleYSlider.value);
+  const scaleXZ = parseFloat(coneScaleXZSlider.value);
+  const posY = parseFloat(conePosYSlider.value);
+  const rotX = parseFloat(coneRotXSlider.value);
+  const opacity = parseFloat(coneOpacitySlider.value);
+  const density = parseFloat(coneDensitySlider.value);
+  const speed = parseFloat(coneSpeedSlider.value);
+
+  hologramScreenInstance.setBeamTransform(scaleXZ, scaleY, posY, rotX);
+  hologramScreenInstance.setBeamProps(opacity, density, speed);
+
+  if (coneScaleYVal) coneScaleYVal.innerText = scaleY.toFixed(2);
+  if (coneScaleXZVal) coneScaleXZVal.innerText = scaleXZ.toFixed(2);
+  if (conePosYVal) conePosYVal.innerText = posY.toFixed(2);
+  if (coneRotXVal) coneRotXVal.innerText = rotX.toFixed(2);
+  if (coneOpacityVal) coneOpacityVal.innerText = opacity.toFixed(2);
+  if (coneDensityVal) coneDensityVal.innerText = density.toFixed(0);
+  if (coneSpeedVal) coneSpeedVal.innerText = speed.toFixed(2);
+}
+
+coneScaleYSlider?.addEventListener('input', updateConeFromSliders);
+coneScaleXZSlider?.addEventListener('input', updateConeFromSliders);
+conePosYSlider?.addEventListener('input', updateConeFromSliders);
+coneRotXSlider?.addEventListener('input', updateConeFromSliders);
+coneOpacitySlider?.addEventListener('input', updateConeFromSliders);
+coneDensitySlider?.addEventListener('input', updateConeFromSliders);
+coneSpeedSlider?.addEventListener('input', updateConeFromSliders);
+
+copyConeBtn?.addEventListener('click', () => {
+  if (!hologramScreenInstance) return;
+  const scaleY = parseFloat(coneScaleYSlider.value).toFixed(2);
+  const scaleXZ = parseFloat(coneScaleXZSlider.value).toFixed(2);
+  const posY = parseFloat(conePosYSlider.value).toFixed(2);
+  const rotX = parseFloat(coneRotXSlider.value).toFixed(2);
+  const opacity = parseFloat(coneOpacitySlider.value).toFixed(2);
+  const density = parseFloat(coneDensitySlider.value).toFixed(0);
+  const speed = parseFloat(coneSpeedSlider.value).toFixed(2);
+
+  const codeSnippet = `// PROJECTOR CONE TRANSFORM & PROPERTIES
+hologramScreenInstance.setBeamTransform(${scaleXZ}, ${scaleY}, ${posY}, ${rotX});
+hologramScreenInstance.setBeamProps(${opacity}, ${density}, ${speed});`;
+
+  navigator.clipboard.writeText(codeSnippet).then(() => {
+    console.log('[CONE INSPECTOR] Coordinates copied to clipboard:\n' + codeSnippet);
+  }).catch(() => {
+    console.warn('[CONE INSPECTOR] Clipboard blocked, see console log below:');
+  });
+
+  console.log('\n==========================================');
+  console.log('📌 COPIED PROJECTOR CONE TRANSFORM:');
   console.log(codeSnippet);
   console.log('==========================================\n');
 

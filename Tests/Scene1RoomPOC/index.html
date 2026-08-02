@@ -216,9 +216,54 @@
             <label>ROT Z (ROLL): <span id="hologram-rotz-val">0.02</span></label>
             <input type="range" id="hologram-rotz-slider" min="-3.14" max="3.14" step="0.02" value="0.02">
           </div>
+          <div class="slider-row">
+            <label>HOVER GLOW BRIGHTNESS: <span id="hologram-hoverbright-val">0.00</span></label>
+            <input type="range" id="hologram-hoverbright-slider" min="0.0" max="3.0" step="0.1" value="0.00">
+          </div>
           <div class="inspector-controls">
             <button class="control-btn" id="toggle-hologram-vis-btn">TOGGLE HOLOGRAM VISIBILITY</button>
             <button class="control-btn copy-btn" id="copy-hologram-btn">📋 COPY HOLOGRAM TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 6: PROJECTOR CONE Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>PROJECTOR_CONE_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>CONE LENGTH (SCALE Y): <span id="cone-scaley-val">0.70</span></label>
+            <input type="range" id="cone-scaley-slider" min="0.1" max="3.0" step="0.05" value="0.70">
+          </div>
+          <div class="slider-row">
+            <label>CONE WIDTH (SCALE XZ): <span id="cone-scalexz-val">1.00</span></label>
+            <input type="range" id="cone-scalexz-slider" min="0.1" max="3.0" step="0.05" value="1.00">
+          </div>
+          <div class="slider-row">
+            <label>CONE OFFSET Y: <span id="cone-posy-val">-2.20</span></label>
+            <input type="range" id="cone-posy-slider" min="-15.0" max="10.0" step="0.2" value="-2.20">
+          </div>
+          <div class="slider-row">
+            <label>CONE TILT (ROT X): <span id="cone-rotx-val">0.21</span></label>
+            <input type="range" id="cone-rotx-slider" min="-1.57" max="1.57" step="0.01" value="0.21">
+          </div>
+          <div class="slider-row">
+            <label>BEAM OPACITY: <span id="cone-opacity-val">0.28</span></label>
+            <input type="range" id="cone-opacity-slider" min="0.0" max="1.0" step="0.02" value="0.28">
+          </div>
+          <div class="slider-row">
+            <label>RAY DENSITY: <span id="cone-density-val">60</span></label>
+            <input type="range" id="cone-density-slider" min="10" max="150" step="5" value="60">
+          </div>
+          <div class="slider-row">
+            <label>RAY SPEED: <span id="cone-speed-val">0.50</span></label>
+            <input type="range" id="cone-speed-slider" min="0.0" max="2.0" step="0.05" value="0.50">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-cone-btn">📋 COPY CONE TRANSFORM</button>
           </div>
         </div>
       </div>
