@@ -10,6 +10,8 @@ import { CursiveNeonText } from './cursiveText.js';
 import { SpaceCosmosBackground } from './spaceBackground.js';
 import { TechAvatar } from './avatar.js';
 import { HologramScreen } from './hologramScreen.js';
+import { EarthLandingManager } from '../EarthLanding/earthLandingManager.js';
+import { ENGINE_STATE } from '../EarthLanding/state.js';
 
 export function initScene1() {
   // ==========================================
@@ -125,10 +127,13 @@ export function initScene1() {
   buttonRedLight.position.set(37.5, -2.2, 6.5);
   scene.add(buttonRedLight);
 
+  let rocketLight = null;
+
   // ==========================================
-  // 5. SPACE ENVIRONMENT
+  // 5. SPACE ENVIRONMENT & EARTH LANDING MANAGER
   // ==========================================
   const cosmosBackground = new SpaceCosmosBackground(scene);
+  const earthLandingManager = new EarthLandingManager(scene, camera, renderer, composer, bloomPass, loadingManager);
 
   // ==========================================
   // 6. DYNAMIC "BLAST OFF" CANVAS TEXTURE
@@ -258,6 +263,8 @@ export function initScene1() {
   const collarFrontNodes = [];
   const collarBackNodes = [];
   const rocketPadNodes = [];
+  const allRocketPadNodes = [];
+  const stationEmissiveMaterials = [];
 
   gltfLoader.load(
     '/assets/FinalSpaceStationModel.glb',
@@ -276,7 +283,10 @@ export function initScene1() {
         if (nodeName.includes('Collar_Right')) collarRightNodes.push(node);
         if (nodeName.includes('Collar_Front')) collarFrontNodes.push(node);
         if (nodeName.includes('Collar_Back')) collarBackNodes.push(node);
-        if (nodeName.includes('Docking_Platform') || nodeName.includes('Exterior_Docking_Collar')) rocketPadNodes.push(node);
+        const isRingBelowRocket = /docking_platform/i.test(nodeName);
+        if (isRingBelowRocket) {
+          allRocketPadNodes.push(node);
+        }
 
         if (node.isMesh && node.material) {
           node.castShadow = true;
@@ -297,11 +307,7 @@ export function initScene1() {
             node.material.roughness = 0.4;
             node.material.metalness = 0.85;
           } else if (matName === 'Rocket_Silver' || matName.toLowerCase().includes('rocket') || nodeName.toLowerCase().includes('rocket')) {
-            node.material.color.setHex(0xaaaaaa);
-            node.material.metalness = 0.99;
-            node.material.roughness = 0.01;
-            node.material.envMapIntensity = 0.35;
-            node.material.needsUpdate = true;
+            node.visible = false;
           } else if (matName === 'Gantry_Copper' || nodeName.includes('Window_Inner_Frame') || nodeName.includes('Window_Frame')) {
             node.material = new THREE.MeshStandardMaterial({
               color: 0x0f2b5c,
@@ -333,6 +339,7 @@ export function initScene1() {
               emissive: new THREE.Color(0x38bdf8),
               emissiveIntensity: 1.4
             });
+            stationEmissiveMaterials.push(node.material);
           }
           if (nodeName.includes('Button_Cylinder')) {
             buttonCylinderMesh = node;
@@ -343,7 +350,14 @@ export function initScene1() {
               roughness: 0.1,
               metalness: 0.2
             });
+            stationEmissiveMaterials.push(node.material);
             clickableObjects.push(node);
+          }
+
+          if (matName.includes('Glow') || nodeName.includes('Indicator') || (node.material.emissiveIntensity && node.material.emissiveIntensity > 0)) {
+            if (!stationEmissiveMaterials.includes(node.material)) {
+              stationEmissiveMaterials.push(node.material);
+            }
           }
         }
       });
@@ -371,7 +385,7 @@ export function initScene1() {
       lidOverlayMesh.scale.set(2.30, 2.30, 2.30);
       scene.add(lidOverlayMesh);
 
-      const rocketLight = new THREE.PointLight(0x38bdf8, 3.5, 45.0);
+      rocketLight = new THREE.PointLight(0x38bdf8, 3.5, 45.0);
       rocketLight.position.set(20.0, 5.0, 18.0);
       scene.add(rocketLight);
 
@@ -386,6 +400,8 @@ export function initScene1() {
       console.error('[SCENE 1] Error loading station model:', error);
     }
   );
+
+
 
   // ==========================================
   // 8. 3D NEON CURSIVE TEXT ("Hi, I am Venkat Koppula")
@@ -622,56 +638,183 @@ export function initScene1() {
 
     console.log(`[DESTINATION SELECTION] Initiating sequence for ${targetName}...`);
 
+    const PAD_CAM_POS = new THREE.Vector3(37.67, -9.11, 28.00);
+    const PAD_CAM_LOOK = new THREE.Vector3(38.30, -4.81, 28.34);
+
+    const FLIGHT_ROCKET_POS = new THREE.Vector3(12.0, -1.0, -0.5);
+    const FLIGHT_ROCKET_ROT = new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180);
+    const FLIGHT_ROCKET_SCALE = new THREE.Vector3(0.65, 0.65, 0.65);
+    const WARP_INITIAL_CAM_POS = new THREE.Vector3(9.36, 0.30, -2.60);
+    const WARP_INITIAL_LOOK_TARGET = new THREE.Vector3(9.52, 0.08, 0.22);
+
     const tl = gsap.timeline({
       onComplete: () => {
-        console.log('[DESTINATION SELECTION] Sequence complete. Moving camera to interior view...');
-
-        const DEST_CAM_POS = new THREE.Vector3(38.88, -7.64, 32.98);
-        const DEST_LOOK_TARGET = new THREE.Vector3(46.73, 20.65, 31.94);
-
-        const camTl = gsap.timeline({
-          onComplete: () => {
-            isTransitioning = false;
-            window.isTransitioning = false;
-            controls.enabled = true;
-            if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'DISABLE FREE CAM';
-            if (camStatus) camStatus.innerText = 'DESTINATION_ARRIVED';
-          }
-        });
-
-        camTl.to(camera.position, {
-          x: DEST_CAM_POS.x,
-          y: DEST_CAM_POS.y,
-          z: DEST_CAM_POS.z,
-          duration: 2.5,
-          ease: 'power2.inOut'
-        }, 0);
-
-        camTl.to(currentLookTarget, {
-          x: DEST_LOOK_TARGET.x,
-          y: DEST_LOOK_TARGET.y,
-          z: DEST_LOOK_TARGET.z,
-          duration: 2.5,
-          ease: 'power2.inOut',
-          onUpdate: () => {
-            controls.target.copy(currentLookTarget);
-          }
-        }, 0);
+        isTransitioning = false;
+        window.isTransitioning = false;
+        if (camStatus) camStatus.innerText = 'DESCENT_SEQUENCE_ACTIVE';
+        console.log('[DESTINATION SELECTION] Camera and rocket settled at flight 50/50 frame. Launching Earth Landing sequence!');
+        if (earthLandingManager) {
+          earthLandingManager.startSequence();
+        }
       }
     });
 
+    // Step 1: Projection fades out, while station lights dim to a moody cinematic level (not fully dark) (t = 0 to 1.5s)
+    // Camera does NOT move during this phase!
     if (hologramScreenInstance) {
-      hologramScreenInstance.fadeOut(1.8);
+      hologramScreenInstance.fadeOut(1.5);
+    }
+    if (ambientLight) tl.to(ambientLight, { intensity: 0.45, duration: 1.5, ease: 'power2.inOut' }, 0);
+    if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.15, duration: 1.5, ease: 'power2.inOut' }, 0);
+    if (sunLight) tl.to(sunLight, { intensity: 0.55, duration: 1.5, ease: 'power2.inOut' }, 0);
+    if (cabinLight) tl.to(cabinLight, { intensity: 0.35, duration: 1.5, ease: 'power2.inOut' }, 0);
+    if (buttonRedLight) tl.to(buttonRedLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 0);
+    if (rocketLight) tl.to(rocketLight, { intensity: 1.2, duration: 1.5, ease: 'power2.inOut' }, 0);
+    if (avatarLight) tl.to(avatarLight, { intensity: 0.2, duration: 1.5, ease: 'power2.inOut' }, 0);
+
+    // Extinguish Table & Console Glows (t = 0 to 1.5s)
+    stationEmissiveMaterials.forEach((mat) => {
+      tl.to(mat, { emissiveIntensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 0);
+    });
+
+    // Hide ONLY the ring mesh directly below the rocket when lights dim (without touching shared materials)
+    tl.add(() => {
+      allRocketPadNodes.forEach((node) => {
+        node.visible = false;
+      });
+    }, 1.5);
+
+    // Step 2: Camera glides along shortest path to rocket base at 50/50 position (t = 1.5s to 4.7s)
+    // EVERYTHING ELSE (station room, gantry towers, exterior hulls, cursive text, avatar, cosmos background) remains 100% present & visible!
+    tl.to(camera.position, {
+      x: PAD_CAM_POS.x,
+      y: PAD_CAM_POS.y,
+      z: PAD_CAM_POS.z,
+      duration: 3.2,
+      ease: 'power3.inOut',
+      onUpdate: () => {
+        camera.lookAt(currentLookTarget);
+        if (controls) controls.target.copy(currentLookTarget);
+      }
+    }, 1.5);
+
+    tl.to(currentLookTarget, {
+      x: PAD_CAM_LOOK.x,
+      y: PAD_CAM_LOOK.y,
+      z: PAD_CAM_LOOK.z,
+      duration: 3.2,
+      ease: 'power3.inOut',
+      onUpdate: () => {
+        camera.lookAt(currentLookTarget);
+        if (controls) controls.target.copy(currentLookTarget);
+      }
+    }, 1.5);
+
+    // Step 3: WHEN camera is at 50/50 position (at t = 4.7s), remove things & rotate simultaneously (t = 4.7s to 7.2s)
+    if (earthLandingManager && earthLandingManager.rocketModel) {
+      tl.to(earthLandingManager.rocketModel.position, {
+        x: FLIGHT_ROCKET_POS.x,
+        y: FLIGHT_ROCKET_POS.y,
+        z: FLIGHT_ROCKET_POS.z,
+        duration: 2.5,
+        ease: 'power2.inOut'
+      }, 4.7);
+
+      tl.to(earthLandingManager.rocketModel.rotation, {
+        x: FLIGHT_ROCKET_ROT.x,
+        y: FLIGHT_ROCKET_ROT.y,
+        z: FLIGHT_ROCKET_ROT.z,
+        duration: 2.5,
+        ease: 'power2.inOut'
+      }, 4.7);
+
+      tl.to(earthLandingManager.rocketModel.scale, {
+        x: FLIGHT_ROCKET_SCALE.x,
+        y: FLIGHT_ROCKET_SCALE.y,
+        z: FLIGHT_ROCKET_SCALE.z,
+        duration: 2.5,
+        ease: 'power2.inOut'
+      }, 4.7);
     }
 
-    if (ambientLight) tl.to(ambientLight, { intensity: 0.02, duration: 1.8, ease: 'power2.inOut' }, 0);
-    if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.01, duration: 1.8, ease: 'power2.inOut' }, 0);
-    if (sunLight) tl.to(sunLight, { intensity: 0.02, duration: 1.8, ease: 'power2.inOut' }, 0);
-    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
-    if (buttonRedLight) tl.to(buttonRedLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
-    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0);
+    tl.to(camera.position, {
+      x: WARP_INITIAL_CAM_POS.x,
+      y: WARP_INITIAL_CAM_POS.y,
+      z: WARP_INITIAL_CAM_POS.z,
+      duration: 2.5,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        camera.lookAt(currentLookTarget);
+        if (controls) controls.target.copy(currentLookTarget);
+      }
+    }, 4.7);
 
+    tl.to(currentLookTarget, {
+      x: WARP_INITIAL_LOOK_TARGET.x,
+      y: WARP_INITIAL_LOOK_TARGET.y,
+      z: WARP_INITIAL_LOOK_TARGET.z,
+      duration: 2.5,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        camera.lookAt(currentLookTarget);
+        if (controls) controls.target.copy(currentLookTarget);
+      }
+    }, 4.7);
 
+    // Procedural background crossfade & space transition starting at 50/50 position (t = 4.7s to 6.5s)
+    if (cosmosBackground && cosmosBackground.fadeOut) {
+      cosmosBackground.fadeOut(1.8, tl, 4.7);
+    }
+    tl.to(scene.background, {
+      r: 2 / 255,
+      g: 2 / 255,
+      b: 5 / 255,
+      duration: 1.8,
+      ease: 'power2.inOut'
+    }, 4.7);
+
+    tl.add(() => {
+      if (earthLandingManager) {
+        earthLandingManager.spaceGroup.visible = true;
+      }
+    }, 4.7);
+    ENGINE_STATE.starsOpacity = 0.0;
+    tl.to(ENGINE_STATE, { starsOpacity: 1.0, duration: 2.0, ease: 'power2.inOut' }, 4.7);
+
+    // Smoothly dissolve station body + gantry starting at 50/50 position (t = 4.7s to 6.5s)
+    if (stationModel) {
+      stationModel.traverse((node) => {
+        if (node.isMesh && node.material) {
+          node.material.transparent = true;
+          tl.to(node.material, { opacity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.7);
+        }
+      });
+    }
+
+    // Step 4: Clean up dissolved station elements once fully invisible
+    tl.add(() => {
+      if (stationModel) stationModel.visible = false;
+      if (techAvatarInstance && techAvatarInstance.group) techAvatarInstance.group.visible = false;
+      if (cursiveTextInstance && cursiveTextInstance.group) cursiveTextInstance.group.visible = false;
+      if (lidOverlayMesh) lidOverlayMesh.visible = false;
+      if (cosmosBackground && cosmosBackground.group) cosmosBackground.group.visible = false;
+    }, 6.5);
+
+    // Fade out partial station lights and fade in space lighting smoothly
+    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 4.7);
+    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 4.7);
+    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 4.7);
+    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 4.7);
+    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 4.7);
+
+    if (earthLandingManager) {
+      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.5, ease: 'power2.inOut' }, 5.5);
+      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.5, ease: 'power2.inOut' }, 5.5);
+      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.5, ease: 'power2.inOut' }, 5.5);
+    }
+
+    tl.to(renderer, { toneMappingExposure: 0.90, duration: 1.5, ease: 'power2.inOut' }, 5.5);
+    tl.to(bloomPass, { strength: 0.0, duration: 1.5, ease: 'power2.inOut' }, 5.5);
   }
 
   // ==========================================
@@ -926,7 +1069,10 @@ export function initScene1() {
 
     const delta = clock.getDelta();
     const elapsedTime = clock.getElapsedTime();
-    cosmosBackground.update(elapsedTime);
+
+    if (cosmosBackground && cosmosBackground.group && cosmosBackground.group.visible) {
+      cosmosBackground.update(elapsedTime);
+    }
     if (techAvatarInstance && techAvatarInstance.update) {
       techAvatarInstance.update(delta);
     }
@@ -934,10 +1080,21 @@ export function initScene1() {
       hologramScreenInstance.update(elapsedTime);
     }
 
-    if (controls.enabled) {
-      controls.update();
+    // Earth Landing Manager Tick
+    if (earthLandingManager) {
+      earthLandingManager.update(elapsedTime, delta);
+    }
+
+    if (!earthLandingManager || !earthLandingManager.isActive) {
+      if (controls.enabled) {
+        controls.update();
+      } else {
+        camera.lookAt(currentLookTarget);
+      }
     } else {
-      camera.lookAt(currentLookTarget);
+      if (window.activeControls) {
+        window.activeControls.update();
+      }
     }
 
     if (camPosVal) {

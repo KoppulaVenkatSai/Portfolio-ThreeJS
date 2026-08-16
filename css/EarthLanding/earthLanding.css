@@ -1,0 +1,340 @@
+/* Earth Landing POC V3 Stylesheet */
+:root {
+  --el-color-primary: #00f0ff;
+  --el-color-secondary: #ffd700;
+  --el-color-text: #e2e8f0;
+  --el-color-hud-bg: rgba(6, 10, 20, 0.4);
+  --el-color-hud-border: rgba(0, 240, 255, 0.2);
+  --el-font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
+}
+
+/* Storm fullscreen flash overlay */
+#storm-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 5;
+  background-color: #ffffff;
+  opacity: 0.0;
+  pointer-events: none;
+}
+
+/* Earth Landing Main HUD Overlay */
+#earthlanding-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 15;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 30px;
+  opacity: 0;
+  transition: opacity 0.8s ease-in-out;
+}
+
+#earthlanding-hud.hud-active {
+  opacity: 1;
+}
+
+/* Telemetry HUD Unified Top Bar Styling */
+.hud-top-bar {
+  pointer-events: auto;
+  width: 100%;
+  background: rgba(6, 10, 20, 0.65);
+  border: 1px solid var(--el-color-hud-border);
+  padding: 15px 25px 25px 25px;
+  border-radius: 6px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 45px rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+}
+
+.hud-top-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.system-info {
+  width: 25%;
+}
+
+.system-info .hud-title {
+  font-family: var(--el-font-mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  background: linear-gradient(45deg, var(--el-color-primary), var(--el-color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 4px;
+}
+
+.system-info .hud-status {
+  font-family: var(--el-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  text-shadow: 0 0 8px rgba(148, 163, 184, 0.25);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timeline-info {
+  width: 45%;
+  margin-top: -6px;
+}
+
+.telemetry-info {
+  width: 30%;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 25px;
+}
+
+.telemetry-bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--el-font-mono);
+}
+
+.telemetry-bar-item .label {
+  font-size: 0.65rem;
+  color: #64748b;
+  letter-spacing: 0.1em;
+  margin-bottom: 2px;
+}
+
+.telemetry-bar-item .value {
+  font-size: 0.85rem;
+  color: #00ff66;
+  text-shadow: 0 0 8px rgba(0, 255, 102, 0.4);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Timeline visual tracker components */
+.hud-timeline-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+#hud-timeline-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--el-color-primary), #00ff66);
+  border-radius: 2px;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+}
+
+#hud-timeline-marker {
+  position: absolute;
+  top: 50%;
+  left: 0%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background-color: #00ff66;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #00ff66, 0 0 20px #00ff66;
+  z-index: 5;
+}
+
+.hud-timeline-step {
+  position: absolute;
+  top: 12px;
+  transform: translateX(-50%);
+  font-family: var(--el-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.hud-timeline-step::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Sci-Fi Monolith Spatial 3D Rotation Controls */
+#monolith-rotation-controls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.5s ease-out;
+  perspective: 1000px;
+}
+
+#monolith-rotation-controls.visible {
+  opacity: 1;
+}
+
+.monolith-rot-btn {
+  position: absolute;
+  pointer-events: auto;
+  background: none !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  cursor: pointer;
+  opacity: 0.60;
+  outline: none !important;
+  box-shadow: none !important;
+  transform-style: preserve-3d;
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.98);
+  transition: opacity 0.35s ease, transform 0.35s ease, filter 0.35s ease;
+  filter: drop-shadow(0 0 10px rgba(0, 247, 255, 0.50));
+}
+
+.rot-btn-right {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.98);
+  filter: drop-shadow(0 0 10px rgba(255, 224, 51, 0.50));
+}
+
+.monolith-rot-btn:hover {
+  opacity: 0.95;
+  transform: translate(-50%, -50%) rotateX(36deg) scale(1.04);
+  filter: drop-shadow(0 0 16px rgba(0, 247, 255, 0.80));
+}
+
+.rot-btn-right:hover {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(1.04);
+  filter: drop-shadow(0 0 16px rgba(255, 224, 51, 0.80));
+}
+
+.monolith-rot-btn:active, .rot-btn-right:active {
+  transform: translate(-50%, -50%) rotateX(36deg) scale(0.95);
+}
+
+.rot-arc-svg {
+  width: 120px;
+  height: 75px;
+  overflow: visible;
+}
+
+.rot-arc-bg {
+  fill: none;
+  stroke: rgba(0, 247, 255, 0.22);
+  stroke-width: 2.5;
+  stroke-dasharray: 4 6;
+}
+
+.rot-arc-path {
+  fill: none;
+  stroke: url(#rotGradLeft);
+  stroke-width: 6.0;
+  stroke-linecap: round;
+  stroke-dasharray: 260;
+  stroke-dashoffset: 0;
+  animation: rotArcDash 2.4s linear infinite;
+}
+
+.rot-arc-right {
+  stroke: url(#rotGradRight);
+}
+
+@keyframes rotArcDash {
+  0% { stroke-dashoffset: 520; }
+  100% { stroke-dashoffset: 0; }
+}
+
+.rot-head-poly {
+  fill: #00f7ff;
+  stroke: #ffffff;
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px #00f7ff);
+}
+
+.rot-head-right {
+  fill: #ffe033;
+  stroke: #ffffff;
+  stroke-width: 1.2px;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 8px #ffe033);
+}
+
+.rot-node-dot {
+  fill: #00f7ff;
+  animation: rotDotPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes rotDotPulse {
+  0% { r: 4px; opacity: 0.5; }
+  100% { r: 8px; opacity: 1.0; }
+}
+
+/* Earth Landing Settings Panel */
+.el-settings-toggle {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  width: 45px;
+  height: 45px;
+  background-color: var(--el-color-hud-bg);
+  border: 1px solid var(--el-color-hud-border);
+  color: var(--el-color-primary);
+  border-radius: 4px;
+  display: none;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 20;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.1);
+  pointer-events: auto;
+}
+
+.el-settings-toggle:hover {
+  background-color: rgba(0, 240, 255, 0.15);
+  border-color: var(--el-color-primary);
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+}
+
+.el-settings-box {
+  position: absolute;
+  bottom: 80px;
+  right: 25px;
+  width: 290px;
+  background-color: var(--el-color-hud-bg);
+  border: 1px solid var(--el-color-hud-border);
+  backdrop-filter: blur(8px);
+  padding: 15px;
+  border-radius: 4px;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 240, 255, 0.1);
+  pointer-events: auto;
+}

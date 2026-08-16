@@ -331,4 +331,21 @@ export class SpaceCosmosBackground {
       });
     }
   }
+
+  fadeOut(duration = 2.0, tl = null, startTime = 0) {
+    if (tl) {
+      if (this.starMat && this.starMat.uniforms.uOpacity) {
+        tl.to(this.starMat.uniforms.uOpacity, { value: 0.0, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+      if (this.clusterMat && this.clusterMat.uniforms.uOpacity) {
+        tl.to(this.clusterMat.uniforms.uOpacity, { value: 0.0, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+      if (this.nebMat1) {
+        tl.to(this.nebMat1, { opacity: 0.0, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+      if (this.nebMat2) {
+        tl.to(this.nebMat2, { opacity: 0.0, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+    }
+  }
 }

@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Portfolio - Scene 1 & Scene 2</title>
   <link rel="stylesheet" href="./css/Scene_1/scene1.css">
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/EarthLanding/earthLanding.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Share+Tech+Mono&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
 </head>
 <body>
   <canvas id="webgl-canvas"></canvas>
@@ -275,6 +276,44 @@
     <div class="hud-footer">
       <div class="hud-info">STATUS: <span id="cam-status">INTERIOR_VIEW</span></div>
     </div>
+  </div>
+
+  <!-- Storm lightning overlay -->
+  <div id="storm-overlay"></div>
+
+  <!-- Sci-Fi Monolith 3D Curved Rotation Controls Overlay -->
+  <div id="monolith-rotation-controls">
+    <button id="monolith-rotate-left" class="monolith-rot-btn rot-btn-left" title="Rotate Monolith 90° Left">
+      <svg class="rot-arc-svg" viewBox="0 0 160 120">
+        <defs>
+          <linearGradient id="rotGradLeft" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#00f7ff" stop-opacity="0.2" />
+            <stop offset="50%" stop-color="#00b0ff" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#00f7ff" stop-opacity="1" />
+          </linearGradient>
+        </defs>
+        <path d="M 25 90 A 65 48 0 0 1 135 35" class="rot-arc-bg" />
+        <path d="M 25 90 A 65 48 0 0 1 135 35" class="rot-arc-path rot-arc-left" />
+        <path d="M 152 24 L 126 16 L 134 34 L 120 44 Z" class="rot-head-poly rot-head-left" />
+        <circle cx="25" cy="90" r="5" class="rot-node-dot" />
+      </svg>
+    </button>
+
+    <button id="monolith-rotate-right" class="monolith-rot-btn rot-btn-right" title="Rotate Monolith 90° Right">
+      <svg class="rot-arc-svg" viewBox="0 0 160 120">
+        <defs>
+          <linearGradient id="rotGradRight" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#ffe033" stop-opacity="0.2" />
+            <stop offset="50%" stop-color="#ff9d00" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#ffe033" stop-opacity="1" />
+          </linearGradient>
+        </defs>
+        <path d="M 135 90 A 65 48 0 0 0 25 35" class="rot-arc-bg" />
+        <path d="M 135 90 A 65 48 0 0 0 25 35" class="rot-arc-path rot-arc-right" />
+        <path d="M 8 24 L 34 16 L 26 34 L 40 44 Z" class="rot-head-poly rot-head-right" />
+        <circle cx="135" cy="90" r="5" class="rot-node-dot" />
+      </svg>
+    </button>
   </div>
 
   <script type="module" src="./main.js"></script>
