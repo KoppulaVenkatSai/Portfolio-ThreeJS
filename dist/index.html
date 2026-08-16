@@ -1,14 +1,282 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-  <title>Three JS Page</title>
-  <script type="module" crossorigin src="/assets/index-Bbza5AkK.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-rB-lfRsv.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portfolio - Scene 1 & Scene 2</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-jE3aR9Is.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CzcsD0NN.css">
 </head>
-
 <body>
-  <canvas class="canvas"></canvas>
-</body>
+  <canvas id="webgl-canvas"></canvas>
 
+  <!-- Preloader Screen -->
+  <div id="loader-screen">
+    <div class="loader-matrix">
+      <div class="loader-title">SYSTEM INITIALIZATION // SCENE 01</div>
+      <div class="loader-bar-bg">
+        <div id="loader-bar"></div>
+      </div>
+      <div id="loader-status">Preloading WebGL and assets...</div>
+    </div>
+  </div>
+
+  <!-- HUD Overlay -->
+  <div id="hud-container">
+    <div class="hud-header">
+      <div class="hud-tag">STATION INTERIOR // MODULE 01</div>
+      <div class="hud-right-actions">
+        <div class="hud-status"><span class="pulse-dot"></span> SYSTEMS READY</div>
+        <button id="settings-toggle-btn" class="icon-btn" title="Toggle Inspector Controls">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Inspector Controls Accordion Panel -->
+    <div id="camera-inspector" class="inspector-hidden">
+      
+      <!-- Accordion 1: Camera & Bloom Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>CAMERA_&_BLOOM_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="info-row">
+            <span class="label">CAM POS:</span>
+            <span class="value" id="cam-pos-val">0.00, 0.00, 0.00</span>
+          </div>
+          <div class="info-row">
+            <span class="label">LOOK TARGET:</span>
+            <span class="value" id="cam-target-val">0.00, 0.00, 0.00</span>
+          </div>
+
+          <div class="slider-row" style="margin-top: 8px;">
+            <label>BLOOM STRENGTH: <span id="bloom-strength-val">0.40</span></label>
+            <input type="range" id="bloom-strength-slider" min="0.0" max="4.0" step="0.05" value="0.40">
+          </div>
+          <div class="slider-row">
+            <label>BLOOM THRESHOLD: <span id="bloom-threshold-val">0.96</span></label>
+            <input type="range" id="bloom-threshold-slider" min="0.0" max="1.0" step="0.01" value="0.96">
+          </div>
+
+          <div class="inspector-controls">
+            <button class="control-btn" id="toggle-orbit-btn">ENABLE FREE CAM</button>
+            <button class="control-btn copy-btn" id="copy-cam-btn">📋 COPY CAM POS & TARGET</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 2: 3D Text Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>3D_NAME_TEXT_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SIZE / SCALE: <span id="text-scale-val">1.45</span></label>
+            <input type="range" id="text-scale-slider" min="0.2" max="3.0" step="0.05" value="1.45">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="text-x-val">35.10</span></label>
+            <input type="range" id="text-x-slider" min="20" max="50" step="0.1" value="35.10">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="text-y-val">0.40</span></label>
+            <input type="range" id="text-y-slider" min="-3" max="3" step="0.05" value="0.40">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="text-z-val">9.40</span></label>
+            <input type="range" id="text-z-slider" min="-10" max="20" step="0.1" value="9.40">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="text-roty-val">3.05</span></label>
+            <input type="range" id="text-roty-slider" min="0" max="6.28" step="0.05" value="3.05">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-text-btn">📋 COPY TEXT POS & ROTATION</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 3: BLAST OFF Lid Text Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>BLAST_OFF_LID_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SIZE / SCALE: <span id="lid-scale-val">1.60</span></label>
+            <input type="range" id="lid-scale-slider" min="0.2" max="3.0" step="0.05" value="1.60">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="lid-x-val">37.50</span></label>
+            <input type="range" id="lid-x-slider" min="30.0" max="45.0" step="0.05" value="37.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="lid-y-val">-2.55</span></label>
+            <input type="range" id="lid-y-slider" min="-5.0" max="2.0" step="0.05" value="-2.55">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="lid-z-val">7.35</span></label>
+            <input type="range" id="lid-z-slider" min="0.0" max="15.0" step="0.05" value="7.35">
+          </div>
+          <div class="slider-row">
+            <label>ROT X: <span id="lid-rotx-val">-0.04</span></label>
+            <input type="range" id="lid-rotx-slider" min="-3.14" max="3.14" step="0.02" value="-0.04">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="lid-roty-val">3.15</span></label>
+            <input type="range" id="lid-roty-slider" min="0.0" max="6.28" step="0.05" value="3.15">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-lid-btn">📋 COPY LID TEXT TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 4: AVATAR Model Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>AVATAR_MODEL_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SCALE: <span id="avatar-scale-val">7.70</span></label>
+            <input type="range" id="avatar-scale-slider" min="0.5" max="15.0" step="0.05" value="7.70">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="avatar-x-val">32.95</span></label>
+            <input type="range" id="avatar-x-slider" min="20.0" max="50.0" step="0.05" value="32.95">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="avatar-y-val">-5.50</span></label>
+            <input type="range" id="avatar-y-slider" min="-10.0" max="5.0" step="0.05" value="-5.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="avatar-z-val">1.10</span></label>
+            <input type="range" id="avatar-z-slider" min="-10.0" max="20.0" step="0.05" value="1.10">
+          </div>
+          <div class="slider-row">
+            <label>ROT X: <span id="avatar-rotx-val">0.00</span></label>
+            <input type="range" id="avatar-rotx-slider" min="-3.14" max="3.14" step="0.02" value="0.00">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="avatar-roty-val">2.04</span></label>
+            <input type="range" id="avatar-roty-slider" min="-3.14" max="6.28" step="0.02" value="2.04">
+          </div>
+          <div class="slider-row">
+            <label>ROT Z: <span id="avatar-rotz-val">0.00</span></label>
+            <input type="range" id="avatar-rotz-slider" min="-3.14" max="3.14" step="0.02" value="0.00">
+          </div>
+          <div class="slider-row" style="margin-top: 6px;">
+            <label>SKIN / FACE COLOR:</label>
+            <input type="color" id="avatar-skin-picker" value="#ffdbac" style="width: 100%; height: 28px; border: none; cursor: pointer; background: transparent;">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-avatar-btn">📋 COPY AVATAR TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 5: HOLOGRAM Screen Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>HOLOGRAM_SCREEN_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SCALE: <span id="hologram-scale-val">0.25</span></label>
+            <input type="range" id="hologram-scale-slider" min="0.05" max="3.0" step="0.01" value="0.25">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="hologram-x-val">-11.50</span></label>
+            <input type="range" id="hologram-x-slider" min="-30.0" max="30.0" step="0.1" value="-11.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="hologram-y-val">30.60</span></label>
+            <input type="range" id="hologram-y-slider" min="-10.0" max="60.0" step="0.1" value="30.60">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="hologram-z-val">70.30</span></label>
+            <input type="range" id="hologram-z-slider" min="-20.0" max="100.0" step="0.1" value="70.30">
+          </div>
+          <div class="slider-row">
+            <label>ROT X (TILT): <span id="hologram-rotx-val">0.10</span></label>
+            <input type="range" id="hologram-rotx-slider" min="-3.14" max="3.14" step="0.02" value="0.10">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y (PAN): <span id="hologram-roty-val">-0.30</span></label>
+            <input type="range" id="hologram-roty-slider" min="-3.14" max="6.28" step="0.02" value="-0.30">
+          </div>
+          <div class="slider-row">
+            <label>ROT Z (ROLL): <span id="hologram-rotz-val">0.02</span></label>
+            <input type="range" id="hologram-rotz-slider" min="-3.14" max="3.14" step="0.02" value="0.02">
+          </div>
+          <div class="slider-row">
+            <label>HOVER GLOW BRIGHTNESS: <span id="hologram-hoverbright-val">0.00</span></label>
+            <input type="range" id="hologram-hoverbright-slider" min="0.0" max="3.0" step="0.1" value="0.00">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn" id="toggle-hologram-vis-btn">TOGGLE HOLOGRAM VISIBILITY</button>
+            <button class="control-btn copy-btn" id="copy-hologram-btn">📋 COPY HOLOGRAM TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 6: PROJECTOR CONE Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>PROJECTOR_CONE_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>CONE LENGTH (SCALE Y): <span id="cone-scaley-val">0.70</span></label>
+            <input type="range" id="cone-scaley-slider" min="0.1" max="3.0" step="0.05" value="0.70">
+          </div>
+          <div class="slider-row">
+            <label>CONE WIDTH (SCALE XZ): <span id="cone-scalexz-val">1.00</span></label>
+            <input type="range" id="cone-scalexz-slider" min="0.1" max="3.0" step="0.05" value="1.00">
+          </div>
+          <div class="slider-row">
+            <label>CONE OFFSET Y: <span id="cone-posy-val">-2.20</span></label>
+            <input type="range" id="cone-posy-slider" min="-15.0" max="10.0" step="0.2" value="-2.20">
+          </div>
+          <div class="slider-row">
+            <label>CONE TILT (ROT X): <span id="cone-rotx-val">0.21</span></label>
+            <input type="range" id="cone-rotx-slider" min="-1.57" max="1.57" step="0.01" value="0.21">
+          </div>
+          <div class="slider-row">
+            <label>BEAM OPACITY: <span id="cone-opacity-val">0.28</span></label>
+            <input type="range" id="cone-opacity-slider" min="0.0" max="1.0" step="0.02" value="0.28">
+          </div>
+          <div class="slider-row">
+            <label>RAY DENSITY: <span id="cone-density-val">60</span></label>
+            <input type="range" id="cone-density-slider" min="10" max="150" step="5" value="60">
+          </div>
+          <div class="slider-row">
+            <label>RAY SPEED: <span id="cone-speed-val">0.50</span></label>
+            <input type="range" id="cone-speed-slider" min="0.0" max="2.0" step="0.05" value="0.50">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-cone-btn">📋 COPY CONE TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="copy-toast">COPIED TO CLIPBOARD & CONSOLE!</div>
+    </div>
+
+    <!-- Navigation / Debug Controls -->
+    <div class="hud-footer">
+      <div class="hud-info">STATUS: <span id="cam-status">INTERIOR_VIEW</span></div>
+    </div>
+  </div>
+
+</body>
 </html>
