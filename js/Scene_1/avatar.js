@@ -18,7 +18,7 @@ export class TechAvatar {
   }
 
   loadModel(modelPath, onLoad, loadingManager = null) {
-    const dracoLoader = new DRACOLoader(loadingManager);
+    const dracoLoader = new DRACOLoader();
     dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
 
     const gltfLoader = new GLTFLoader(loadingManager);

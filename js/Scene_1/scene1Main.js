@@ -32,17 +32,17 @@ export function initScene1() {
     logarithmicDepthBuffer: true
   });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.25;
 
-  // Post-Processing Composer & Bloom
+  // Post-Processing Composer & Bloom (Half-resolution for maximum fillrate performance)
   const composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   const bloomPass = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2)),
     0.45,
     0.5,
     0.92
@@ -64,21 +64,45 @@ export function initScene1() {
   const loaderStatus = document.getElementById('loader-status');
 
   const loadingManager = new THREE.LoadingManager();
+  const progressState = { pct: 0 };
+  let isLoaderDismissed = false;
 
   loadingManager.onProgress = (url, loaded, total) => {
-    const pct = Math.floor((loaded / total) * 100);
-    if (loaderBar) loaderBar.style.width = `${pct}%`;
-    if (loaderStatus) loaderStatus.innerText = `Preloading WebGL and assets... (${pct}%)`;
+    const rawPct = total > 0 ? Math.floor((loaded / total) * 100) : 0;
+    const targetPct = Math.max(progressState.pct, Math.min(rawPct, 99));
+    gsap.to(progressState, {
+      pct: targetPct,
+      duration: 0.35,
+      ease: 'power1.out',
+      onUpdate: () => {
+        const displayPct = Math.floor(progressState.pct);
+        if (loaderBar) loaderBar.style.width = `${displayPct}%`;
+        if (loaderStatus) loaderStatus.innerText = `Preloading WebGL and assets... (${displayPct}%)`;
+      }
+    });
   };
 
   loadingManager.onLoad = () => {
-    if (loaderStatus) loaderStatus.innerText = 'Initialization Complete';
-    if (loaderScreen) {
-      loaderScreen.style.opacity = '0';
-      setTimeout(() => {
-        loaderScreen.style.display = 'none';
-      }, 800);
-    }
+    if (isLoaderDismissed) return;
+    isLoaderDismissed = true;
+    gsap.to(progressState, {
+      pct: 100,
+      duration: 0.35,
+      ease: 'power1.out',
+      onUpdate: () => {
+        if (loaderBar) loaderBar.style.width = '100%';
+        if (loaderStatus) loaderStatus.innerText = 'Initialization Complete (100%)';
+      },
+      onComplete: () => {
+        if (loaderScreen) {
+          loaderScreen.style.transition = 'opacity 0.6s ease';
+          loaderScreen.style.opacity = '0';
+          setTimeout(() => {
+            loaderScreen.style.display = 'none';
+          }, 600);
+        }
+      }
+    });
     console.log('[SCENE 1] Loading Manager complete.');
   };
 
@@ -413,13 +437,13 @@ export function initScene1() {
   });
   scene.add(cursiveTextInstance.group);
 
-  gsap.to(cursiveTextInstance.floatGroup.position, {
-    y: '+=0.06',
-    duration: 2.8,
-    repeat: -1,
-    yoyo: true,
-    ease: 'sine.inOut'
-  });
+  // gsap.to(cursiveTextInstance.floatGroup.position, {
+  //   y: '+=0.06',
+  //   duration: 2.8,
+  //   repeat: -1,
+  //   yoyo: true,
+  //   ease: 'sine.inOut'
+  // });
 
   // ==========================================
   // 8.5 3D AVATAR ("Venky Avatar")
@@ -612,8 +636,8 @@ export function initScene1() {
     }
 
     timeline.to(bloomPass, {
-      strength: 1.2,
-      duration: 1.2,
+      strength: 0.85,
+      duration: 1.0,
       yoyo: true,
       repeat: 1,
       ease: 'sine.inOut'
@@ -638,14 +662,30 @@ export function initScene1() {
 
     console.log(`[DESTINATION SELECTION] Initiating sequence for ${targetName}...`);
 
-    const PAD_CAM_POS = new THREE.Vector3(37.67, -9.11, 28.00);
-    const PAD_CAM_LOOK = new THREE.Vector3(38.30, -4.81, 28.34);
+    // Canonical 50/50 Camera Framing in Rocket-Local Space
+    // (Rocket hull fills right 50% of viewport, starry deep space on left 50%)
+    const LOCAL_CAM_OFFSET = new THREE.Vector3(-4.32766, -2.86449, -2.00000);
+    const LOCAL_LOOK_OFFSET = new THREE.Vector3(-3.70432, 1.43601, -1.66154);
 
-    const FLIGHT_ROCKET_POS = new THREE.Vector3(12.0, -1.0, -0.5);
-    const FLIGHT_ROCKET_ROT = new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180);
-    const FLIGHT_ROCKET_SCALE = new THREE.Vector3(0.65, 0.65, 0.65);
-    const WARP_INITIAL_CAM_POS = new THREE.Vector3(9.36, 0.30, -2.60);
-    const WARP_INITIAL_LOOK_TARGET = new THREE.Vector3(9.52, 0.08, 0.22);
+    if (earthLandingManager && earthLandingManager.rocketModel) {
+      earthLandingManager.rocketModel.updateMatrixWorld(true);
+    }
+    const PAD_CAM_POS = (earthLandingManager && earthLandingManager.rocketModel)
+      ? LOCAL_CAM_OFFSET.clone().applyMatrix4(earthLandingManager.rocketModel.matrixWorld)
+      : new THREE.Vector3(37.67, -9.11, 28.00);
+    const PAD_CAM_LOOK = (earthLandingManager && earthLandingManager.rocketModel)
+      ? LOCAL_LOOK_OFFSET.clone().applyMatrix4(earthLandingManager.rocketModel.matrixWorld)
+      : new THREE.Vector3(38.30, -4.81, 28.34);
+
+    const posStart = new THREE.Vector3(42.0, -6.25, 30.0);
+    const posEnd = new THREE.Vector3(12.0, -1.0, -0.5);
+    const qStart = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0));
+    const qEnd = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180));
+    const qCurrent = new THREE.Quaternion();
+    const scaleStart = 1.0;
+    const scaleEnd = 0.65;
+
+    const transitionState = { progress: 0.0 };
 
     const tl = gsap.timeline({
       onComplete: () => {
@@ -654,6 +694,7 @@ export function initScene1() {
         if (camStatus) camStatus.innerText = 'DESCENT_SEQUENCE_ACTIVE';
         console.log('[DESTINATION SELECTION] Camera and rocket settled at flight 50/50 frame. Launching Earth Landing sequence!');
         if (earthLandingManager) {
+          earthLandingManager.updateCubeNow();
           earthLandingManager.startSequence();
         }
       }
@@ -684,7 +725,7 @@ export function initScene1() {
       });
     }, 1.5);
 
-    // Step 2: Camera glides along shortest path to rocket base at 50/50 position (t = 1.5s to 4.7s)
+    // Step 2: Camera glides along shortest path to rocket base at exact local 50/50 position (t = 1.5s to 4.7s)
     // EVERYTHING ELSE (station room, gantry towers, exterior hulls, cursive text, avatar, cosmos background) remains 100% present & visible!
     tl.to(camera.position, {
       x: PAD_CAM_POS.x,
@@ -710,54 +751,28 @@ export function initScene1() {
       }
     }, 1.5);
 
-    // Step 3: WHEN camera is at 50/50 position (at t = 4.7s), remove things & rotate simultaneously (t = 4.7s to 7.2s)
-    if (earthLandingManager && earthLandingManager.rocketModel) {
-      tl.to(earthLandingManager.rocketModel.position, {
-        x: FLIGHT_ROCKET_POS.x,
-        y: FLIGHT_ROCKET_POS.y,
-        z: FLIGHT_ROCKET_POS.z,
-        duration: 2.5,
-        ease: 'power2.inOut'
-      }, 4.7);
-
-      tl.to(earthLandingManager.rocketModel.rotation, {
-        x: FLIGHT_ROCKET_ROT.x,
-        y: FLIGHT_ROCKET_ROT.y,
-        z: FLIGHT_ROCKET_ROT.z,
-        duration: 2.5,
-        ease: 'power2.inOut'
-      }, 4.7);
-
-      tl.to(earthLandingManager.rocketModel.scale, {
-        x: FLIGHT_ROCKET_SCALE.x,
-        y: FLIGHT_ROCKET_SCALE.y,
-        z: FLIGHT_ROCKET_SCALE.z,
-        duration: 2.5,
-        ease: 'power2.inOut'
-      }, 4.7);
-    }
-
-    tl.to(camera.position, {
-      x: WARP_INITIAL_CAM_POS.x,
-      y: WARP_INITIAL_CAM_POS.y,
-      z: WARP_INITIAL_CAM_POS.z,
+    // Step 3: WHEN camera is at 50/50 position (at t = 4.7s), rotate simultaneously with rigid arc tracking (t = 4.7s to 7.2s)
+    // Camera is driven directly from rocket.matrixWorld on every frame so framing remains 100% rigid with 0 wobble
+    tl.to(transitionState, {
+      progress: 1.0,
       duration: 2.5,
       ease: 'power2.inOut',
       onUpdate: () => {
-        camera.lookAt(currentLookTarget);
-        if (controls) controls.target.copy(currentLookTarget);
-      }
-    }, 4.7);
+        const t = transitionState.progress;
+        if (earthLandingManager && earthLandingManager.rocketModel) {
+          const rocket = earthLandingManager.rocketModel;
+          rocket.position.lerpVectors(posStart, posEnd, t);
+          const s = THREE.MathUtils.lerp(scaleStart, scaleEnd, t);
+          rocket.scale.set(s, s, s);
+          qCurrent.slerpQuaternions(qStart, qEnd, t);
+          rocket.quaternion.copy(qCurrent);
+          rocket.updateMatrixWorld(true);
 
-    tl.to(currentLookTarget, {
-      x: WARP_INITIAL_LOOK_TARGET.x,
-      y: WARP_INITIAL_LOOK_TARGET.y,
-      z: WARP_INITIAL_LOOK_TARGET.z,
-      duration: 2.5,
-      ease: 'power2.inOut',
-      onUpdate: () => {
-        camera.lookAt(currentLookTarget);
-        if (controls) controls.target.copy(currentLookTarget);
+          camera.position.copy(LOCAL_CAM_OFFSET).applyMatrix4(rocket.matrixWorld);
+          currentLookTarget.copy(LOCAL_LOOK_OFFSET).applyMatrix4(rocket.matrixWorld);
+          camera.lookAt(currentLookTarget);
+          if (controls) controls.target.copy(currentLookTarget);
+        }
       }
     }, 4.7);
 
@@ -1056,7 +1071,9 @@ export function initScene1() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     composer.setSize(window.innerWidth, window.innerHeight);
+    bloomPass.resolution.set(Math.floor(window.innerWidth / 2), Math.floor(window.innerHeight / 2));
   });
 
   // ==========================================

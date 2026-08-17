@@ -260,14 +260,29 @@ export class EarthLandingManager {
     console.log("[EARTH LANDING] Sequence ignited at 50/50 starting frame!");
   }
 
-  update(elapsed, delta) {
-    // Dynamic Cube Camera (renders mirror chrome reflections on launchpad & in flight)
+  updateCubeNow() {
     if (this.rocketModel && this.cubeCamera && this.rocketModel.visible) {
       const origVis = this.rocketModel.visible;
+      const origShadows = this.renderer.shadowMap.enabled;
+      this.renderer.shadowMap.enabled = false;
       this.rocketModel.visible = false;
       this.cubeCamera.position.copy(this.rocketModel.position);
       this.cubeCamera.update(this.renderer, this.scene);
       this.rocketModel.visible = origVis;
+      this.renderer.shadowMap.enabled = origShadows;
+      this.hasRenderedInitialCube = true;
+    }
+  }
+
+  update(elapsed, delta) {
+    // Smart Throttled Dynamic Cube Camera (every 6 frames or once on load)
+    if (this.rocketModel && this.cubeCamera && this.rocketModel.visible) {
+      if (!this.cubeFrameCounter) this.cubeFrameCounter = 0;
+      this.cubeFrameCounter++;
+      const shouldUpdateCube = !this.hasRenderedInitialCube || (this.isActive && this.cubeFrameCounter % 6 === 0);
+      if (shouldUpdateCube) {
+        this.updateCubeNow();
+      }
     }
 
     if (!this.isActive) return;

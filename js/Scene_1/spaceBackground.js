@@ -105,7 +105,7 @@ const TwinkleStarShader = {
       float t = uTime * aSpeed + aPhase;
       vBrightness = 0.05 + 0.95 * pow(0.5 + 0.5 * sin(t), 3.0);
       
-      gl_PointSize = uSize * (650.0 / -mvPosition.z) * (0.6 + 0.4 * vBrightness);
+      gl_PointSize = uSize * (350.0 / -mvPosition.z) * (0.7 + 0.3 * vBrightness);
     }
   `,
   fragment: `
@@ -169,7 +169,7 @@ export class SpaceCosmosBackground {
       fragmentShader: TwinkleStarShader.fragment,
       uniforms: {
         uTime: { value: 0.0 },
-        uSize: { value: 2.2 },
+        uSize: { value: 1.5 },
         uTexture: { value: createStarTexture() },
         uColor: { value: new THREE.Color(0xffffff) },
         uOpacity: { value: 0.95 }
@@ -236,7 +236,7 @@ export class SpaceCosmosBackground {
       fragmentShader: TwinkleStarShader.fragment,
       uniforms: {
         uTime: { value: 0.0 },
-        uSize: { value: 2.2 },
+        uSize: { value: 1.5 },
         uTexture: { value: createStarTexture() },
         uColor: { value: new THREE.Color(0xe0f2fe) },
         uOpacity: { value: 1.0 }
