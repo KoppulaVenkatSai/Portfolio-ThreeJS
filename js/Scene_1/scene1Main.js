@@ -13,6 +13,8 @@ import { HologramScreen } from './hologramScreen.js';
 import { RocketDockingPad } from './dockingPad.js';
 import { EarthLandingManager } from '../EarthLanding/earthLandingManager.js';
 import { ENGINE_STATE } from '../EarthLanding/state.js';
+import { RocketAlignmentHelper } from '../helpers/alignmentHelper.js';
+import { SceneInspectorHelper } from '../helpers/inspectorHelper.js';
 
 export function initScene1() {
   // ==========================================
@@ -159,6 +161,12 @@ export function initScene1() {
   // ==========================================
   const cosmosBackground = new SpaceCosmosBackground(scene);
   const earthLandingManager = new EarthLandingManager(scene, camera, renderer, composer, bloomPass, loadingManager);
+
+  // ==========================================
+  // HELPERS (Defaults to False / Inactive)
+  // ==========================================
+  const rocketAlignmentHelper = new RocketAlignmentHelper(scene, camera, earthLandingManager, false);
+  window.rocketAlignmentHelper = rocketAlignmentHelper;
 
   // ==========================================
   // 6. DYNAMIC "BLAST OFF" CANVAS TEXTURE
@@ -699,7 +707,7 @@ export function initScene1() {
     console.log(`[DESTINATION SELECTION] Initiating sequence for ${targetName}...`);
 
     // Vertical 50/50 Camera Framing on the Rocket Hull (user exact calibrated 50/50 state)
-    const PAD_CAM_POS = new THREE.Vector3(38.38948, -8.53400, 30.21334);
+    const PAD_CAM_POS = new THREE.Vector3(38.69034, -8.56499, 30.52824);
     const PAD_CAM_LOOK = new THREE.Vector3(38.71423, -5.01504, 30.55209);
 
     const tl = gsap.timeline({
@@ -707,19 +715,22 @@ export function initScene1() {
         isTransitioning = false;
         window.isTransitioning = false;
 
-        // Re-enable free orbit controls around the rocket base so user can move camera freely
-        controls.enabled = true;
-        controls.target.copy(PAD_CAM_LOOK);
-        camera.up.set(0.0, 1.0, 0.0);
-        if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'DISABLE FREE CAM';
+        const camStatus = document.getElementById('cam-status');
+        if (camStatus) camStatus.innerText = 'WARP_IGNITION_ACTIVE';
+        console.log('[DESTINATION SELECTION] Camera arrived at rocket base. Seamlessly igniting warp sequence...');
 
-        if (camStatus) camStatus.innerText = 'BASE_REACHED // FREE_CAM_ACTIVE';
-        console.log('[DESTINATION SELECTION] Camera reached rocket base. Free Cam is active!');
-
-        // Display the Warp Action HUD
+        // Keep HUD hidden & alignment helpers disabled
         const warpActionContainer = document.getElementById('warp-action-container');
         if (warpActionContainer) {
-          warpActionContainer.classList.remove('warp-action-hidden');
+          warpActionContainer.classList.add('warp-action-hidden');
+        }
+        rocketAlignmentHelper.setEnabled(false);
+        controls.enabled = false;
+
+        // Directly ignite Earth Landing warp sequence without stopping
+        if (earthLandingManager) {
+          earthLandingManager.updateCubeNow();
+          earthLandingManager.startSequence();
         }
       }
     });
@@ -751,26 +762,48 @@ export function initScene1() {
       });
     }, 1.5);
 
-    // Step 2: Camera flies along a unified 3D curved arc bulging under the rocket with continuous gaze curvature
+    // Step 2: Camera flies along a unified 3D curved arc bulging smoothly under the rocket
     const pStart = camera.position.clone();
-    const pC1 = new THREE.Vector3(6.0, 6.0, 66.0); // Forward & downward swoop
-    const pC2 = new THREE.Vector3(24.0, -14.0, 46.0); // Bulge under the rocket launchpad
+    const pC1 = new THREE.Vector3(8.0, 8.0, 68.0); // Gentle forward & downward swoop
+    const pC2 = new THREE.Vector3(28.0, -11.0, 40.0); // Soft curvature dipping under pad
     const pEnd = PAD_CAM_POS.clone();
     const posCurve = new THREE.CubicBezierCurve3(pStart, pC1, pC2, pEnd);
 
     // Continuous 3D Look Curve (seamlessly arcs gaze from station -> pad -> rocket tip)
     const lStart = currentLookTarget.clone();
-    const lC1 = new THREE.Vector3(22.0, -3.0, 16.0); // Anticipates pad approach
-    const lC2 = new THREE.Vector3(38.0, -6.0, 26.0); // Rocket fuselage base
+    const lC1 = new THREE.Vector3(18.0, 0.0, 20.0); // Anticipates pad approach
+    const lC2 = new THREE.Vector3(34.0, -5.0, 28.0); // Smooth gaze sweep to rocket tip
     const lEnd = PAD_CAM_LOOK.clone(); // Rocket tip in 50/50 vertical framing
     const lookCurve = new THREE.CubicBezierCurve3(lStart, lC1, lC2, lEnd);
+
+    // Camera approach flight duration & easing: 97% distance traversed smoothly, final 3% distance gets enhanced quartic soft-landing easing
+    const TOTAL_APPROACH_DURATION = 5.0;
+    const splitTime = 0.65; // 65% of duration (3.25s) covers the first 97% distance
+    const splitDistance = 0.97; // 97% distance mark
+
+    function approachWithFinalDistanceCushionEase(p) {
+      if (p <= 0) return 0;
+      if (p >= 1) return 1;
+
+      if (p < splitTime) {
+        // Smooth responsive in-out flight across the first 97% distance
+        const t = p / splitTime;
+        const base = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        return base * splitDistance;
+      } else {
+        // Enhanced quartic soft-landing easing specifically for the final 3% distance (over the last 1.75s)
+        const t = (p - splitTime) / (1.0 - splitTime);
+        const cushion = 1.0 - Math.pow(1.0 - t, 4.0);
+        return splitDistance + (1.0 - splitDistance) * cushion;
+      }
+    }
 
     const arcState = { progress: 0.0 };
 
     tl.to(arcState, {
       progress: 1.0,
-      duration: 3.5,
-      ease: 'power2.inOut',
+      duration: TOTAL_APPROACH_DURATION,
+      ease: approachWithFinalDistanceCushionEase,
       onUpdate: () => {
         const t = arcState.progress;
         // Evaluate continuous 3D spatial position
@@ -795,32 +828,32 @@ export function initScene1() {
       }
     }, 1.5);
 
-    // Step 3: Procedural background crossfade & space transition as camera nests on the hull (t = 4.2s to 5.5s)
+    // Step 3: Procedural background crossfade & space transition as camera nests on the hull (t = 4.5s to 6.3s)
     if (cosmosBackground && cosmosBackground.fadeOut) {
-      cosmosBackground.fadeOut(1.3, tl, 4.2);
+      cosmosBackground.fadeOut(1.8, tl, 4.5);
     }
     tl.to(scene.background, {
       r: 2 / 255,
       g: 2 / 255,
       b: 5 / 255,
-      duration: 1.3,
+      duration: 1.8,
       ease: 'power2.inOut'
-    }, 4.2);
+    }, 4.5);
 
     tl.add(() => {
       if (earthLandingManager) {
         earthLandingManager.spaceGroup.visible = true;
       }
-    }, 4.2);
+    }, 4.5);
     ENGINE_STATE.starsOpacity = 0.0;
-    tl.to(ENGINE_STATE, { starsOpacity: 1.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    tl.to(ENGINE_STATE, { starsOpacity: 1.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
 
-    // Smoothly dissolve station body + gantry (t = 4.2s to 5.5s)
+    // Smoothly dissolve station body + gantry (t = 4.5s to 6.3s)
     if (stationModel) {
       stationModel.traverse((node) => {
         if (node.isMesh && node.material) {
           node.material.transparent = true;
-          tl.to(node.material, { opacity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+          tl.to(node.material, { opacity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
         }
       });
     }
@@ -833,83 +866,37 @@ export function initScene1() {
       if (cursiveTextInstance && cursiveTextInstance.group) cursiveTextInstance.group.visible = false;
       if (lidOverlayMesh) lidOverlayMesh.visible = false;
       if (cosmosBackground && cosmosBackground.group) cosmosBackground.group.visible = false;
-    }, 5.5);
+    }, 6.3);
 
     // Fade out partial station lights smoothly
-    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
 
     if (earthLandingManager) {
-      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.8, ease: 'power2.inOut' }, 4.5);
     }
-    tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.3, ease: 'power2.inOut' }, 4.2);
-    if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
   }
 
   // ==========================================
-  // 11. INSPECTOR CONTROLS WIRING
+  // 11. INSPECTOR CONTROLS WIRING (HELPER)
   // ==========================================
-  const cameraInspector = document.getElementById('camera-inspector');
-  const settingsToggleBtn = document.getElementById('settings-toggle-btn');
-  const camPosVal = document.getElementById('cam-pos-val');
-  const camTargetVal = document.getElementById('cam-target-val');
-  const camFovVal = document.getElementById('cam-fov-val');
-  const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
-  const copyCamBtn = document.getElementById('copy-cam-btn');
-  const copyToast = document.getElementById('copy-toast');
-
-  settingsToggleBtn?.addEventListener('click', () => {
-    if (cameraInspector) {
-      cameraInspector.classList.toggle('inspector-hidden');
-    }
+  const sceneInspectorHelper = new SceneInspectorHelper({
+    camera,
+    controls,
+    bloomPass,
+    cursiveTextInstance,
+    techAvatarInstance,
+    hologramScreenInstance,
+    isTransitioningRef: () => isTransitioning
   });
-
-  document.querySelectorAll('.accordion-header').forEach((header) => {
-    header.addEventListener('click', () => {
-      const item = header.closest('.accordion-item');
-      if (item) item.classList.toggle('active');
-    });
-  });
-
-  toggleOrbitBtn?.addEventListener('click', () => {
-    controls.enabled = !controls.enabled;
-    const camStatus = document.getElementById('cam-status');
-    if (controls.enabled) {
-      toggleOrbitBtn.innerText = 'DISABLE FREE CAM';
-      if (camStatus) camStatus.innerText = 'FREE_ORBIT_ENABLED';
-    } else {
-      toggleOrbitBtn.innerText = 'ENABLE FREE CAM';
-      if (camStatus) camStatus.innerText = isTransitioning ? 'EXTERIOR_VIEW' : 'INTERIOR_VIEW';
-    }
-  });
-
-  copyCamBtn?.addEventListener('click', () => {
-    const posX = camera.position.x.toFixed(2);
-    const posY = camera.position.y.toFixed(2);
-    const posZ = camera.position.z.toFixed(2);
-
-    const targetX = controls.target.x.toFixed(2);
-    const targetY = controls.target.y.toFixed(2);
-    const targetZ = controls.target.z.toFixed(2);
-
-    const codeSnippet = `const INTERIOR_CAM_POS = new THREE.Vector3(${posX}, ${posY}, ${posZ});\nconst INTERIOR_LOOK_TARGET = new THREE.Vector3(${targetX}, ${targetY}, ${targetZ});`;
-
-    navigator.clipboard.writeText(codeSnippet).then(() => {
-      console.log('[CAMERA INSPECTOR] Coordinates copied to clipboard:\n' + codeSnippet);
-    }).catch(() => {});
-
-    if (copyToast) {
-      copyToast.style.display = 'block';
-      setTimeout(() => {
-        copyToast.style.display = 'none';
-      }, 2500);
-    }
-  });
+  window.sceneInspectorHelper = sceneInspectorHelper;
 
   // Warp Action Buttons (Rocket Base Free Cam & Warp Sequence)
   const igniteWarpBtn = document.getElementById('ignite-warp-btn');
@@ -919,6 +906,7 @@ export function initScene1() {
   igniteWarpBtn?.addEventListener('click', () => {
     const warpActionContainer = document.getElementById('warp-action-container');
     if (warpActionContainer) warpActionContainer.classList.add('warp-action-hidden');
+    rocketAlignmentHelper.setEnabled(false);
     controls.enabled = false;
     const camStatus = document.getElementById('cam-status');
     if (camStatus) camStatus.innerText = 'WARP_IGNITION_ACTIVE';
@@ -931,9 +919,9 @@ export function initScene1() {
 
   resetBaseCamBtn?.addEventListener('click', () => {
     gsap.to(camera.position, {
-      x: 38.38948,
-      y: -8.53400,
-      z: 30.21334,
+      x: 38.69034,
+      y: -8.56499,
+      z: 30.52824,
       duration: 0.8,
       ease: 'power2.inOut'
     });
@@ -956,184 +944,10 @@ export function initScene1() {
     const fullStr = `PAD_CAM_POS = ${posStr};\nPAD_CAM_LOOK = ${lookStr};\nPAD_CAM_UP = new THREE.Vector3(${camera.up.x.toFixed(2)}, ${camera.up.y.toFixed(2)}, ${camera.up.z.toFixed(2)});`;
     navigator.clipboard.writeText(fullStr);
     console.log('[CAMERA COPIED]:\n' + fullStr);
+    const copyToast = document.getElementById('copy-toast');
     if (copyToast) {
       copyToast.style.display = 'block';
       setTimeout(() => { copyToast.style.display = 'none'; }, 2500);
-    }
-  });
-
-  // Bloom controls
-  const bloomStrengthSlider = document.getElementById('bloom-strength-slider');
-  const bloomThresholdSlider = document.getElementById('bloom-threshold-slider');
-  const bloomStrengthVal = document.getElementById('bloom-strength-val');
-  const bloomThresholdVal = document.getElementById('bloom-threshold-val');
-
-  bloomStrengthSlider?.addEventListener('input', () => {
-    const val = parseFloat(bloomStrengthSlider.value);
-    bloomPass.strength = val;
-    if (bloomStrengthVal) bloomStrengthVal.innerText = val.toFixed(2);
-  });
-
-  bloomThresholdSlider?.addEventListener('input', () => {
-    const val = parseFloat(bloomThresholdSlider.value);
-    bloomPass.threshold = val;
-    if (bloomThresholdVal) bloomThresholdVal.innerText = val.toFixed(2);
-  });
-
-  // Cursive Text controls
-  const textScaleSlider = document.getElementById('text-scale-slider');
-  const textXSlider = document.getElementById('text-x-slider');
-  const textYSlider = document.getElementById('text-y-slider');
-  const textZSlider = document.getElementById('text-z-slider');
-  const textRotYSlider = document.getElementById('text-roty-slider');
-
-  const textScaleVal = document.getElementById('text-scale-val');
-  const textXVal = document.getElementById('text-x-val');
-  const textYVal = document.getElementById('text-y-val');
-  const textZVal = document.getElementById('text-z-val');
-  const textRotYVal = document.getElementById('text-roty-val');
-
-  function updateTextTransformFromSliders() {
-    if (!cursiveTextInstance) return;
-    const scale = parseFloat(textScaleSlider.value);
-    const x = parseFloat(textXSlider.value);
-    const y = parseFloat(textYSlider.value);
-    const z = parseFloat(textZSlider.value);
-    const rotY = parseFloat(textRotYSlider.value);
-
-    cursiveTextInstance.group.scale.set(scale, scale, scale);
-    cursiveTextInstance.group.position.set(x, y, z);
-    cursiveTextInstance.group.rotation.set(0, rotY, 0);
-
-    if (textScaleVal) textScaleVal.innerText = scale.toFixed(2);
-    if (textXVal) textXVal.innerText = x.toFixed(2);
-    if (textYVal) textYVal.innerText = y.toFixed(2);
-    if (textZVal) textZVal.innerText = z.toFixed(2);
-    if (textRotYVal) textRotYVal.innerText = rotY.toFixed(2);
-  }
-
-  textScaleSlider?.addEventListener('input', updateTextTransformFromSliders);
-  textXSlider?.addEventListener('input', updateTextTransformFromSliders);
-  textYSlider?.addEventListener('input', updateTextTransformFromSliders);
-  textZSlider?.addEventListener('input', updateTextTransformFromSliders);
-  textRotYSlider?.addEventListener('input', updateTextTransformFromSliders);
-
-  // Avatar controls
-  const avatarScaleSlider = document.getElementById('avatar-scale-slider');
-  const avatarXSlider = document.getElementById('avatar-x-slider');
-  const avatarYSlider = document.getElementById('avatar-y-slider');
-  const avatarZSlider = document.getElementById('avatar-z-slider');
-  const avatarRotXSlider = document.getElementById('avatar-rotx-slider');
-  const avatarRotYSlider = document.getElementById('avatar-roty-slider');
-  const avatarRotZSlider = document.getElementById('avatar-rotz-slider');
-
-  const avatarScaleVal = document.getElementById('avatar-scale-val');
-  const avatarXVal = document.getElementById('avatar-x-val');
-  const avatarYVal = document.getElementById('avatar-y-val');
-  const avatarZVal = document.getElementById('avatar-z-val');
-  const avatarRotXVal = document.getElementById('avatar-rotx-val');
-  const avatarRotYVal = document.getElementById('avatar-roty-val');
-  const avatarRotZVal = document.getElementById('avatar-rotz-val');
-
-  function updateAvatarTransformFromSliders() {
-    if (!techAvatarInstance || !techAvatarInstance.group) return;
-    const scale = parseFloat(avatarScaleSlider.value);
-    const x = parseFloat(avatarXSlider.value);
-    const y = parseFloat(avatarYSlider.value);
-    const z = parseFloat(avatarZSlider.value);
-    const rotX = parseFloat(avatarRotXSlider.value);
-    const rotY = parseFloat(avatarRotYSlider.value);
-    const rotZ = parseFloat(avatarRotZSlider.value);
-
-    techAvatarInstance.group.scale.set(scale, scale, scale);
-    techAvatarInstance.group.position.set(x, y, z);
-    techAvatarInstance.group.rotation.set(rotX, rotY, rotZ);
-
-    if (avatarScaleVal) avatarScaleVal.innerText = scale.toFixed(2);
-    if (avatarXVal) avatarXVal.innerText = x.toFixed(2);
-    if (avatarYVal) avatarYVal.innerText = y.toFixed(2);
-    if (avatarZVal) avatarZVal.innerText = z.toFixed(2);
-    if (avatarRotXVal) avatarRotXVal.innerText = rotX.toFixed(2);
-    if (avatarRotYVal) avatarRotYVal.innerText = rotY.toFixed(2);
-    if (avatarRotZVal) avatarRotZVal.innerText = rotZ.toFixed(2);
-  }
-
-  avatarScaleSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-  avatarXSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-  avatarYSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-  avatarZSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-  avatarRotXSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-  avatarRotYSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-  avatarRotZSlider?.addEventListener('input', updateAvatarTransformFromSliders);
-
-  const avatarSkinPicker = document.getElementById('avatar-skin-picker');
-  avatarSkinPicker?.addEventListener('input', () => {
-    if (techAvatarInstance && techAvatarInstance.setSkinColor) {
-      techAvatarInstance.setSkinColor(avatarSkinPicker.value);
-    }
-  });
-
-  // Hologram screen controls
-  const hologramScaleSlider = document.getElementById('hologram-scale-slider');
-  const hologramXSlider = document.getElementById('hologram-x-slider');
-  const hologramYSlider = document.getElementById('hologram-y-slider');
-  const hologramZSlider = document.getElementById('hologram-z-slider');
-  const hologramRotXSlider = document.getElementById('hologram-rotx-slider');
-  const hologramRotYSlider = document.getElementById('hologram-roty-slider');
-  const hologramRotZSlider = document.getElementById('hologram-rotz-slider');
-  const hologramHoverBrightSlider = document.getElementById('hologram-hoverbright-slider');
-
-  const hologramScaleVal = document.getElementById('hologram-scale-val');
-  const hologramXVal = document.getElementById('hologram-x-val');
-  const hologramYVal = document.getElementById('hologram-y-val');
-  const hologramZVal = document.getElementById('hologram-z-val');
-  const hologramRotXVal = document.getElementById('hologram-rotx-val');
-  const hologramRotYVal = document.getElementById('hologram-roty-val');
-  const hologramRotZVal = document.getElementById('hologram-rotz-val');
-  const hologramHoverBrightVal = document.getElementById('hologram-hoverbright-val');
-  const toggleHologramVisBtn = document.getElementById('toggle-hologram-vis-btn');
-
-  function updateHologramTransformFromSliders() {
-    if (!hologramScreenInstance || !hologramScreenInstance.group) return;
-    const scale = parseFloat(hologramScaleSlider.value);
-    const x = parseFloat(hologramXSlider.value);
-    const y = parseFloat(hologramYSlider.value);
-    const z = parseFloat(hologramZSlider.value);
-    const rotX = parseFloat(hologramRotXSlider.value);
-    const rotY = parseFloat(hologramRotYSlider.value);
-    const rotZ = parseFloat(hologramRotZSlider.value);
-    const hoverBright = parseFloat(hologramHoverBrightSlider?.value || 1.0);
-
-    hologramScreenInstance.group.scale.set(scale, scale, scale);
-    hologramScreenInstance.group.position.set(x, y, z);
-    hologramScreenInstance.group.rotation.set(rotX, rotY, rotZ);
-    hologramScreenInstance.setHoverBrightness(hoverBright);
-
-    if (hologramScaleVal) hologramScaleVal.innerText = scale.toFixed(2);
-    if (hologramXVal) hologramXVal.innerText = x.toFixed(2);
-    if (hologramYVal) hologramYVal.innerText = y.toFixed(2);
-    if (hologramZVal) hologramZVal.innerText = z.toFixed(2);
-    if (hologramRotXVal) hologramRotXVal.innerText = rotX.toFixed(2);
-    if (hologramRotYVal) hologramRotYVal.innerText = rotY.toFixed(2);
-    if (hologramRotZVal) hologramRotZVal.innerText = rotZ.toFixed(2);
-    if (hologramHoverBrightVal) hologramHoverBrightVal.innerText = hoverBright.toFixed(2);
-  }
-
-  hologramScaleSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramXSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramYSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramZSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramRotXSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramRotYSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramRotZSlider?.addEventListener('input', updateHologramTransformFromSliders);
-  hologramHoverBrightSlider?.addEventListener('input', updateHologramTransformFromSliders);
-
-  toggleHologramVisBtn?.addEventListener('click', () => {
-    if (!hologramScreenInstance) return;
-    if (hologramScreenInstance.isVisible) {
-      hologramScreenInstance.fadeOut(0.4);
-    } else {
-      hologramScreenInstance.fadeIn(0.4);
     }
   });
 
@@ -1184,14 +998,12 @@ export function initScene1() {
       }
     }
 
-    if (camPosVal) {
-      camPosVal.innerText = `${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)}`;
+    // Update Helpers
+    if (sceneInspectorHelper) {
+      sceneInspectorHelper.updateHUD();
     }
-    if (camTargetVal) {
-      camTargetVal.innerText = `${controls.target.x.toFixed(2)}, ${controls.target.y.toFixed(2)}, ${controls.target.z.toFixed(2)}`;
-    }
-    if (camFovVal) {
-      camFovVal.innerText = `${camera.fov.toFixed(0)}°`;
+    if (rocketAlignmentHelper) {
+      rocketAlignmentHelper.update();
     }
 
     composer.render();

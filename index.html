@@ -290,8 +290,38 @@
       </div>
       <div class="warp-action-btns">
         <button id="ignite-warp-btn" class="warp-btn ignite-warp-btn">🚀 IGNITE WARP SEQUENCE</button>
+        <button id="toggle-align-guide-btn" class="warp-btn align-guide-btn">🎯 ALIGNMENT GUIDES: OFF</button>
         <button id="reset-base-cam-btn" class="warp-btn reset-cam-btn">🎯 RESET 50/50 FRAMING</button>
         <button id="copy-base-cam-btn" class="warp-btn copy-cam-btn">📋 COPY CAMERA COORDS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen Center Reticle & Rocket Alignment Overlay -->
+  <div id="alignment-reticle-overlay" class="alignment-reticle-hidden">
+    <div class="reticle-crosshair-h"></div>
+    <div class="reticle-crosshair-v"></div>
+    <div class="reticle-target-ring">
+      <div class="reticle-inner-ring"></div>
+      <div class="reticle-center-dot"></div>
+      <div class="reticle-label">SCREEN CENTER (0, 0)</div>
+    </div>
+    <div id="alignment-telemetry-card">
+      <div class="telemetry-header">
+        <span class="telemetry-dot"></span>
+        <span class="telemetry-title">ALIGNMENT TELEMETRY</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">ROCKET TIP (NDC):</span>
+        <span id="telemetry-tip-coords" class="telemetry-val">0.000, 0.000</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">OFFSET TO CENTER:</span>
+        <span id="telemetry-delta" class="telemetry-val">0.000</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">ALIGNMENT STATE:</span>
+        <span id="telemetry-status-badge" class="badge-aligning">ALIGNING...</span>
       </div>
     </div>
   </div>

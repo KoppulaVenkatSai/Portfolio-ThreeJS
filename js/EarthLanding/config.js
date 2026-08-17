@@ -63,7 +63,7 @@ export const CONFIG = {
   // Camera coordinates relative to the rocket / world
   camera: {
     initial: {
-      pos: new THREE.Vector3(38.38948, -8.53400, 30.21334),
+      pos: new THREE.Vector3(38.69034, -8.56499, 30.52824),
       look: new THREE.Vector3(38.71423, -5.01504, 30.55209)
     },
     warp: {

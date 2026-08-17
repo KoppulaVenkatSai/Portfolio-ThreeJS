@@ -83,7 +83,7 @@ class CameraRigController {
         const travelDistance = Math.max(0.0, this.localYOffset - (-8.0));
         
         // Exact 50/50 starting frame on the launchpad (Zero tilt, zero yaw, zero pan)
-        _vPos.set(38.38948, -8.53400, 30.21334);
+        _vPos.set(38.69034, -8.56499, 30.52824);
         _vLook.set(38.71423, -5.01504, 30.55209);
         
         if (travelDistance > 0.0) {

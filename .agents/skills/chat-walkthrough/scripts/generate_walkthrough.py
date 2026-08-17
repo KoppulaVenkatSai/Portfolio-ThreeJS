@@ -4,6 +4,7 @@ import json
 import re
 import argparse
 import glob
+from datetime import datetime
 
 def parse_user_input(content):
     m_req = re.search(r'<USER_REQUEST>(.*?)</USER_REQUEST>', content, re.DOTALL)
@@ -59,22 +60,52 @@ def filter_response(resp):
     res = "\n".join(lines_filtered).strip()
     return res
 
-# Reconstruct system truncations
 def fix_truncations(text):
-    # Fix Turn 13 truncation
-    t13_old = 'Without changing any code, we can modify the threshold map to capture \n<truncated 359 bytes>\nthon\n"reheater_outlet_temperature_hot_reheat": 1,        # Detects the clamped -1.27% drop'
-    t13_new = 'Without changing any code, we can modify the threshold map to capture these small deviations. In `average_deviation_thresholds_map` in both `AiFeatures.py` and `mimic_check_status.py`, we can override the default 5% thresholds for the specific tags that are affected by clamping to lower values:\n\n```python\n"reheater_outlet_temperature_hot_reheat": 1,        # Detects the clamped -1.27% drop'
-    text = text.replace(t13_old, t13_new)
-    
-    # Fix Turn 15 truncation
-    t15_old = '6. The Python deviation script splits \n<truncated 420 bytes>\ning this threshold to $15\\%$ is **essential** because of the following:'
-    t15_new = '6. The Python deviation script splits the data into 5-point batches. Since there are 26 data points in total, the final batch has only 1 point. This 1-second lag at index 25 calculates a -12.73% deviation. Because the batch size is 1, the average deviation of that batch is also -12.73%, crossing the default 5% threshold and classifying the tag as decreases. Therefore, raising this threshold to $15\\%$ is **essential** because of the following:'
-    text = text.replace(t15_old, t15_new)
-    
     return text
 
+def generate_relevant_filename(convo_turns, convo_id=None):
+    stop_words = {
+        "the", "a", "an", "and", "or", "to", "in", "for", "with", "on", "at", "by",
+        "from", "of", "it", "this", "that", "i", "we", "you", "my", "me", "can",
+        "now", "just", "please", "update", "run", "do", "how", "what", "is", "are",
+        "good", "great", "yes", "no", "not", "too", "have", "ahve", "also", "look",
+        "into", "lets", "let", "set", "add", "all", "back", "more", "users", "venkat",
+        "desktop", "other", "projects", "threetest", "portfolio", "threejs", "chat",
+        "history", "walkthrough", "markdown", "file", "skill", "checkpoint", "relevent",
+        "relevant", "remind", "work", "store", "new", "name"
+    }
+    
+    keywords = []
+    for turn in convo_turns:
+        user_text = turn.get("user", "")
+        # Filter out path-like tokens and mentions
+        user_text = re.sub(r'/[^\s]+', ' ', user_text)
+        user_text = re.sub(r'@\[[^\]]+\]', ' ', user_text)
+        clean_text = re.sub(r'[^a-zA-Z\s]', ' ', user_text)
+        words = [w.lower() for w in clean_text.split() if w.lower() not in stop_words and len(w) >= 3]
+        keywords.extend(words)
+    
+    seen = set()
+    selected = []
+    for k in keywords:
+        if k not in seen:
+            seen.add(k)
+            selected.append(k)
+        if len(selected) >= 5:
+            break
+            
+    slug = "_".join(selected) if selected else "session"
+    base_name = f"chat_walkthrough_{slug}"
+    
+    filename = f"{base_name}.md"
+    if os.path.exists(filename):
+        time_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{base_name}_{time_str}.md"
+        
+    return filename
+
 def main():
-    parser = argparse.ArgumentParser(description="Generate polished chat logs.")
+    parser = argparse.ArgumentParser(description="Generate polished chat walkthrough markdown.")
     parser.add_argument("--transcript", help="Path to transcript.jsonl")
     parser.add_argument("--output", help="Path to write the markdown walkthrough file")
     parser.add_argument("--convo-id", help="Conversation ID to extract")
@@ -84,11 +115,11 @@ def main():
     
     # Resolve transcript path
     transcript_path = args.transcript
+    convo_id = args.convo_id
     if not transcript_path:
-        if args.convo_id:
-            transcript_path = os.path.join(brain_dir, args.convo_id, ".system_generated", "logs", "transcript.jsonl")
+        if convo_id:
+            transcript_path = os.path.join(brain_dir, convo_id, ".system_generated", "logs", "transcript.jsonl")
         else:
-            # Auto-detect latest
             pattern = os.path.join(brain_dir, "*", ".system_generated", "logs", "transcript.jsonl")
             candidates = glob.glob(pattern)
             if not candidates:
@@ -96,16 +127,12 @@ def main():
                 return
             candidates.sort(key=os.path.getmtime, reverse=True)
             transcript_path = candidates[0]
+            convo_id = transcript_path.split("/")[-4]
             print(f"Auto-detected active transcript: {transcript_path}")
 
     if not os.path.exists(transcript_path):
         print(f"Error: Transcript file not found at {transcript_path}")
         return
-
-    # Resolve output path
-    output_path = args.output
-    if not output_path:
-        output_path = os.path.join(os.getcwd(), "chat_history_walkthrough.md")
 
     try:
         with open(transcript_path, "r", encoding="utf-8") as f:
@@ -159,28 +186,28 @@ def main():
             "model": final_response if final_response else "*(Response pending)*"
         })
 
+    # Resolve output path dynamically
+    output_path = args.output
+    if not output_path:
+        filename = generate_relevant_filename(convo_turns, convo_id)
+        output_path = os.path.join(os.getcwd(), filename)
+
     # Format into Markdown
-    md_content = """# Chat Log: Chronological Walkthrough & Analysis
-
-This document contains a highly detailed, chronological step-by-step history of all user queries and final model responses discussed and performed in this session.
-
----
-
-"""
+    title_slug = os.path.basename(output_path).replace(".md", "").replace("chat_walkthrough_", "").replace("_", " ").title()
+    md_content = f"# Chat Walkthrough: {title_slug}\n\n"
+    md_content += f">> **Conversation ID**: `{convo_id}`  \n"
+    md_content += f">> **Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  \n"
+    md_content += f">> **Total Turns**: {len(convo_turns)}\n\n"
+    md_content += "---\n\n"
 
     for idx, turn in enumerate(convo_turns, 1):
         user_text = turn["user"]
         model_text = turn["model"]
         
-        # Clean last turn response if running on the active chat to provide a meaningful result
-        if idx == len(convo_turns) and "create a skill for this" in user_text.lower():
-            model_text = f"I have successfully created the `chat-walkthrough` skill under the global directory. You can run this skill at any time using: `python3 /Users/venkat/.gemini/antigravity-ide/skills/chat-walkthrough/scripts/generate_walkthrough.py`."
-        else:
-            model_text = fix_truncations(model_text)
-        
+        model_text = fix_truncations(model_text)
         model_text = re.sub(r'\n{3,}', '\n\n', model_text)
         
-        md_content += f"## Turn {idx}: User Query / Input\n\n"
+        md_content += f"## Turn {idx}: User Request\n\n"
         if not user_text.startswith("**[Artifact"):
             md_content += f"> {user_text}\n\n"
         else:
@@ -194,7 +221,7 @@ This document contains a highly detailed, chronological step-by-step history of 
     try:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(md_content)
-        print(f"Successfully generated chat history walkthrough at {output_path}!")
+        print(f"Successfully generated chat history walkthrough at: {output_path}")
         print(f"Total turns extracted: {len(convo_turns)}")
     except Exception as e:
         print(f"Error writing output file: {e}")
