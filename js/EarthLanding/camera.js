@@ -91,9 +91,7 @@ class CameraRigController {
         _vLook.copy(_vLocalLookPos).applyMatrix4(rocket.matrixWorld);
         
         this.setTarget(_vPos, _vLook);
-        
-        _vCameraUp.copy(_vLocalUp).transformDirection(rocket.matrixWorld);
-        camera.up.copy(_vCameraUp);
+        camera.up.set(0.0, 1.0, 0.0);
       } else if (sc === "STORM") {
         if (!this.stormDetachPos) {
           rocket.updateMatrixWorld();

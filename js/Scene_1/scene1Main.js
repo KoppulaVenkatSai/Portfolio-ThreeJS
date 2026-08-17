@@ -694,7 +694,6 @@ export function initScene1() {
     // Vertical 50/50 Camera Framing on the Rocket Hull (looking up towards the tip)
     const PAD_CAM_POS = new THREE.Vector3(37.67234, -9.11449, 28.00000);
     const PAD_CAM_LOOK = new THREE.Vector3(38.29568, -4.81399, 28.33846);
-    const PAD_CAM_UP = new THREE.Vector3(0.0, 0.0, -1.0);
 
     const tl = gsap.timeline({
       onComplete: () => {
@@ -736,42 +735,43 @@ export function initScene1() {
       });
     }, 1.5);
 
-    // Step 2: Camera glides to rocket hull in vertical 50/50 framing looking at rocket tip (t = 1.5s to 3.8s)
-    tl.to(camera.position, {
-      x: PAD_CAM_POS.x,
-      y: PAD_CAM_POS.y,
-      z: PAD_CAM_POS.z,
-      duration: 2.3,
-      ease: 'power3.inOut',
+    // Step 2: Camera flies along a unified 3D curved arc bulging under the rocket with continuous gaze curvature
+    const pStart = camera.position.clone();
+    const pC1 = new THREE.Vector3(6.0, 6.0, 66.0); // Forward & downward swoop
+    const pC2 = new THREE.Vector3(24.0, -14.0, 46.0); // Bulge under the rocket launchpad
+    const pEnd = PAD_CAM_POS.clone();
+    const posCurve = new THREE.CubicBezierCurve3(pStart, pC1, pC2, pEnd);
+
+    // Continuous 3D Look Curve (seamlessly arcs gaze from station -> pad -> rocket tip)
+    const lStart = currentLookTarget.clone();
+    const lC1 = new THREE.Vector3(22.0, -3.0, 16.0); // Anticipates pad approach
+    const lC2 = new THREE.Vector3(38.0, -6.0, 26.0); // Rocket fuselage base
+    const lEnd = PAD_CAM_LOOK.clone(); // Rocket tip in 50/50 vertical framing
+    const lookCurve = new THREE.CubicBezierCurve3(lStart, lC1, lC2, lEnd);
+
+    const arcState = { progress: 0.0 };
+
+    tl.to(arcState, {
+      progress: 1.0,
+      duration: 3.5,
+      ease: 'power2.inOut',
       onUpdate: () => {
+        const t = arcState.progress;
+        // Evaluate continuous 3D spatial position
+        posCurve.getPoint(t, camera.position);
+        lookCurve.getPoint(t, currentLookTarget);
+
+        // Strictly locked World Up - ZERO twist, ZERO barrel roll, ZERO world rotation
+        camera.up.set(0.0, 1.0, 0.0);
+
         camera.lookAt(currentLookTarget);
         if (controls) controls.target.copy(currentLookTarget);
       }
     }, 1.5);
 
-    tl.to(currentLookTarget, {
-      x: PAD_CAM_LOOK.x,
-      y: PAD_CAM_LOOK.y,
-      z: PAD_CAM_LOOK.z,
-      duration: 2.3,
-      ease: 'power3.inOut',
-      onUpdate: () => {
-        camera.lookAt(currentLookTarget);
-        if (controls) controls.target.copy(currentLookTarget);
-      }
-    }, 1.5);
-
-    tl.to(camera.up, {
-      x: PAD_CAM_UP.x,
-      y: PAD_CAM_UP.y,
-      z: PAD_CAM_UP.z,
-      duration: 2.3,
-      ease: 'power3.inOut'
-    }, 1.5);
-
-    // Step 3: Procedural background crossfade & space transition (t = 3.5s to 4.8s)
+    // Step 3: Procedural background crossfade & space transition as camera nests on the hull (t = 4.2s to 5.5s)
     if (cosmosBackground && cosmosBackground.fadeOut) {
-      cosmosBackground.fadeOut(1.3, tl, 3.5);
+      cosmosBackground.fadeOut(1.3, tl, 4.2);
     }
     tl.to(scene.background, {
       r: 2 / 255,
@@ -779,22 +779,22 @@ export function initScene1() {
       b: 5 / 255,
       duration: 1.3,
       ease: 'power2.inOut'
-    }, 3.5);
+    }, 4.2);
 
     tl.add(() => {
       if (earthLandingManager) {
         earthLandingManager.spaceGroup.visible = true;
       }
-    }, 3.5);
+    }, 4.2);
     ENGINE_STATE.starsOpacity = 0.0;
-    tl.to(ENGINE_STATE, { starsOpacity: 1.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
+    tl.to(ENGINE_STATE, { starsOpacity: 1.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
 
-    // Smoothly dissolve station body + gantry (t = 3.5s to 4.8s)
+    // Smoothly dissolve station body + gantry (t = 4.2s to 5.5s)
     if (stationModel) {
       stationModel.traverse((node) => {
         if (node.isMesh && node.material) {
           node.material.transparent = true;
-          tl.to(node.material, { opacity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
+          tl.to(node.material, { opacity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
         }
       });
     }
@@ -807,22 +807,22 @@ export function initScene1() {
       if (cursiveTextInstance && cursiveTextInstance.group) cursiveTextInstance.group.visible = false;
       if (lidOverlayMesh) lidOverlayMesh.visible = false;
       if (cosmosBackground && cosmosBackground.group) cosmosBackground.group.visible = false;
-    }, 4.8);
+    }, 5.5);
 
     // Fade out partial station lights smoothly
-    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
+    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
 
     if (earthLandingManager) {
-      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.3, ease: 'power2.inOut' }, 3.5);
+      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.3, ease: 'power2.inOut' }, 4.2);
     }
-    tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.3, ease: 'power2.inOut' }, 3.5);
-    if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.3, ease: 'power2.inOut' }, 3.5);
+    tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.3, ease: 'power2.inOut' }, 4.2);
+    if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.3, ease: 'power2.inOut' }, 4.2);
   }
 
   // ==========================================

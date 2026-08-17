@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trajectory & Angle 3D Visualizer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #030712; color: #f9fafb; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+    
+    #viewport-container { flex: 1; position: relative; width: 100%; height: 100%; }
+    #main-canvas { width: 100%; height: 100%; display: block; }
+    
+    /* PiP Camera POV */
+    #pip-container {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      width: 320px;
+      height: 180px;
+      border: 2px solid #38bdf8;
+      border-radius: 8px;
+      background: #000;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.8);
+      z-index: 10;
+    }
+    #pip-canvas { width: 100%; height: 100%; display: block; }
+    #pip-label {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      background: rgba(0,0,0,0.7);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #38bdf8;
+      letter-spacing: 0.5px;
+    }
+    
+    /* HUD Info Panel */
+    #info-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 16px;
+      border-radius: 8px;
+      width: 380px;
+      z-index: 10;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    h2 { font-size: 16px; font-weight: 700; color: #38bdf8; margin-bottom: 8px; }
+    .phase-badge {
+      display: inline-block;
+      background: #0284c7;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+    .data-card { background: rgba(30, 41, 59, 0.6); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); }
+    .data-title { color: #94a3b8; font-size: 11px; margin-bottom: 2px; }
+    .data-val { color: #f1f5f9; font-weight: 600; font-family: monospace; font-size: 12px; }
+    .highlight { color: #38bdf8; }
+    
+    /* Bottom Controls */
+    #controls-bar {
+      height: 90px;
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      padding: 12px 24px;
+      gap: 8px;
+      z-index: 20;
+    }
+    .slider-row { display: flex; align-items: center; gap: 16px; width: 100%; }
+    input[type=range] { flex: 1; accent-color: #38bdf8; cursor: pointer; height: 6px; }
+    .time-display { font-family: monospace; font-size: 14px; font-weight: 700; color: #38bdf8; min-width: 65px; }
+    .btn-row { display: flex; gap: 12px; align-items: center; }
+    button {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover { background: #334155; border-color: #38bdf8; }
+    button.active { background: #0284c7; border-color: #38bdf8; color: #fff; }
+    .legend { margin-left: auto; font-size: 11px; color: #64748b; display: flex; gap: 16px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="viewport-container">
+    <canvas id="main-canvas"></canvas>
+    
+    <div id="pip-container">
+      <canvas id="pip-canvas"></canvas>
+      <div id="pip-label">CAMERA POV (ACTIVE VIEW)</div>
+    </div>
+    
+    <div id="info-panel">
+      <h2>DESTINATION & WARP TIMELINE</h2>
+      <div id="phase-badge" class="phase-badge">Phase 1: Exterior View</div>
+      <div class="data-grid">
+        <div class="data-card">
+          <div class="data-title">Camera Position (X, Y, Z)</div>
+          <div id="cam-pos-val" class="data-val">-12.68, 29.89, 78.14</div>
+        </div>
+        <div class="data-card">
+          <div class="data-title">Camera Look Target</div>
+          <div id="cam-look-val" class="data-val">0.00, 0.00, 0.00</div>
+        </div>
+        <div class="data-card">
+          <div class="data-title">Camera Pitch Angle</div>
+          <div id="cam-pitch-val" class="data-val highlight">-20.7° (Looking Down)</div>
+        </div>
+        <div class="data-card">
+          <div class="data-title">Camera Up Vector</div>
+          <div id="cam-up-val" class="data-val">0.0, 1.0, 0.0 (Anchored)</div>
+        </div>
+        <div class="data-card">
+          <div class="data-title">Rocket Position</div>
+          <div id="rocket-pos-val" class="data-val">42.0, -6.3, 30.0</div>
+        </div>
+        <div class="data-card">
+          <div class="data-title">Rocket Pitch (Orientation)</div>
+          <div id="rocket-rot-val" class="data-val highlight">0.0° (Upright Launchpad)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="controls-bar">
+    <div class="slider-row">
+      <button id="play-btn">PLAY</button>
+      <input id="time-slider" type="range" min="0" max="22.3" step="0.05" value="0">
+      <div id="time-val" class="time-display">0.00 s</div>
+    </div>
+    <div class="btn-row">
+      <button class="step-btn" data-time="0.0">0.0s Exterior</button>
+      <button class="step-btn" data-time="3.5">3.5s Swoop Under</button>
+      <button class="step-btn" data-time="5.5">5.5s Pad Arrival</button>
+      <button class="step-btn" data-time="7.0">7.0s Warp Start</button>
+      <button class="step-btn" data-time="8.7">8.7s Mid-Bank (45°)</button>
+      <button class="step-btn" data-time="10.5">10.5s Cruise (90°)</button>
+      <button class="step-btn" data-time="22.3">22.3s Earth Reveal</button>
+
+      <div class="legend">
+        <div class="legend-item"><span class="dot" style="background:#f59e0b;"></span> Swoop Arc</div>
+        <div class="legend-item"><span class="dot" style="background:#38bdf8;"></span> Camera Rig</div>
+        <div class="legend-item"><span class="dot" style="background:#10b981;"></span> Look Target</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // 1. Setup Main Overview Renderer
+    const mainCanvas = document.getElementById('main-canvas');
+    const mainRenderer = new THREE.WebGLRenderer({ canvas: mainCanvas, antialias: true });
+    mainRenderer.setPixelRatio(window.devicePixelRatio);
+    mainRenderer.setSize(mainCanvas.clientWidth, mainCanvas.clientHeight);
+
+    // 2. Setup PiP Camera Renderer
+    const pipCanvas = document.getElementById('pip-canvas');
+    const pipRenderer = new THREE.WebGLRenderer({ canvas: pipCanvas, antialias: true });
+    pipRenderer.setPixelRatio(window.devicePixelRatio);
+    pipRenderer.setSize(pipCanvas.clientWidth, pipCanvas.clientHeight);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x050811);
+    scene.fog = new THREE.FogExp2(0x050811, 0.004);
+
+    // Lights
+    const ambLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight.position.set(50, 100, 50);
+    scene.add(dirLight);
+
+    // Grid Floor
+    const grid = new THREE.GridHelper(200, 50, 0x1e293b, 0x0f172a);
+    grid.position.y = -20;
+    scene.add(grid);
+
+    // Main Perspective Free Orbit Camera
+    const mainCamera = new THREE.PerspectiveCamera(50, mainCanvas.clientWidth / mainCanvas.clientHeight, 0.1, 1000);
+    mainCamera.position.set(70, 45, 110);
+    const mainControls = new OrbitControls(mainCamera, mainCanvas);
+    mainControls.target.set(25, 0, 35);
+    mainControls.update();
+
+    // Scene Cinematic POV Camera (Driven by Timeline)
+    const povCamera = new THREE.PerspectiveCamera(45, pipCanvas.clientWidth / pipCanvas.clientHeight, 0.1, 1000);
+    scene.add(povCamera);
+
+    // Visual Helpers: Camera Frustum Cone & Look Indicator
+    const camConeGeom = new THREE.ConeGeometry(2.0, 5.0, 16);
+    camConeGeom.rotateX(Math.PI / 2);
+    const camConeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
+    const camMarker = new THREE.Mesh(camConeGeom, camConeMat);
+    scene.add(camMarker);
+
+    const lookMarkerGeom = new THREE.SphereGeometry(1.2, 16, 16);
+    const lookMarkerMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+    const lookMarker = new THREE.Mesh(lookMarkerGeom, lookMarkerMat);
+    scene.add(lookMarker);
+
+    // Line from Camera to Look Target
+    const lineGeom = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.7 });
+    const lookLine = new THREE.Line(lineGeom, lineMat);
+    scene.add(lookLine);
+
+    // Space Station Dummy Representation
+    const stationGroup = new THREE.Group();
+    const hubGeom = new THREE.CylinderGeometry(8, 8, 30, 24);
+    hubGeom.rotateZ(Math.PI / 2);
+    const hubMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+    const hub = new THREE.Mesh(hubGeom, hubMat);
+    stationGroup.add(hub);
+
+    // Gantry Arm to Pad
+    const armGeom = new THREE.BoxGeometry(42, 2.5, 3);
+    armGeom.translate(21, -6.25, 15);
+    const arm = new THREE.Mesh(armGeom, hubMat);
+    stationGroup.add(arm);
+
+    // Rocket Docking Pad
+    const padGeom = new THREE.CylinderGeometry(7.5, 7.5, 1.5, 32);
+    const padMat = new THREE.MeshStandardMaterial({ color: 0x0f2b5c, metalness: 0.9, roughness: 0.2 });
+    const pad = new THREE.Mesh(padGeom, padMat);
+    pad.position.set(42.0, -7.5, 30.0);
+    stationGroup.add(pad);
+    scene.add(stationGroup);
+
+    // Procedural Rocket Model Representation
+    const rocketGroup = new THREE.Group();
+    const bodyGeom = new THREE.CylinderGeometry(1.8, 1.8, 14.0, 24);
+    bodyGeom.translate(0, 7.0, 0); // Pivot at engine base
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd1d5db, metalness: 0.95, roughness: 0.05 });
+    const rocketBody = new THREE.Mesh(bodyGeom, bodyMat);
+    rocketGroup.add(rocketBody);
+
+    const noseGeom = new THREE.ConeGeometry(1.8, 4.5, 24);
+    noseGeom.translate(0, 16.25, 0);
+    const noseMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.8, roughness: 0.2 });
+    const nose = new THREE.Mesh(noseGeom, noseMat);
+    rocketGroup.add(nose);
+    scene.add(rocketGroup);
+
+    // Trajectory Curves
+    const pStart = new THREE.Vector3(-12.68, 29.89, 78.14);
+    const pC1 = new THREE.Vector3(6.0, 6.0, 66.0);
+    const pC2 = new THREE.Vector3(24.0, -14.0, 46.0);
+    const pEnd = new THREE.Vector3(37.67234, -9.11449, 28.00000);
+    const posCurve = new THREE.CubicBezierCurve3(pStart, pC1, pC2, pEnd);
+
+    const lStart = new THREE.Vector3(0.0, 0.0, 0.0);
+    const lC1 = new THREE.Vector3(22.0, -3.0, 16.0);
+    const lC2 = new THREE.Vector3(38.0, -6.0, 26.0);
+    const lEnd = new THREE.Vector3(38.29568, -4.81399, 28.33846);
+    const lookCurve = new THREE.CubicBezierCurve3(lStart, lC1, lC2, lEnd);
+
+    // Draw Arc Curves in 3D Scene
+    const arcPoints = posCurve.getPoints(50);
+    const arcLineGeom = new THREE.BufferGeometry().setFromPoints(arcPoints);
+    const arcLineMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 2 });
+    const arcLine = new THREE.Line(arcLineGeom, arcLineMat);
+    scene.add(arcLine);
+
+    // Rocket Pad & Flight Anchors
+    const padPos = new THREE.Vector3(42.0, -6.25, 30.0);
+    const flightPos = new THREE.Vector3(12.0, -1.0, -0.5);
+    const qStart = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0));
+    const qEnd = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180));
+    const qCurrent = new THREE.Quaternion();
+
+    const LOCAL_CAM = new THREE.Vector3(-4.32766, -2.86449, -2.00000);
+    const LOCAL_LOOK = new THREE.Vector3(-3.70432, 1.43601, -1.66154);
+
+    // UI Elements
+    const timeSlider = document.getElementById('time-slider');
+    const timeVal = document.getElementById('time-val');
+    const playBtn = document.getElementById('play-btn');
+    const phaseBadge = document.getElementById('phase-badge');
+    const camPosVal = document.getElementById('cam-pos-val');
+    const camLookVal = document.getElementById('cam-look-val');
+    const camPitchVal = document.getElementById('cam-pitch-val');
+    const rocketPosVal = document.getElementById('rocket-pos-val');
+    const rocketRotVal = document.getElementById('rocket-rot-val');
+
+    let currentTime = 0.0;
+    let isPlaying = false;
+
+    function updateSimulation(tTotal) {
+      const curCamPos = new THREE.Vector3();
+      const curLookTarget = new THREE.Vector3();
+      let phaseText = "";
+
+      if (tTotal <= 1.5) {
+        // Phase 1a: Exterior Still View (Station lights dim)
+        phaseText = "Phase 1: Exterior View (Lights Dimming)";
+        curCamPos.copy(pStart);
+        curLookTarget.copy(lStart);
+        rocketGroup.position.copy(padPos);
+        rocketGroup.rotation.set(0, 0, 0);
+        rocketGroup.scale.set(1.0, 1.0, 1.0);
+        stationGroup.visible = true;
+      } else if (tTotal <= 5.5) {
+        // Phase 1b: 3D Bulging Arc Swoop under rocket
+        phaseText = "Phase 1: Swooping Arc Under Rocket Pad";
+        const arcProgress = (tTotal - 1.5) / 4.0;
+        posCurve.getPoint(arcProgress, curCamPos);
+        lookCurve.getPoint(arcProgress, curLookTarget);
+        rocketGroup.position.copy(padPos);
+        rocketGroup.rotation.set(0, 0, 0);
+        rocketGroup.scale.set(1.0, 1.0, 1.0);
+        stationGroup.visible = true;
+      } else {
+        // Phase 2: EarthLanding Warp Timeline
+        stationGroup.visible = false;
+        const warpTime = tTotal - 5.5; // 0.0 to 16.8s
+
+        if (warpTime <= 1.5) {
+          // Vertical Warp Ignition
+          phaseText = "Phase 2: Vertical Warp Ignition (Top-to-Bottom)";
+          rocketGroup.position.copy(padPos);
+          rocketGroup.rotation.set(0, 0, 0);
+          rocketGroup.scale.set(1.0, 1.0, 1.0);
+          rocketGroup.updateMatrixWorld(true);
+
+          curCamPos.copy(LOCAL_CAM).applyMatrix4(rocketGroup.matrixWorld);
+          curLookTarget.copy(LOCAL_LOOK).applyMatrix4(rocketGroup.matrixWorld);
+        } else if (warpTime <= 5.0) {
+          // Hyperspace Bank (0 to 90 deg)
+          phaseText = "Phase 2: Hyperspace Banking Rotation";
+          const bankT = (warpTime - 1.5) / 3.5;
+          rocketGroup.position.lerpVectors(padPos, flightPos, bankT);
+          const s = THREE.MathUtils.lerp(1.0, 0.65, bankT);
+          rocketGroup.scale.set(s, s, s);
+          qCurrent.slerpQuaternions(qStart, qEnd, bankT);
+          rocketGroup.quaternion.copy(qCurrent);
+          rocketGroup.updateMatrixWorld(true);
+
+          curCamPos.copy(LOCAL_CAM).applyMatrix4(rocketGroup.matrixWorld);
+          curLookTarget.copy(LOCAL_LOOK).applyMatrix4(rocketGroup.matrixWorld);
+        } else if (warpTime <= 6.8) {
+          // Horizontal Flight settled before peak
+          phaseText = "Phase 2: Horizontal Cruise (90° Level Flight)";
+          rocketGroup.position.copy(flightPos);
+          rocketGroup.scale.set(0.65, 0.65, 0.65);
+          rocketGroup.quaternion.copy(qEnd);
+          rocketGroup.updateMatrixWorld(true);
+
+          curCamPos.copy(LOCAL_CAM).applyMatrix4(rocketGroup.matrixWorld);
+          curLookTarget.copy(LOCAL_LOOK).applyMatrix4(rocketGroup.matrixWorld);
+        } else {
+          // Camera Fly-Past at Peak Warp
+          phaseText = "Phase 2: Camera Fly-Past & Earth Silhouette Reveal";
+          rocketGroup.position.copy(flightPos);
+          rocketGroup.scale.set(0.65, 0.65, 0.65);
+          rocketGroup.quaternion.copy(qEnd);
+          rocketGroup.updateMatrixWorld(true);
+
+          const flyProgress = (warpTime - 6.8) / 10.0;
+          const flyDist = Math.min(58.0, flyProgress * 58.0);
+
+          const locCam = LOCAL_CAM.clone();
+          locCam.y += flyDist;
+          const locLook = LOCAL_LOOK.clone();
+          locLook.y += flyDist;
+
+          curCamPos.copy(locCam).applyMatrix4(rocketGroup.matrixWorld);
+          curLookTarget.copy(locLook).applyMatrix4(rocketGroup.matrixWorld);
+        }
+      }
+
+      // Update Active POV Camera (Permanently locked World Up - Zero twist / roll)
+      povCamera.position.copy(curCamPos);
+      povCamera.up.set(0.0, 1.0, 0.0);
+      povCamera.lookAt(curLookTarget);
+
+      // Update Visual Helper Markers
+      camMarker.position.copy(curCamPos);
+      camMarker.lookAt(curLookTarget);
+      lookMarker.position.copy(curLookTarget);
+
+      const linePosAttr = lookLine.geometry.attributes.position;
+      linePosAttr.setXYZ(0, curCamPos.x, curCamPos.y, curCamPos.z);
+      linePosAttr.setXYZ(1, curLookTarget.x, curLookTarget.y, curLookTarget.z);
+      linePosAttr.needsUpdate = true;
+
+      // Update HUD Values
+      const dir = curLookTarget.clone().sub(curCamPos).normalize();
+      const pitchDeg = (Math.asin(dir.y) * 180 / Math.PI).toFixed(1);
+      const rocketEuler = new THREE.Euler().setFromQuaternion(rocketGroup.quaternion, 'YXZ');
+      const rocketPitchDeg = (rocketEuler.x * 180 / Math.PI).toFixed(1);
+
+      phaseBadge.innerText = phaseText;
+      timeVal.innerText = tTotal.toFixed(2) + " s";
+      camPosVal.innerText = `${curCamPos.x.toFixed(1)}, ${curCamPos.y.toFixed(1)}, ${curCamPos.z.toFixed(1)}`;
+      camLookVal.innerText = `${curLookTarget.x.toFixed(1)}, ${curLookTarget.y.toFixed(1)}, ${curLookTarget.z.toFixed(1)}`;
+      camPitchVal.innerText = `${pitchDeg}° (${pitchDeg > 0 ? 'Looking Up' : 'Looking Down'})`;
+      rocketPosVal.innerText = `${rocketGroup.position.x.toFixed(1)}, ${rocketGroup.position.y.toFixed(1)}, ${rocketGroup.position.z.toFixed(1)}`;
+      rocketRotVal.innerText = `${rocketPitchDeg}° (${Math.abs(rocketPitchDeg) < 5 ? 'Upright' : Math.abs(rocketPitchDeg - 90) < 5 ? 'Horizontal Cruise' : 'Banking'})`;
+    }
+
+    // Event Listeners
+    timeSlider.addEventListener('input', (e) => {
+      currentTime = parseFloat(e.target.value);
+      updateSimulation(currentTime);
+    });
+
+    document.querySelectorAll('.step-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentTime = parseFloat(btn.dataset.time);
+        timeSlider.value = currentTime;
+        updateSimulation(currentTime);
+      });
+    });
+
+    playBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      playBtn.innerText = isPlaying ? 'PAUSE' : 'PLAY';
+      playBtn.classList.toggle('active', isPlaying);
+    });
+
+    // Main Render Loop
+    let lastTimestamp = performance.now();
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const delta = (now - lastTimestamp) / 1000;
+      lastTimestamp = now;
+
+      if (isPlaying) {
+        currentTime += delta * 1.5;
+        if (currentTime > 22.3) currentTime = 0.0;
+        timeSlider.value = currentTime;
+        updateSimulation(currentTime);
+      }
+
+      mainControls.update();
+      mainRenderer.render(scene, mainCamera);
+      pipRenderer.render(scene, povCamera);
+    }
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      const w = mainCanvas.clientWidth;
+      const h = mainCanvas.clientHeight;
+      mainRenderer.setSize(w, h);
+      mainCamera.aspect = w / h;
+      mainCamera.updateProjectionMatrix();
+    });
+
+    updateSimulation(0.0);
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

@@ -251,7 +251,15 @@ export class EarthLandingManager {
 
     if (this.rocketModel) {
       this.rocketModel.visible = true;
+      this.rocketModel.position.set(42.0, -6.25, 30.0);
+      this.rocketModel.rotation.set(0, 0, 0);
+      this.rocketModel.scale.set(1.0, 1.0, 1.0);
+      this.rocketModel.updateMatrixWorld(true);
     }
+
+    CAMERA_RIG.currentPos.copy(this.camera.position);
+    CAMERA_RIG.targetPos.copy(this.camera.position);
+    CAMERA_RIG.localYOffset = -8.0;
 
     if (this.cinematicTimeline) {
       this.cinematicTimeline.play(0);
