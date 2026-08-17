@@ -279,13 +279,13 @@
     const pStart = new THREE.Vector3(-12.68, 29.89, 78.14);
     const pC1 = new THREE.Vector3(6.0, 6.0, 66.0);
     const pC2 = new THREE.Vector3(24.0, -14.0, 46.0);
-    const pEnd = new THREE.Vector3(37.67234, -9.11449, 28.00000);
+    const pEnd = new THREE.Vector3(37.82203, -9.38523, 31.17224);
     const posCurve = new THREE.CubicBezierCurve3(pStart, pC1, pC2, pEnd);
 
     const lStart = new THREE.Vector3(0.0, 0.0, 0.0);
     const lC1 = new THREE.Vector3(22.0, -3.0, 16.0);
     const lC2 = new THREE.Vector3(38.0, -6.0, 26.0);
-    const lEnd = new THREE.Vector3(38.29568, -4.81399, 28.33846);
+    const lEnd = new THREE.Vector3(38.40633, -5.08115, 31.53408);
     const lookCurve = new THREE.CubicBezierCurve3(lStart, lC1, lC2, lEnd);
 
     // Draw Arc Curves in 3D Scene
@@ -302,8 +302,8 @@
     const qEnd = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180));
     const qCurrent = new THREE.Quaternion();
 
-    const LOCAL_CAM = new THREE.Vector3(-4.32766, -2.86449, -2.00000);
-    const LOCAL_LOOK = new THREE.Vector3(-3.70432, 1.43601, -1.66154);
+    const LOCAL_CAM = new THREE.Vector3(-4.17797, -3.13523, 1.17224);
+    const LOCAL_LOOK = new THREE.Vector3(-3.59367, 1.16885, 1.53408);
 
     // UI Elements
     const timeSlider = document.getElementById('time-slider');

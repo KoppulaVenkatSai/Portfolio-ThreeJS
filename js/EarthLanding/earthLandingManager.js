@@ -259,13 +259,16 @@ export class EarthLandingManager {
 
     CAMERA_RIG.currentPos.copy(this.camera.position);
     CAMERA_RIG.targetPos.copy(this.camera.position);
+    CAMERA_RIG.currentLook.set(38.71423, -5.01504, 30.55209);
+    CAMERA_RIG.targetLook.set(38.71423, -5.01504, 30.55209);
+    CAMERA_RIG.instantSnapNextFrame = true;
     CAMERA_RIG.localYOffset = -8.0;
 
     if (this.cinematicTimeline) {
       this.cinematicTimeline.play(0);
     }
 
-    console.log("[EARTH LANDING] Sequence ignited at 50/50 starting frame!");
+    console.log("[EARTH LANDING] Sequence ignited at 50/50 starting frame with zero 1-frame hitch!");
   }
 
   updateCubeNow() {

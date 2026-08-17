@@ -333,6 +333,13 @@ export function initScene1() {
           node.visible = false;
         }
 
+        // Hide all old built-in GLB rocket meshes (so only the standalone NewRocket.glb is rendered)
+        const isOldRocketNode = /rocket/i.test(nodeName);
+        if (isOldRocketNode) {
+          node.visible = false;
+          return;
+        }
+
         if (node.isMesh && node.material) {
           node.castShadow = true;
           node.receiveShadow = true;
@@ -691,19 +698,28 @@ export function initScene1() {
 
     console.log(`[DESTINATION SELECTION] Initiating sequence for ${targetName}...`);
 
-    // Vertical 50/50 Camera Framing on the Rocket Hull (looking up towards the tip)
-    const PAD_CAM_POS = new THREE.Vector3(37.67234, -9.11449, 28.00000);
-    const PAD_CAM_LOOK = new THREE.Vector3(38.29568, -4.81399, 28.33846);
+    // Vertical 50/50 Camera Framing on the Rocket Hull (user exact calibrated 50/50 state)
+    const PAD_CAM_POS = new THREE.Vector3(38.38948, -8.53400, 30.21334);
+    const PAD_CAM_LOOK = new THREE.Vector3(38.71423, -5.01504, 30.55209);
 
     const tl = gsap.timeline({
       onComplete: () => {
         isTransitioning = false;
         window.isTransitioning = false;
-        if (camStatus) camStatus.innerText = 'WARP_IGNITION_ACTIVE';
-        console.log('[DESTINATION SELECTION] Camera settled on rocket hull looking at tip. Igniting Vertical Warp!');
-        if (earthLandingManager) {
-          earthLandingManager.updateCubeNow();
-          earthLandingManager.startSequence();
+
+        // Re-enable free orbit controls around the rocket base so user can move camera freely
+        controls.enabled = true;
+        controls.target.copy(PAD_CAM_LOOK);
+        camera.up.set(0.0, 1.0, 0.0);
+        if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'DISABLE FREE CAM';
+
+        if (camStatus) camStatus.innerText = 'BASE_REACHED // FREE_CAM_ACTIVE';
+        console.log('[DESTINATION SELECTION] Camera reached rocket base. Free Cam is active!');
+
+        // Display the Warp Action HUD
+        const warpActionContainer = document.getElementById('warp-action-container');
+        if (warpActionContainer) {
+          warpActionContainer.classList.remove('warp-action-hidden');
         }
       }
     });
@@ -766,6 +782,16 @@ export function initScene1() {
 
         camera.lookAt(currentLookTarget);
         if (controls) controls.target.copy(currentLookTarget);
+
+        // Keep rocket in its natural upright launchpad stance
+        if (earthLandingManager && earthLandingManager.rocketModel) {
+          const r = earthLandingManager.rocketModel;
+          r.visible = true;
+          r.position.set(42.0, -6.25, 30.0);
+          r.scale.set(1.0, 1.0, 1.0);
+          r.rotation.set(0, 0, 0);
+          r.updateMatrixWorld(true);
+        }
       }
     }, 1.5);
 
@@ -882,6 +908,57 @@ export function initScene1() {
       setTimeout(() => {
         copyToast.style.display = 'none';
       }, 2500);
+    }
+  });
+
+  // Warp Action Buttons (Rocket Base Free Cam & Warp Sequence)
+  const igniteWarpBtn = document.getElementById('ignite-warp-btn');
+  const resetBaseCamBtn = document.getElementById('reset-base-cam-btn');
+  const copyBaseCamBtn = document.getElementById('copy-base-cam-btn');
+
+  igniteWarpBtn?.addEventListener('click', () => {
+    const warpActionContainer = document.getElementById('warp-action-container');
+    if (warpActionContainer) warpActionContainer.classList.add('warp-action-hidden');
+    controls.enabled = false;
+    const camStatus = document.getElementById('cam-status');
+    if (camStatus) camStatus.innerText = 'WARP_IGNITION_ACTIVE';
+    console.log('[WARP IGNITION] Starting EarthLanding Warp sequence...');
+    if (earthLandingManager) {
+      earthLandingManager.updateCubeNow();
+      earthLandingManager.startSequence();
+    }
+  });
+
+  resetBaseCamBtn?.addEventListener('click', () => {
+    gsap.to(camera.position, {
+      x: 38.38948,
+      y: -8.53400,
+      z: 30.21334,
+      duration: 0.8,
+      ease: 'power2.inOut'
+    });
+    gsap.to(controls.target, {
+      x: 38.71423,
+      y: -5.01504,
+      z: 30.55209,
+      duration: 0.8,
+      ease: 'power2.inOut',
+      onUpdate: () => {
+        camera.up.set(0.0, 1.0, 0.0);
+        camera.lookAt(controls.target);
+      }
+    });
+  });
+
+  copyBaseCamBtn?.addEventListener('click', () => {
+    const posStr = `new THREE.Vector3(${camera.position.x.toFixed(5)}, ${camera.position.y.toFixed(5)}, ${camera.position.z.toFixed(5)})`;
+    const lookStr = `new THREE.Vector3(${controls.target.x.toFixed(5)}, ${controls.target.y.toFixed(5)}, ${controls.target.z.toFixed(5)})`;
+    const fullStr = `PAD_CAM_POS = ${posStr};\nPAD_CAM_LOOK = ${lookStr};\nPAD_CAM_UP = new THREE.Vector3(${camera.up.x.toFixed(2)}, ${camera.up.y.toFixed(2)}, ${camera.up.z.toFixed(2)});`;
+    navigator.clipboard.writeText(fullStr);
+    console.log('[CAMERA COPIED]:\n' + fullStr);
+    if (copyToast) {
+      copyToast.style.display = 'block';
+      setTimeout(() => { copyToast.style.display = 'none'; }, 2500);
     }
   });
 

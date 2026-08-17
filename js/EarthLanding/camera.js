@@ -82,13 +82,16 @@ class CameraRigController {
         this.stormDetachPos = null;
         const travelDistance = Math.max(0.0, this.localYOffset - (-8.0));
         
-        // Locked 50/50 rocket-local framing (looking up at rocket tip when vertical, forward when horizontal):
-        _vLocalCamPos.set(-4.32766, -2.86449 + travelDistance, -2.00000);
-        _vLocalLookPos.set(-3.70432, 1.43601 + travelDistance, -1.66154);
+        // Exact 50/50 starting frame on the launchpad (Zero tilt, zero yaw, zero pan)
+        _vPos.set(38.38948, -8.53400, 30.21334);
+        _vLook.set(38.71423, -5.01504, 30.55209);
         
-        rocket.updateMatrixWorld(true);
-        _vPos.copy(_vLocalCamPos).applyMatrix4(rocket.matrixWorld);
-        _vLook.copy(_vLocalLookPos).applyMatrix4(rocket.matrixWorld);
+        if (travelDistance > 0.0) {
+          // Forward overtake velocity along the look vector
+          _vForward.subVectors(_vLook, _vPos).normalize();
+          _vPos.addScaledVector(_vForward, travelDistance);
+          _vLook.addScaledVector(_vForward, travelDistance);
+        }
         
         this.setTarget(_vPos, _vLook);
         camera.up.set(0.0, 1.0, 0.0);

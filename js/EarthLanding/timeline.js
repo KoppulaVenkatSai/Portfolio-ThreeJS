@@ -59,7 +59,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (rocket) {
       rocket.visible = true;
       rocket.position.copy(padPos);
-      rocket.rotation.set(0, 0, 0); // Starts vertical on launchpad!
+      rocket.rotation.set(0, 0, 0);
       rocket.scale.set(1.0, 1.0, 1.0);
     }
     if (spaceGroup) spaceGroup.visible = true;
@@ -75,27 +75,21 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     ease: "power2.in"
   }, 0.0);
   
-  const qStart = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0));
-  const qEnd = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180));
-  const qCurrent = new THREE.Quaternion();
-
-  // Smoothly bank into horizontal flight inside the warp tunnel (t = 1.5s to 5.0s)
+  // Slow, majestic Y-axis rotation on the upright rocket
   tl.to(ENGINE_STATE, {
     warpBankProgress: 1.0,
-    duration: 3.5,
-    ease: "power2.inOut",
+    duration: 6.8,
+    ease: "power1.inOut",
     onUpdate: () => {
       const t = ENGINE_STATE.warpBankProgress;
       if (rocket) {
-        rocket.position.lerpVectors(padPos, flightPos, t);
-        const s = THREE.MathUtils.lerp(1.0, 0.65, t);
-        rocket.scale.set(s, s, s);
-        qCurrent.slerpQuaternions(qStart, qEnd, t);
-        rocket.quaternion.copy(qCurrent);
+        rocket.position.copy(padPos);
+        rocket.scale.set(1.0, 1.0, 1.0);
+        rocket.rotation.set(0, t * Math.PI * 0.5, 0);
         rocket.updateMatrixWorld(true);
       }
     }
-  }, 1.5);
+  }, 0.0);
   
   // Acceleration to maximum warp speed (t = 3.0s to 7.5s)
   tl.to(ENGINE_STATE, {
