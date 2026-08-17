@@ -10,6 +10,7 @@ import { CursiveNeonText } from './cursiveText.js';
 import { SpaceCosmosBackground } from './spaceBackground.js';
 import { TechAvatar } from './avatar.js';
 import { HologramScreen } from './hologramScreen.js';
+import { RocketDockingPad } from './dockingPad.js';
 import { EarthLandingManager } from '../EarthLanding/earthLandingManager.js';
 import { ENGINE_STATE } from '../EarthLanding/state.js';
 
@@ -277,6 +278,10 @@ export function initScene1() {
   // ==========================================
   const gltfLoader = new GLTFLoader(loadingManager);
 
+  // 6.5 HIGH-POLY PROCEDURAL ROCKET DOCKING PAD & ALIGNED BOOM
+  const rocketDockingPadInstance = new RocketDockingPad();
+  scene.add(rocketDockingPadInstance.group);
+
   let stationModel = null;
   let buttonCylinderMesh = null;
   let lidOverlayMesh = null;
@@ -289,6 +294,20 @@ export function initScene1() {
   const rocketPadNodes = [];
   const allRocketPadNodes = [];
   const stationEmissiveMaterials = [];
+
+  const stationGoldMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2e230a,
+    roughness: 0.22,
+    metalness: 0.94,
+    envMapIntensity: 1.3
+  });
+
+  const stationCopperMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2e230a,
+    roughness: 0.24,
+    metalness: 0.92,
+    envMapIntensity: 1.3
+  });
 
   gltfLoader.load(
     '/assets/FinalSpaceStationModel.glb',
@@ -307,9 +326,11 @@ export function initScene1() {
         if (nodeName.includes('Collar_Right')) collarRightNodes.push(node);
         if (nodeName.includes('Collar_Front')) collarFrontNodes.push(node);
         if (nodeName.includes('Collar_Back')) collarBackNodes.push(node);
-        const isRingBelowRocket = /docking_platform/i.test(nodeName);
-        if (isRingBelowRocket) {
-          allRocketPadNodes.push(node);
+        
+        // Hide old low-poly / misaligned GLB docking platform and neck meshes
+        const isOldPadNode = /docking_platform/i.test(nodeName);
+        if (isOldPadNode) {
+          node.visible = false;
         }
 
         if (node.isMesh && node.material) {
@@ -322,7 +343,15 @@ export function initScene1() {
             node.visible = false;
           }
 
-          if (matName === 'Hull_Light') {
+          // Pure circular rings with alternating Gold & Warm Copper colorway
+          const isGoldRing = /^(Collar_(Left|Right)_Detail_Ring|Sphere_Cap_Top_Ring_1|Hub_Front_Ring_1|Hub_Hatch_Ring_[13]|Arm_Truss_(North|South)_Ring_[13])$/i.test(nodeName);
+          const isCopperRing = /^(Collar_(Front|Back)_Detail_Ring|Sphere_Cap_Bottom_Ring_1|Hub_Front_Ring_2|Hub_Hatch_Ring_[24]|Arm_Truss_(North|South)_Ring_2)$/i.test(nodeName);
+
+          if (isGoldRing) {
+            node.material = stationGoldMaterial;
+          } else if (isCopperRing) {
+            node.material = stationCopperMaterial;
+          } else if (matName === 'Hull_Light') {
             node.material.color.setHex(0x64748b);
             node.material.roughness = 0.35;
             node.material.metalness = 0.8;
@@ -720,6 +749,9 @@ export function initScene1() {
 
     // Hide ONLY the ring mesh directly below the rocket when lights dim (without touching shared materials)
     tl.add(() => {
+      if (rocketDockingPadInstance && rocketDockingPadInstance.padRingGroup) {
+        rocketDockingPadInstance.padRingGroup.visible = false;
+      }
       allRocketPadNodes.forEach((node) => {
         node.visible = false;
       });
@@ -809,6 +841,7 @@ export function initScene1() {
     // Step 4: Clean up dissolved station elements once fully invisible
     tl.add(() => {
       if (stationModel) stationModel.visible = false;
+      if (rocketDockingPadInstance && rocketDockingPadInstance.group) rocketDockingPadInstance.group.visible = false;
       if (techAvatarInstance && techAvatarInstance.group) techAvatarInstance.group.visible = false;
       if (cursiveTextInstance && cursiveTextInstance.group) cursiveTextInstance.group.visible = false;
       if (lidOverlayMesh) lidOverlayMesh.visible = false;
