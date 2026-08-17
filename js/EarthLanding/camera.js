@@ -7,6 +7,9 @@ const _vLook = new THREE.Vector3();
 const _vRocketPos = new THREE.Vector3(-1.1, -1.0, -8.6);
 const _vRocketScale = new THREE.Vector3(0.65, 0.65, 0.65);
 const _vLocalCamPos = new THREE.Vector3();
+const _vLocalLookPos = new THREE.Vector3();
+const _vCameraUp = new THREE.Vector3();
+const _vLocalUp = new THREE.Vector3(0.0, 0.0, -1.0);
 const _vForward = new THREE.Vector3(0, 0, 1);
 const _vP1 = new THREE.Vector3(-100.4, 296.5, -30.0);
 const _vInitialLookDir = new THREE.Vector3();
@@ -77,10 +80,20 @@ class CameraRigController {
         this.setTarget(CONFIG.camera.initial.pos, CONFIG.camera.initial.look);
       } else if (sc === "WARP") {
         this.stormDetachPos = null;
-        const travelDistance = this.localYOffset - (-8.0);
-        _vPos.copy(CONFIG.camera.initial.pos).addScaledVector(_vForward, travelDistance);
-        _vLook.copy(CONFIG.camera.initial.look).addScaledVector(_vForward, travelDistance);
+        const travelDistance = Math.max(0.0, this.localYOffset - (-8.0));
+        
+        // Locked 50/50 rocket-local framing (looking up at rocket tip when vertical, forward when horizontal):
+        _vLocalCamPos.set(-4.32766, -2.86449 + travelDistance, -2.00000);
+        _vLocalLookPos.set(-3.70432, 1.43601 + travelDistance, -1.66154);
+        
+        rocket.updateMatrixWorld(true);
+        _vPos.copy(_vLocalCamPos).applyMatrix4(rocket.matrixWorld);
+        _vLook.copy(_vLocalLookPos).applyMatrix4(rocket.matrixWorld);
+        
         this.setTarget(_vPos, _vLook);
+        
+        _vCameraUp.copy(_vLocalUp).transformDirection(rocket.matrixWorld);
+        camera.up.copy(_vCameraUp);
       } else if (sc === "STORM") {
         if (!this.stormDetachPos) {
           rocket.updateMatrixWorld();
@@ -163,7 +176,9 @@ class CameraRigController {
       this.currentPos.copy(this.targetPos);
       this.currentLook.copy(this.targetLook);
       
-      if (rocket && (sc === "WARP" || sc === "INITIAL" || sc === "SNAP_BACK")) {
+      if (sc === "WARP") {
+        // camera.up is dynamically computed from rocket.matrixWorld
+      } else if (rocket && (sc === "INITIAL" || sc === "SNAP_BACK")) {
         camera.up.set(0.0, 1.0, 0.0);
       } else if (sc === "REENTRY") {
         // Handled in REENTRY block above

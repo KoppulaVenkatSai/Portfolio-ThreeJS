@@ -3,6 +3,7 @@ export const ENGINE_STATE = {
   globalTime: 0.0,
   timelineTime: 0.0,
   warpProgress: 0.0,
+  warpBankProgress: 0.0,
   cameraShakeAmp: 0.0,
   globalFogDensity: 0.0,
   atmosphereFriction: 0.0,

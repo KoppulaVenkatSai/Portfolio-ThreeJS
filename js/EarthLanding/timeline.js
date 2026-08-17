@@ -45,16 +45,22 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     });
   }
 
+  const padPos = new THREE.Vector3(42.0, -6.25, 30.0);
+  const flightPos = new THREE.Vector3(12.0, -1.0, -0.5);
+
   // 1. SCENE X: THE WARP
   tl.add(() => {
     ENGINE_STATE.setScene("WARP");
     ENGINE_STATE.warpProgress = 0.0;
+    ENGINE_STATE.warpBankProgress = 0.0;
     ENGINE_STATE.starsOpacity = 1.0;
     if (bloomPass) bloomPass.strength = 0.0;
     CAMERA_RIG.localYOffset = -8.0;
     if (rocket) {
       rocket.visible = true;
-      rocket.rotation.set(Math.PI / 2, 0, 5 * Math.PI / 180);
+      rocket.position.copy(padPos);
+      rocket.rotation.set(0, 0, 0); // Starts vertical on launchpad!
+      rocket.scale.set(1.0, 1.0, 1.0);
     }
     if (spaceGroup) spaceGroup.visible = true;
     if (oceanGroup) oceanGroup.visible = false;
@@ -62,19 +68,41 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (spaceAmbient) spaceAmbient.intensity = ENGINE_STATE.ambientIntensity;
   }, 0.0);
   
-  // Slow start: 0.0 to 0.1 over 4.0s
+  // Vertical warp streaks ignition (t = 0.0s to 3.0s)
   tl.to(ENGINE_STATE, {
-    warpProgress: 0.1,
-    duration: 4.0,
+    warpProgress: 0.18,
+    duration: 3.0,
     ease: "power2.in"
   }, 0.0);
   
-  // Acceleration: 0.1 to 1.0 over 6.0s
+  const qStart = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0));
+  const qEnd = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 5 * Math.PI / 180));
+  const qCurrent = new THREE.Quaternion();
+
+  // Smoothly bank into horizontal flight inside the warp tunnel (t = 1.5s to 5.0s)
+  tl.to(ENGINE_STATE, {
+    warpBankProgress: 1.0,
+    duration: 3.5,
+    ease: "power2.inOut",
+    onUpdate: () => {
+      const t = ENGINE_STATE.warpBankProgress;
+      if (rocket) {
+        rocket.position.lerpVectors(padPos, flightPos, t);
+        const s = THREE.MathUtils.lerp(1.0, 0.65, t);
+        rocket.scale.set(s, s, s);
+        qCurrent.slerpQuaternions(qStart, qEnd, t);
+        rocket.quaternion.copy(qCurrent);
+        rocket.updateMatrixWorld(true);
+      }
+    }
+  }, 1.5);
+  
+  // Acceleration to maximum warp speed (t = 3.0s to 7.5s)
   tl.to(ENGINE_STATE, {
     warpProgress: 1.0,
-    duration: 6.0,
+    duration: 4.5,
     ease: "power2.in"
-  }, 4.0);
+  }, 3.0);
   
   // Camera shoots forward ahead of the rocket during warp peak
   tl.to(CAMERA_RIG, {
