@@ -212,11 +212,11 @@ export class EarthLandingManager {
           const mats = Array.isArray(node.material) ? node.material : [node.material];
           mats.forEach((mat) => {
             this.rocketMaterials.push(mat);
-            mat.metalness = 0.99;
-            mat.roughness = 0.01;
-            if (mat.color) mat.color.setHex(0xaaaaaa);
+            mat.metalness = 0.98;
+            mat.roughness = 0.03;
+            if (mat.color) mat.color.setHex(0xcccccc);
             mat.envMap = this.cubeRenderTarget.texture;
-            mat.envMapIntensity = 0.35;
+            mat.envMapIntensity = 1.0;
             mat.needsUpdate = true;
           });
         }
@@ -299,7 +299,8 @@ export class EarthLandingManager {
     if (this.rocketModel && this.cubeCamera && this.rocketModel.visible) {
       if (!this.cubeFrameCounter) this.cubeFrameCounter = 0;
       this.cubeFrameCounter++;
-      const shouldUpdateCube = !this.hasRenderedInitialCube || (this.isActive && this.cubeFrameCounter % 6 === 0);
+      const isAnyWarpActive = this.isActive || (window.koppulaSystemManager && window.koppulaSystemManager.isActive);
+      const shouldUpdateCube = !this.hasRenderedInitialCube || (isAnyWarpActive && this.cubeFrameCounter % 2 === 0);
       if (shouldUpdateCube) {
         this.updateCubeNow();
       }

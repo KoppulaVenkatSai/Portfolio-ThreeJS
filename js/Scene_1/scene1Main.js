@@ -12,6 +12,7 @@ import { TechAvatar } from './avatar.js';
 import { HologramScreen } from './hologramScreen.js';
 import { RocketDockingPad } from './dockingPad.js';
 import { EarthLandingManager } from '../EarthLanding/earthLandingManager.js';
+import { KoppulaSystemManager } from '../Planets/koppulaSystemManager.js';
 import { ENGINE_STATE } from '../EarthLanding/state.js';
 import { RocketAlignmentHelper } from '../helpers/alignmentHelper.js';
 import { SceneInspectorHelper } from '../helpers/inspectorHelper.js';
@@ -157,10 +158,12 @@ export function initScene1() {
   let rocketLight = null;
 
   // ==========================================
-  // 5. SPACE ENVIRONMENT & EARTH LANDING MANAGER
+  // 5. SPACE ENVIRONMENT, EARTH LANDING & KOPPULA SOLAR SYSTEM
   // ==========================================
   const cosmosBackground = new SpaceCosmosBackground(scene);
   const earthLandingManager = new EarthLandingManager(scene, camera, renderer, composer, bloomPass, loadingManager);
+  const koppulaSystemManager = new KoppulaSystemManager(scene, camera, renderer, composer, bloomPass, loadingManager);
+  window.koppulaSystemManager = koppulaSystemManager;
 
   // ==========================================
   // HELPERS (Defaults to False / Inactive)
@@ -702,6 +705,8 @@ export function initScene1() {
     isTransitioning = true;
     window.isTransitioning = true;
 
+    const isTargetA = targetName.includes('KOPPULA SYSTEM') || targetName.includes('TARGET A');
+
     controls.enabled = false;
     const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
     if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'ENABLE FREE CAM';
@@ -732,10 +737,21 @@ export function initScene1() {
         rocketAlignmentHelper.setEnabled(false);
         controls.enabled = false;
 
-        // Directly ignite Earth Landing warp sequence without stopping
+        const activeRocket = earthLandingManager && earthLandingManager.rocketModel;
         if (earthLandingManager) {
           earthLandingManager.updateCubeNow();
-          earthLandingManager.startSequence();
+        }
+
+        if (isTargetA) {
+          console.log('[DESTINATION SELECTION] Starting Koppula System Warp sequence...');
+          if (koppulaSystemManager) {
+            koppulaSystemManager.startSequence(activeRocket);
+          }
+        } else {
+          console.log('[DESTINATION SELECTION] Starting Earth Landing Warp sequence...');
+          if (earthLandingManager) {
+            earthLandingManager.startSequence();
+          }
         }
       }
     });
@@ -824,13 +840,13 @@ export function initScene1() {
         if (controls) controls.target.copy(currentLookTarget);
 
         // Keep rocket in its natural upright launchpad stance
-        if (earthLandingManager && earthLandingManager.rocketModel) {
-          const r = earthLandingManager.rocketModel;
-          r.visible = true;
-          r.position.set(42.0, -6.25, 30.0);
-          r.scale.set(1.0, 1.0, 1.0);
-          r.rotation.set(0, 0, 0);
-          r.updateMatrixWorld(true);
+        const activeRocket = earthLandingManager && earthLandingManager.rocketModel;
+        if (activeRocket) {
+          activeRocket.visible = true;
+          activeRocket.position.set(42.0, -6.25, 30.0);
+          activeRocket.scale.set(1.0, 1.0, 1.0);
+          activeRocket.rotation.set(0, 0, 0);
+          activeRocket.updateMatrixWorld(true);
         }
       }
     }, 1.5);
@@ -848,8 +864,10 @@ export function initScene1() {
     }, 4.5);
 
     tl.add(() => {
-      if (earthLandingManager) {
-        earthLandingManager.spaceGroup.visible = true;
+      if (isTargetA) {
+        if (koppulaSystemManager) koppulaSystemManager.spaceGroup.visible = true;
+      } else {
+        if (earthLandingManager) earthLandingManager.spaceGroup.visible = true;
       }
     }, 4.5);
     ENGINE_STATE.starsOpacity = 0.0;
@@ -882,13 +900,17 @@ export function initScene1() {
     if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
     if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
 
-    if (earthLandingManager) {
+    if (!isTargetA && earthLandingManager) {
       tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.8, ease: 'power2.inOut' }, 4.5);
       tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.8, ease: 'power2.inOut' }, 4.5);
       tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    } else if (isTargetA && koppulaSystemManager) {
+      tl.to(koppulaSystemManager.flightAmbient, { intensity: 0.7, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(koppulaSystemManager.flightSun, { intensity: 1.8, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(koppulaSystemManager.flightHemi, { intensity: 1.3, duration: 1.8, ease: 'power2.inOut' }, 4.5);
     }
-    tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-    if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
   }
 
   // ==========================================
@@ -994,10 +1016,23 @@ export function initScene1() {
 
     // Earth Landing Manager Tick
     if (earthLandingManager) {
-      earthLandingManager.update(elapsedTime, delta);
+      if (earthLandingManager.isActive) {
+        earthLandingManager.update(elapsedTime, delta);
+      } else if (koppulaSystemManager && koppulaSystemManager.isActive && earthLandingManager.rocketModel && earthLandingManager.rocketModel.visible) {
+        if (!window._koppulaCubeCounter) window._koppulaCubeCounter = 0;
+        window._koppulaCubeCounter++;
+        if (window._koppulaCubeCounter % 2 === 0) {
+          earthLandingManager.updateCubeNow();
+        }
+      }
     }
 
-    if (!earthLandingManager || !earthLandingManager.isActive) {
+    // Koppula Solar System Manager Tick
+    if (koppulaSystemManager && koppulaSystemManager.isActive) {
+      koppulaSystemManager.update(elapsedTime, delta);
+    }
+
+    if ((!earthLandingManager || !earthLandingManager.isActive) && (!koppulaSystemManager || !koppulaSystemManager.isActive)) {
       if (controls.enabled) {
         controls.update();
       } else {

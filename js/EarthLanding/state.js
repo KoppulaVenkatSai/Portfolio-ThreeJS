@@ -14,6 +14,7 @@ export const ENGINE_STATE = {
   starBatchProgress: 0.0,
   timeScale: 1.0,
   ambientIntensity: 0.6,
+  starDriftSpeed: 0.0,
   
   // V3 specific states
   rocketArcProgress: 0.0,

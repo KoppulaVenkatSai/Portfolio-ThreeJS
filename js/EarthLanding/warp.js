@@ -440,13 +440,18 @@ export class WarpSystem {
     this.centerStars.visible = showStars;
     this.tunnel.visible = showStars;
     
-    if (sc === "INITIAL" || ENGINE_STATE.warpProgress <= 0.0001) {
-      if (sc === "INITIAL") this.warpOffset = 0.0;
+    if (sc === "INITIAL") {
+      this.warpOffset = 0.0;
     } else if (delta) {
-      // Progressively accelerate speed from 200 to 300 as warpProgress increases from 0.0 to 1.0
-      const progressiveSpeed = THREE.MathUtils.lerp(200.0, 300.0, ENGINE_STATE.warpProgress) * (this.warpSpeed / 250.0);
-      const speedFactor = 0.015 + ENGINE_STATE.warpProgress * 0.985;
-      this.warpOffset += speedFactor * delta * progressiveSpeed;
+      if (ENGINE_STATE.warpProgress > 0.0001) {
+        // Progressively accelerate speed from 200 to 300 as warpProgress increases from 0.0 to 1.0
+        const progressiveSpeed = THREE.MathUtils.lerp(200.0, 300.0, ENGINE_STATE.warpProgress) * (this.warpSpeed / 250.0);
+        const speedFactor = 0.015 + ENGINE_STATE.warpProgress * 0.985;
+        this.warpOffset += speedFactor * delta * progressiveSpeed;
+      }
+      if (ENGINE_STATE.starDriftSpeed && ENGINE_STATE.starDriftSpeed > 0.0001) {
+        this.warpOffset += ENGINE_STATE.starDriftSpeed * delta;
+      }
     }
     
     if (camera) {

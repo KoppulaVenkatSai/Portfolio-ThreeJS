@@ -1,0 +1,360 @@
+/* Custom Sci-Fi Theme CSS for Koppula Solar System HUD */
+
+/* Custom Sci-Fi Cursor Tooltip */
+#custom-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  background: rgba(5, 7, 15, 0.85);
+  border: 1px solid #00f3ff;
+  border-radius: 3px;
+  padding: 6px 12px;
+  font-family: 'JetBrains Mono', 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: #00f3ff;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 0 15px rgba(0, 243, 255, 0.25);
+  transform: translate(-50%, -120%);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+#custom-tooltip.visible {
+  opacity: 1;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #00f3ff;
+}
+
+/* 4-Corner Emerging HUD Data Panels Overlay */
+#data-hud-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 20;
+  display: none;
+}
+
+#data-hud-overlay.active {
+  display: block;
+}
+
+.hud-panel-card {
+  position: absolute;
+  width: 320px;
+  background: rgba(6, 10, 22, 0.82);
+  border: 1px solid rgba(0, 243, 255, 0.35);
+  border-radius: 6px;
+  padding: 18px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), inset 0 0 15px rgba(0, 243, 255, 0.08);
+  pointer-events: auto;
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease, visibility 0.5s ease;
+  transform-origin: center center;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  color: #e2e8f0;
+}
+
+/* 4 Near-Center Corner Locations */
+.hud-panel-card.top-left {
+  top: 12%;
+  left: 12%;
+}
+
+.hud-panel-card.top-right {
+  top: 12%;
+  right: 12%;
+}
+
+.hud-panel-card.bottom-left {
+  bottom: 12%;
+  left: 12%;
+}
+
+.hud-panel-card.bottom-right {
+  bottom: 12%;
+  right: 12%;
+}
+
+/* Emerging & Collapsing to/from viewport center (50vw, 50vh) */
+#data-hud-overlay.closed .hud-panel-card.top-left {
+  transform: translate(calc(50vw - 12vw - 160px), calc(50vh - 12vh - 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#data-hud-overlay.closed .hud-panel-card.top-right {
+  transform: translate(calc(-50vw + 12vw + 160px), calc(50vh - 12vh - 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#data-hud-overlay.closed .hud-panel-card.bottom-left {
+  transform: translate(calc(50vw - 12vw - 160px), calc(-50vh + 12vh + 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#data-hud-overlay.closed .hud-panel-card.bottom-right {
+  transform: translate(calc(-50vw + 12vw + 160px), calc(-50vh + 12vh + 120px)) scale(0);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Staggered card emergence delays when opening */
+#data-hud-overlay:not(.closed) .hud-panel-card.top-left {
+  transition-delay: 0.0s;
+}
+#data-hud-overlay:not(.closed) .hud-panel-card.top-right {
+  transition-delay: 0.12s;
+}
+#data-hud-overlay:not(.closed) .hud-panel-card.bottom-left {
+  transition-delay: 0.24s;
+}
+#data-hud-overlay:not(.closed) .hud-panel-card.bottom-right {
+  transition-delay: 0.36s;
+}
+
+#data-hud-overlay.closed .hud-panel-card {
+  transition-delay: 0s !important;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 243, 255, 0.25);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-corner-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.1em;
+}
+
+.system-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #00f3ff;
+  letter-spacing: 0.2em;
+}
+
+.hud-project-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+}
+
+.data-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.data-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #94a3b8;
+  letter-spacing: 0.15em;
+  border-left: 2px solid #00f3ff;
+  padding-left: 8px;
+}
+
+.data-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: #00f3ff;
+  font-weight: bold;
+}
+
+.data-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd5e1;
+  font-weight: 300;
+}
+
+.tech-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.tech-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  background: rgba(0, 243, 255, 0.1);
+  border: 1px solid rgba(0, 243, 255, 0.35);
+  color: #00f3ff;
+  padding: 4px 8px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 5px rgba(0, 243, 255, 0.08);
+}
+
+.close-btn {
+  margin-top: 14px;
+  background: rgba(0, 243, 255, 0.1);
+  border: 1px solid #00f3ff;
+  color: #00f3ff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 8px 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 8px rgba(0, 243, 255, 0.2);
+  width: 100%;
+}
+
+.close-btn:hover {
+  background: #00f3ff;
+  color: #020617;
+  box-shadow: 0 0 16px #00f3ff;
+}
+
+/* Floating Starfield Controls for Planets Screen */
+.stars-control-widget {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: 250px;
+  background: rgba(6, 10, 22, 0.88);
+  border: 1px solid rgba(0, 243, 255, 0.4);
+  border-radius: 6px;
+  padding: 12px 14px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), inset 0 0 10px rgba(0, 243, 255, 0.08);
+  z-index: 50;
+  font-family: 'JetBrains Mono', monospace;
+  color: #e2e8f0;
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(15px);
+  transition: opacity 0.4s ease, transform 0.4s ease, visibility 0.4s ease;
+}
+
+.stars-control-widget.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.star-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  color: #00f3ff;
+  letter-spacing: 0.12em;
+}
+
+.star-icon {
+  margin-right: 6px;
+  color: #00f3ff;
+}
+
+.star-toggle-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 243, 255, 0.3);
+  color: #00f3ff;
+  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.star-toggle-btn:hover {
+  background: rgba(0, 243, 255, 0.2);
+}
+
+.star-widget-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+  overflow: hidden;
+}
+
+.star-widget-body.collapsed {
+  display: none;
+}
+
+.star-slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.star-label-group {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #94a3b8;
+  letter-spacing: 0.08em;
+}
+
+.star-val {
+  color: #00f3ff;
+  font-weight: bold;
+}
+
+.star-slider-row input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.star-slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #00f3ff;
+  box-shadow: 0 0 8px #00f3ff;
+  cursor: pointer;
+}
+
