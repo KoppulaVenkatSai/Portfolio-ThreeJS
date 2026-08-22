@@ -7,19 +7,39 @@ const WarpShaders = {
     vertex: `
       uniform float uWarpProgress;
       uniform float uWarpOffset;
+      uniform float uBatchProgress;
       uniform vec3 uCameraPos;
+      uniform float uTime;
+      uniform float uTwinkleSpeed;
+      uniform float uTwinkleRatio;
+      uniform float uTwinkleDepth;
+      uniform float uSizeMultiplier;
+      uniform float uCentroidSpace;
       attribute float aSpeed;
       attribute float aAngle;
       attribute float aSize;
+      attribute float aTwinklePhase;
+      attribute float aTwinkleSpeed;
+      attribute float aTwinkleMask;
+      attribute float aBatch;
+      attribute float aBatchDelay;
       varying vec3 vColor;
       varying float vOpacity;
       varying float vAngle;
       varying float vSpeed;
       varying float vWarpProgress;
+      varying float vTwinkle;
+      varying float vBatchFade;
       
       void main() {
         vSpeed = aSpeed;
         vWarpProgress = uWarpProgress;
+        
+        // Progressive batch-wise emergence as rocket begins moving
+        // Initial resting stars (Batch 0) are already visible before the rocket starts moving
+        float bStart = aBatch + aBatchDelay;
+        float bFade = (aBatch < 0.01) ? 1.0 : smoothstep(bStart, bStart + 0.14, uBatchProgress);
+        vBatchFade = bFade;
         
         // Calculate the base Z position, animated by the accumulated warp offset
         float zBase = position.z + (aSpeed * uWarpOffset);
@@ -28,11 +48,16 @@ const WarpShaders = {
         zBase = mod(zBase + 500.0, 1000.0) - 500.0;
         
         float spiral = aAngle; // straight trails, no rotation
-
         
         float r = length(position.xy);
-        // Spread stars wider in the background when not at warp speed
-        r = mix(r * 2.5, r, clamp(uWarpProgress / 0.2, 0.0, 1.0));
+        
+        // Dynamic radial expansion and centroid inner clearance distance from the center axis
+        float distFactor = clamp((zBase + 500.0) / 1000.0, 0.0, 1.0);
+        float outwardSpread = mix(0.35, 2.2, distFactor) * (1.0 + uWarpProgress * 0.75);
+        r = r * outwardSpread + uCentroidSpace * mix(0.4, 1.2, distFactor);
+        
+        // Spread stars wider when idle/slow
+        r = mix(r * 1.5, r, clamp(uWarpProgress / 0.25, 0.0, 1.0));
         
         vec3 pos = vec3(
           r * cos(spiral),
@@ -44,7 +69,6 @@ const WarpShaders = {
         gl_Position = projectionMatrix * mvPosition;
         
         // Calculate the screen-space angle of the star's trajectory from the screen center
-        // This aligns the capsule billboard with the direction of radial movement
         vAngle = atan(gl_Position.y, gl_Position.x);
         
         // Natural starfield colors (mix of white, pale yellow, and pale blue)
@@ -59,8 +83,21 @@ const WarpShaders = {
         // Fade out near the bounds of the tunnel
         vOpacity = smoothstep(-500.0, -350.0, zBase) * smoothstep(500.0, 350.0, zBase);
         
-        // Point size scales with speed and warp progress (restricted to keep stars sharp and individual)
-        gl_PointSize = aSize * (1.0 + uWarpProgress * aSpeed * 1.2);
+        // Dynamic GPU Twinkle calculation
+        float twTime = uTime * uTwinkleSpeed * aTwinkleSpeed + aTwinklePhase;
+        float twSine = sin(twTime);
+        float twVal = pow(0.5 + 0.5 * twSine, 2.8);
+        
+        float isTwinkling = step(1.0 - uTwinkleRatio, aTwinkleMask);
+        float twinkleFactor = mix(1.0, 1.0 - uTwinkleDepth * (1.0 - twVal), isTwinkling);
+        
+        // Smoothly fade out twinkle into solid streaks as warp speed ignites
+        twinkleFactor = mix(twinkleFactor, 1.0, clamp(uWarpProgress * 4.0, 0.0, 1.0));
+        vTwinkle = twinkleFactor;
+        
+        // Slight subtle point size shimmering when twinkling
+        float sizeTwinkle = mix(1.0, 0.82 + 0.36 * twVal, isTwinkling * (1.0 - clamp(uWarpProgress * 4.0, 0.0, 1.0)));
+        gl_PointSize = aSize * uSizeMultiplier * sizeTwinkle * (1.0 + uWarpProgress * aSpeed * 1.2);
       }
     `,
     fragment: `
@@ -70,13 +107,10 @@ const WarpShaders = {
       varying float vAngle;
       varying float vSpeed;
       varying float vWarpProgress;
+      varying float vTwinkle;
+      varying float vBatchFade;
       
       void main() {
-        // Gradually reduce the density of stars as warp progress decays (only keep ~29% in space)
-        float starHash = fract(vSpeed * 73.849);
-        float densityThreshold = mix(0.18, 1.0, clamp(vWarpProgress / 0.15, 0.0, 1.0));
-        if (starHash > densityThreshold) discard;
-
         // Rotate gl_PointCoord around (0.5, 0.5) by vAngle
         vec2 p = gl_PointCoord - vec2(0.5);
         float cosA = cos(vAngle);
@@ -90,10 +124,10 @@ const WarpShaders = {
         // Distance to the line segment from (-halfLength, 0) to (halfLength, 0)
         float dist = length(vec2(rp.x - clamp(rp.x, -halfLength, halfLength), rp.y));
         
-        // Volumetric glow and core falloff (tightened to keep stars sharp and distinct)
+        // Volumetric glow and core falloff
         float core = smoothstep(thickness, 0.0, dist);
         float glow = exp(-dist * 55.0) * 0.60;
-        float intensity = (core * 0.60 + glow * 0.40) * vOpacity * uStarsOpacity;
+        float intensity = (core * 0.60 + glow * 0.40) * vOpacity * uStarsOpacity * vTwinkle * vBatchFade;
         
         if (intensity < 0.01) discard;
         
@@ -190,31 +224,56 @@ export class WarpSystem {
   constructor(scene) {
     this.scene = scene;
     
-    // 1. Core warp speed streaks starfield
-    this.starCount = 1200;
+    // 1. Core outer warp streaks starfield (Max capacity 3000)
+    this.maxOuterStarCount = 3000;
     this.starGeom = new THREE.BufferGeometry();
     
+    const numBatches = 5;
     const pos = [];
     const speeds = [];
     const angles = [];
     const sizes = [];
+    const twPhases = [];
+    const twSpeeds = [];
+    const twMasks = [];
+    const batches = [];
+    const batchDelays = [];
     
-    for (let i = 0; i < this.starCount; i++) {
+    for (let i = 0; i < this.maxOuterStarCount; i++) {
       // Cylinder distribution mapping (outer region)
       const theta = Math.random() * Math.PI * 2;
       const r = 10.0 + Math.random() * 50.0;
       pos.push(r * Math.cos(theta), r * Math.sin(theta), Math.random() * 1000.0 - 500.0);
       speeds.push(0.6 + Math.random() * 1.4);
       angles.push(theta);
-      sizes.push(16.0 + Math.random() * 24.0); // Reduced from 40-100 to make streaks thin and sharp
+      sizes.push(16.0 + Math.random() * 24.0);
+      twPhases.push(Math.random() * Math.PI * 2.0);
+      twSpeeds.push(0.6 + Math.random() * 1.2);
+      twMasks.push(Math.random());
+      
+      const bIdx = i % numBatches;
+      batches.push((bIdx / 5.0) * 0.80);
+      batchDelays.push(Math.random() * 0.04);
     }
     
     this.starGeom.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     this.starGeom.setAttribute("aSpeed", new THREE.Float32BufferAttribute(speeds, 1));
     this.starGeom.setAttribute("aAngle", new THREE.Float32BufferAttribute(angles, 1));
     this.starGeom.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
+    this.starGeom.setAttribute("aTwinklePhase", new THREE.Float32BufferAttribute(twPhases, 1));
+    this.starGeom.setAttribute("aTwinkleSpeed", new THREE.Float32BufferAttribute(twSpeeds, 1));
+    this.starGeom.setAttribute("aTwinkleMask", new THREE.Float32BufferAttribute(twMasks, 1));
+    this.starGeom.setAttribute("aBatch", new THREE.Float32BufferAttribute(batches, 1));
+    this.starGeom.setAttribute("aBatchDelay", new THREE.Float32BufferAttribute(batchDelays, 1));
     
     this.warpOffset = 0.0;
+    this.currentTotalStars = 2000;
+    this.twinkleSpeed = 2.5;
+    this.twinkleRatio = 0.70;
+    this.twinkleDepth = 0.85;
+    this.sizeMultiplier = 1.0;
+    this.centroidSpace = 17.0;
+    this.warpSpeed = 220.0;
 
     this.starMat = new THREE.ShaderMaterial({
       vertexShader: WarpShaders.stars.vertex,
@@ -222,8 +281,15 @@ export class WarpSystem {
       uniforms: {
         uWarpProgress: { value: 0.0 },
         uWarpOffset: { value: 0.0 },
+        uBatchProgress: { value: 0.0 },
         uCameraPos: { value: new THREE.Vector3() },
-        uStarsOpacity: { value: 1.0 }
+        uStarsOpacity: { value: 1.0 },
+        uTime: { value: 0.0 },
+        uTwinkleSpeed: { value: this.twinkleSpeed },
+        uTwinkleRatio: { value: this.twinkleRatio },
+        uTwinkleDepth: { value: this.twinkleDepth },
+        uSizeMultiplier: { value: this.sizeMultiplier },
+        uCentroidSpace: { value: this.centroidSpace }
       },
       transparent: true,
       depthWrite: false,
@@ -233,29 +299,45 @@ export class WarpSystem {
     this.stars = new THREE.Points(this.starGeom, this.starMat);
     this.scene.add(this.stars);
     
-    // 2. High-density central tiny starfield (dense core in front)
-    this.centerStarCount = 3000;
+    // 2. High-density central starfield (Max capacity 7000)
+    this.maxCenterStarCount = 7000;
     this.centerGeom = new THREE.BufferGeometry();
     
     const cPos = [];
     const cSpeeds = [];
     const cAngles = [];
     const cSizes = [];
+    const cTwPhases = [];
+    const cTwSpeeds = [];
+    const cTwMasks = [];
+    const cBatches = [];
+    const cBatchDelays = [];
     
-    for (let i = 0; i < this.centerStarCount; i++) {
+    for (let i = 0; i < this.maxCenterStarCount; i++) {
       const theta = Math.random() * Math.PI * 2;
-      // Distributed very close to the center axis
-      const r = 0.5 + Math.random() * 9.5;
+      const r = 2.5 + Math.pow(Math.random(), 0.85) * 22.0;
       cPos.push(r * Math.cos(theta), r * Math.sin(theta), Math.random() * 1000.0 - 500.0);
       cSpeeds.push(0.3 + Math.random() * 0.7);
       cAngles.push(theta);
-      cSizes.push(2.5 + Math.random() * 5.5); // Reduced from 4-12 to keep central core fine and sharp
+      cSizes.push(2.5 + Math.random() * 5.5);
+      cTwPhases.push(Math.random() * Math.PI * 2.0);
+      cTwSpeeds.push(0.5 + Math.random() * 1.5);
+      cTwMasks.push(Math.random());
+      
+      const bIdx = i % numBatches;
+      cBatches.push((bIdx / 5.0) * 0.80);
+      cBatchDelays.push(Math.random() * 0.04);
     }
     
     this.centerGeom.setAttribute("position", new THREE.Float32BufferAttribute(cPos, 3));
     this.centerGeom.setAttribute("aSpeed", new THREE.Float32BufferAttribute(cSpeeds, 1));
     this.centerGeom.setAttribute("aAngle", new THREE.Float32BufferAttribute(cAngles, 1));
     this.centerGeom.setAttribute("aSize", new THREE.Float32BufferAttribute(cSizes, 1));
+    this.centerGeom.setAttribute("aTwinklePhase", new THREE.Float32BufferAttribute(cTwPhases, 1));
+    this.centerGeom.setAttribute("aTwinkleSpeed", new THREE.Float32BufferAttribute(cTwSpeeds, 1));
+    this.centerGeom.setAttribute("aTwinkleMask", new THREE.Float32BufferAttribute(cTwMasks, 1));
+    this.centerGeom.setAttribute("aBatch", new THREE.Float32BufferAttribute(cBatches, 1));
+    this.centerGeom.setAttribute("aBatchDelay", new THREE.Float32BufferAttribute(cBatchDelays, 1));
     
     this.centerMat = new THREE.ShaderMaterial({
       vertexShader: WarpShaders.stars.vertex,
@@ -263,8 +345,15 @@ export class WarpSystem {
       uniforms: {
         uWarpProgress: { value: 0.0 },
         uWarpOffset: { value: 0.0 },
+        uBatchProgress: { value: 0.0 },
         uCameraPos: { value: new THREE.Vector3() },
-        uStarsOpacity: { value: 1.0 }
+        uStarsOpacity: { value: 1.0 },
+        uTime: { value: 0.0 },
+        uTwinkleSpeed: { value: this.twinkleSpeed },
+        uTwinkleRatio: { value: this.twinkleRatio },
+        uTwinkleDepth: { value: this.twinkleDepth },
+        uSizeMultiplier: { value: this.sizeMultiplier },
+        uCentroidSpace: { value: this.centroidSpace }
       },
       transparent: true,
       depthWrite: false,
@@ -274,10 +363,14 @@ export class WarpSystem {
     this.centerStars = new THREE.Points(this.centerGeom, this.centerMat);
     this.scene.add(this.centerStars);
     
+    // Set initial draw ranges based on default 2000 stars
+    this.currentTotalStars = 2000;
+    this.setStarCount(this.currentTotalStars);
+    
     // 3. Warp Cylinder
     this.cylinderGeom = new THREE.CylinderGeometry(20, 20, 300, 48, 48, true);
-    this.cylinderGeom.rotateX(Math.PI / 2); // Align height along local Z-axis
-    this.cylinderGeom.translate(0, 0, 150); // Align pivot to end
+    this.cylinderGeom.rotateX(Math.PI / 2);
+    this.cylinderGeom.translate(0, 0, 150);
     
     this.cylinderMat = new THREE.ShaderMaterial({
       vertexShader: WarpShaders.tunnel.vertex,
@@ -296,6 +389,49 @@ export class WarpSystem {
     this.tunnel.position.set(0, 0, 50);
     this.scene.add(this.tunnel);
   }
+
+  setStarCount(totalCount) {
+    this.currentTotalStars = Math.max(100, Math.min(10000, totalCount));
+    const outerCount = Math.min(this.maxOuterStarCount, Math.round(this.currentTotalStars * 0.40));
+    const centerCount = Math.min(this.maxCenterStarCount, this.currentTotalStars - outerCount);
+
+    this.starGeom.setDrawRange(0, outerCount);
+    this.centerGeom.setDrawRange(0, centerCount);
+  }
+
+  setTwinkleSpeed(speed) {
+    this.twinkleSpeed = Math.max(0.0, speed);
+    this.starMat.uniforms.uTwinkleSpeed.value = this.twinkleSpeed;
+    this.centerMat.uniforms.uTwinkleSpeed.value = this.twinkleSpeed;
+  }
+
+  setTwinkleRatio(ratio) {
+    this.twinkleRatio = Math.max(0.0, Math.min(1.0, ratio));
+    this.starMat.uniforms.uTwinkleRatio.value = this.twinkleRatio;
+    this.centerMat.uniforms.uTwinkleRatio.value = this.twinkleRatio;
+  }
+
+  setTwinkleDepth(depth) {
+    this.twinkleDepth = Math.max(0.0, Math.min(1.0, depth));
+    this.starMat.uniforms.uTwinkleDepth.value = this.twinkleDepth;
+    this.centerMat.uniforms.uTwinkleDepth.value = this.twinkleDepth;
+  }
+
+  setSizeMultiplier(multiplier) {
+    this.sizeMultiplier = Math.max(0.1, multiplier);
+    this.starMat.uniforms.uSizeMultiplier.value = this.sizeMultiplier;
+    this.centerMat.uniforms.uSizeMultiplier.value = this.sizeMultiplier;
+  }
+
+  setCentroidSpace(val) {
+    this.centroidSpace = Math.max(0.0, val);
+    this.starMat.uniforms.uCentroidSpace.value = this.centroidSpace;
+    this.centerMat.uniforms.uCentroidSpace.value = this.centroidSpace;
+  }
+
+  setWarpSpeed(val) {
+    this.warpSpeed = Math.max(0.0, val);
+  }
   
   update(elapsed, camera, delta) {
     const sc = ENGINE_STATE.currentScene;
@@ -304,11 +440,13 @@ export class WarpSystem {
     this.centerStars.visible = showStars;
     this.tunnel.visible = showStars;
     
-    if (sc === "INITIAL") {
-      this.warpOffset = 0.0;
+    if (sc === "INITIAL" || ENGINE_STATE.warpProgress <= 0.0001) {
+      if (sc === "INITIAL") this.warpOffset = 0.0;
     } else if (delta) {
-      // Accumulate warp offset incrementally on CPU to avoid direction reversal on speed changes
-      this.warpOffset += (0.015 + ENGINE_STATE.warpProgress * 0.985) * delta * 480.0;
+      // Progressively accelerate speed from 200 to 300 as warpProgress increases from 0.0 to 1.0
+      const progressiveSpeed = THREE.MathUtils.lerp(200.0, 300.0, ENGINE_STATE.warpProgress) * (this.warpSpeed / 250.0);
+      const speedFactor = 0.015 + ENGINE_STATE.warpProgress * 0.985;
+      this.warpOffset += speedFactor * delta * progressiveSpeed;
     }
     
     if (camera) {
@@ -326,13 +464,19 @@ export class WarpSystem {
       this.tunnel.quaternion.copy(camera.quaternion); // Face exactly where the camera points
     }
     
+    const batchP = (ENGINE_STATE.starBatchProgress !== undefined) ? ENGINE_STATE.starBatchProgress : ENGINE_STATE.warpProgress;
+
     this.starMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;
     this.starMat.uniforms.uWarpOffset.value = this.warpOffset;
+    this.starMat.uniforms.uBatchProgress.value = batchP;
     this.starMat.uniforms.uStarsOpacity.value = ENGINE_STATE.starsOpacity;
+    this.starMat.uniforms.uTime.value = elapsed;
     
     this.centerMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;
     this.centerMat.uniforms.uWarpOffset.value = this.warpOffset;
+    this.centerMat.uniforms.uBatchProgress.value = batchP;
     this.centerMat.uniforms.uStarsOpacity.value = ENGINE_STATE.starsOpacity;
+    this.centerMat.uniforms.uTime.value = elapsed;
     
     this.cylinderMat.uniforms.uWarpProgress.value = ENGINE_STATE.warpProgress;
     this.cylinderMat.uniforms.uTime.value = elapsed;

@@ -53,6 +53,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     ENGINE_STATE.setScene("WARP");
     ENGINE_STATE.warpProgress = 0.0;
     ENGINE_STATE.warpBankProgress = 0.0;
+    ENGINE_STATE.starBatchProgress = 0.0;
     ENGINE_STATE.starsOpacity = 1.0;
     if (bloomPass) bloomPass.strength = 0.0;
     CAMERA_RIG.localYOffset = -8.0;
@@ -68,6 +69,13 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (spaceAmbient) spaceAmbient.intensity = ENGINE_STATE.ambientIntensity;
   }, 0.0);
   
+  // Progressive batch-wise star emergence: 5 batches with 1.0s delay between batches (t = 0.0s to 5.0s)
+  tl.to(ENGINE_STATE, {
+    starBatchProgress: 1.0,
+    duration: 5.0,
+    ease: "none"
+  }, 0.0);
+
   // Vertical warp streaks ignition (t = 0.0s to 3.0s)
   tl.to(ENGINE_STATE, {
     warpProgress: 0.18,

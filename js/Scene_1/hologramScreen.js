@@ -15,6 +15,9 @@ export class HologramScreen {
     this.canvasWidth = 1024;
     this.canvasHeight = 512;
     this.hoverTarget = 0; // 0: None, 1: Target A (Projects), 2: Target B (About Me)
+    this.lockedTarget = 0; // 0: None, 1: Target A, 2: Target B
+    this.btnAScale = 1.0;
+    this.btnBScale = 1.0;
     this.opacity = 0.0;
     this.isVisible = false;
 
@@ -57,11 +60,40 @@ export class HologramScreen {
     this.ctx = this.canvas.getContext('2d');
   }
 
+  triggerClickFeedback(targetId) {
+    this.lockedTarget = targetId;
+    this.hoverTarget = targetId;
+
+    // Subtle tactile button-only scale-down press (7% shrink and bounce back)
+    const scaleProp = targetId === 1 ? 'btnAScale' : 'btnBScale';
+    this[scaleProp] = 1.0;
+    gsap.killTweensOf(this, scaleProp);
+    gsap.to(this, {
+      [scaleProp]: 0.93,
+      duration: 0.10,
+      yoyo: true,
+      repeat: 1,
+      ease: 'power2.out',
+      onUpdate: () => {
+        this.renderCanvasUI();
+      },
+      onComplete: () => {
+        this[scaleProp] = 1.0;
+        this.renderCanvasUI();
+      }
+    });
+
+    this.renderCanvasUI();
+  }
+
   renderCanvasUI() {
     const ctx = this.ctx;
     const w = this.canvasWidth;
     const h = this.canvasHeight;
     const hoverBright = this.hoverBrightness !== undefined ? this.hoverBrightness : 1.0;
+    const isLockedA = this.lockedTarget === 1;
+    const isLockedB = this.lockedTarget === 2;
+    const isLocked = isLockedA || isLockedB;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -70,42 +102,53 @@ export class HologramScreen {
     ctx.fillRect(0, 0, w, h);
 
     // Outer double cyan border frame
-    ctx.strokeStyle = '#38bdf8';
+    ctx.strokeStyle = isLocked ? '#00f0ff' : '#38bdf8';
     ctx.lineWidth = 4;
     ctx.strokeRect(10, 10, w - 20, h - 20);
 
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+    ctx.strokeStyle = isLocked ? 'rgba(0, 240, 255, 0.6)' : 'rgba(56, 189, 248, 0.4)';
     ctx.lineWidth = 2;
     ctx.strokeRect(18, 18, w - 36, h - 36);
 
     // Header Title Bar
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
+    ctx.fillStyle = isLocked ? 'rgba(0, 240, 255, 0.18)' : 'rgba(56, 189, 248, 0.12)';
     ctx.fillRect(20, 20, w - 40, 50);
 
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = isLocked ? '#00f0ff' : '#38bdf8';
     ctx.font = 'bold 22px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('⚡ NAVIGATIONAL CONSOLE // CHOOSE DESTINATION ⚡', w / 2, 45);
+    if (isLockedA) {
+      ctx.fillText('✔ TRAJECTORY LOCKED: KOPPULA SYSTEM // INITIATING WARP ✔', w / 2, 45);
+    } else if (isLockedB) {
+      ctx.fillText('✔ TRAJECTORY LOCKED: ORIGIN PLANET // INITIATING DE-ORBIT ✔', w / 2, 45);
+    } else {
+      ctx.fillText('⚡ NAVIGATIONAL CONSOLE // CHOOSE DESTINATION ⚡', w / 2, 45);
+    }
 
     // Target A Card (Left - Projects System)
-    const isHoverA = this.hoverTarget === 1;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+    const isHoverA = this.hoverTarget === 1 || isLockedA;
+    const alphaA = isLockedB ? 0.35 : 1.0;
+
+    ctx.save();
+    ctx.globalAlpha = alphaA;
+
+    ctx.fillStyle = isLockedA ? 'rgba(14, 116, 144, 0.45)' : 'rgba(15, 23, 42, 0.65)';
     ctx.fillRect(40, 90, 450, 350);
 
-    ctx.strokeStyle = isHoverA ? '#00f0ff' : 'rgba(56, 189, 248, 0.30)';
-    ctx.lineWidth = isHoverA ? 3 : 2;
+    ctx.strokeStyle = (isHoverA || isLockedA) ? '#00f0ff' : 'rgba(56, 189, 248, 0.30)';
+    ctx.lineWidth = isLockedA ? 4 : (isHoverA ? 3 : 2);
     ctx.strokeRect(40, 90, 450, 350);
 
-    if (isHoverA && hoverBright > 0) {
+    if ((isHoverA || isLockedA) && hoverBright > 0) {
       ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = Math.round(25 * hoverBright);
+      ctx.shadowBlur = Math.round((isLockedA ? 30 : 20) * hoverBright);
     } else {
       ctx.shadowBlur = 0;
     }
 
     // Target A Text & Graphics
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = isLockedA ? '#00f0ff' : '#38bdf8';
     ctx.font = 'bold 30px "Bebas Neue", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('TARGET A: KOPPULA SYSTEM', 265, 130);
@@ -146,33 +189,47 @@ export class HologramScreen {
     ctx.font = '15px sans-serif';
     ctx.fillText('Multi-colored planet network & data-star', 265, 335);
 
-    // Action button prompt
-    ctx.fillStyle = isHoverA ? '#00f0ff' : 'rgba(56, 189, 248, 0.2)';
-    ctx.fillRect(80, 370, 370, 45);
-    ctx.fillStyle = isHoverA ? '#020617' : '#38bdf8';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText(isHoverA ? '▶ LOCK & WARP TO PROJECTS' : '[ENTER SYSTEM]', 265, 392);
+    // Action button prompt (Button-only scale)
+    ctx.save();
+    ctx.translate(265, 392.5);
+    ctx.scale(this.btnAScale, this.btnAScale);
+    ctx.translate(-265, -392.5);
 
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = (isLockedA || isHoverA) ? '#00f0ff' : 'rgba(56, 189, 248, 0.2)';
+    ctx.fillRect(80, 370, 370, 45);
+    ctx.fillStyle = (isHoverA || isLockedA) ? '#020617' : '#38bdf8';
+    ctx.font = 'bold 18px monospace';
+    if (isLockedA) {
+      ctx.fillText('✔ DESTINATION LOCKED // ENGAGING...', 265, 392);
+    } else {
+      ctx.fillText(isHoverA ? '▶ LOCK & WARP TO PROJECTS' : '[ENTER SYSTEM]', 265, 392);
+    }
+    ctx.restore();
+    ctx.restore();
 
     // Target B Card (Right - Origin Planet / About Me)
-    const isHoverB = this.hoverTarget === 2;
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
+    const isHoverB = this.hoverTarget === 2 || isLockedB;
+    const alphaB = isLockedA ? 0.35 : 1.0;
+
+    ctx.save();
+    ctx.globalAlpha = alphaB;
+
+    ctx.fillStyle = isLockedB ? 'rgba(14, 116, 144, 0.45)' : 'rgba(15, 23, 42, 0.65)';
     ctx.fillRect(534, 90, 450, 350);
 
-    ctx.strokeStyle = isHoverB ? '#00f0ff' : 'rgba(56, 189, 248, 0.30)';
-    ctx.lineWidth = isHoverB ? 3 : 2;
+    ctx.strokeStyle = (isHoverB || isLockedB) ? '#00f0ff' : 'rgba(56, 189, 248, 0.30)';
+    ctx.lineWidth = isLockedB ? 4 : (isHoverB ? 3 : 2);
     ctx.strokeRect(534, 90, 450, 350);
 
-    if (isHoverB && hoverBright > 0) {
+    if ((isHoverB || isLockedB) && hoverBright > 0) {
       ctx.shadowColor = '#00f0ff';
-      ctx.shadowBlur = Math.round(25 * hoverBright);
+      ctx.shadowBlur = Math.round((isLockedB ? 30 : 20) * hoverBright);
     } else {
       ctx.shadowBlur = 0;
     }
 
     // Target B Text & Graphics
-    ctx.fillStyle = '#38bdf8';
+    ctx.fillStyle = isLockedB ? '#00f0ff' : '#38bdf8';
     ctx.font = 'bold 30px "Bebas Neue", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('TARGET B: ORIGIN PLANET', 759, 130);
@@ -208,20 +265,33 @@ export class HologramScreen {
     ctx.font = '15px sans-serif';
     ctx.fillText('High-fidelity Earth & personal dossier', 759, 335);
 
-    // Action button prompt
-    ctx.fillStyle = isHoverB ? '#00f0ff' : 'rgba(56, 189, 248, 0.2)';
-    ctx.fillRect(574, 370, 370, 45);
-    ctx.fillStyle = isHoverB ? '#020617' : '#38bdf8';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText(isHoverB ? '▶ LOCK & DE-ORBIT TO EARTH' : '[DE-ORBIT TO EARTH]', 759, 392);
+    // Action button prompt (Button-only scale)
+    ctx.save();
+    ctx.translate(759, 392.5);
+    ctx.scale(this.btnBScale, this.btnBScale);
+    ctx.translate(-759, -392.5);
 
-    ctx.shadowBlur = 0;
+    ctx.fillStyle = (isLockedB || isHoverB) ? '#00f0ff' : 'rgba(56, 189, 248, 0.2)';
+    ctx.fillRect(574, 370, 370, 45);
+    ctx.fillStyle = (isHoverB || isLockedB) ? '#020617' : '#38bdf8';
+    ctx.font = 'bold 18px monospace';
+    if (isLockedB) {
+      ctx.fillText('✔ DESTINATION LOCKED // ENGAGING...', 759, 392);
+    } else {
+      ctx.fillText(isHoverB ? '▶ LOCK & DE-ORBIT TO EARTH' : '[DE-ORBIT TO EARTH]', 759, 392);
+    }
+    ctx.restore();
+    ctx.restore();
 
     // Footer Bar
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.8)';
+    ctx.fillStyle = isLocked ? '#00f0ff' : 'rgba(56, 189, 248, 0.8)';
     ctx.font = '13px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('SYSTEM STATUS: ONLINE // ENCRYPTION: 256-BIT // HOVER TO INSPECT TARGET', w / 2, 470);
+    if (isLocked) {
+      ctx.fillText('TRANSMITTING TELEMETRY TO LAUNCHPAD... [ALL SYSTEMS GO]', w / 2, 470);
+    } else {
+      ctx.fillText('SYSTEM STATUS: ONLINE // ENCRYPTION: 256-BIT // HOVER TO INSPECT TARGET', w / 2, 470);
+    }
 
     if (this.texture) {
       this.texture.needsUpdate = true;

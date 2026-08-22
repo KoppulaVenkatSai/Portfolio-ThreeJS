@@ -11,6 +11,7 @@ export const ENGINE_STATE = {
   lightningIntensity: 0.0,
   monolithPulse: 1.0,
   starsOpacity: 1.0,
+  starBatchProgress: 0.0,
   timeScale: 1.0,
   ambientIntensity: 0.6,
   

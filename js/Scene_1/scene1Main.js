@@ -567,12 +567,17 @@ export function initScene1() {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    if (hologramScreenInstance && hologramScreenInstance.isVisible) {
+    if (hologramScreenInstance && hologramScreenInstance.isVisible && !isTransitioning) {
       raycaster.setFromCamera(mouse, camera);
       const holoIntersects = raycaster.intersectObject(hologramScreenInstance.screenMesh);
       if (holoIntersects.length > 0) {
         const uv = holoIntersects[0].uv;
-        const targetName = uv.x < 0.5 ? 'TARGET A: KOPPULA SYSTEM' : 'TARGET B: ORIGIN PLANET';
+        const targetId = uv.x < 0.5 ? 1 : 2;
+        const targetName = targetId === 1 ? 'TARGET A: KOPPULA SYSTEM' : 'TARGET B: ORIGIN PLANET';
+        
+        // Subtle button-only press feedback on the clicked option
+        hologramScreenInstance.triggerClickFeedback(targetId);
+        
         triggerDestinationTransition(targetName);
         return;
       }
@@ -735,9 +740,11 @@ export function initScene1() {
       }
     });
 
-    // Step 1: Projection fades out, while station lights dim to a moody cinematic level (t = 0 to 1.5s)
+    // Step 1: Projection fades out after 0.25s so button press animation is visible, while station lights dim (t = 0 to 1.5s)
     if (hologramScreenInstance) {
-      hologramScreenInstance.fadeOut(1.5);
+      tl.add(() => {
+        hologramScreenInstance.fadeOut(1.25);
+      }, 0.25);
     }
     if (ambientLight) tl.to(ambientLight, { intensity: 0.45, duration: 1.5, ease: 'power2.inOut' }, 0);
     if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.15, duration: 1.5, ease: 'power2.inOut' }, 0);
@@ -894,9 +901,13 @@ export function initScene1() {
     cursiveTextInstance,
     techAvatarInstance,
     hologramScreenInstance,
+    earthLandingManager,
     isTransitioningRef: () => isTransitioning
   });
   window.sceneInspectorHelper = sceneInspectorHelper;
+  if (earthLandingManager) {
+    window.warpSystem = earthLandingManager.warpSystem;
+  }
 
   // Warp Action Buttons (Rocket Base Free Cam & Warp Sequence)
   const igniteWarpBtn = document.getElementById('ignite-warp-btn');

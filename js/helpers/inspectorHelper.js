@@ -8,6 +8,7 @@ export class SceneInspectorHelper {
     this.cursiveTextInstance = options.cursiveTextInstance;
     this.techAvatarInstance = options.techAvatarInstance;
     this.hologramScreenInstance = options.hologramScreenInstance;
+    this.earthLandingManager = options.earthLandingManager;
     this.isTransitioningRef = options.isTransitioningRef;
 
     this.isEnabled = false; // default false (hidden)
@@ -255,6 +256,97 @@ export class SceneInspectorHelper {
         this.hologramScreenInstance.fadeOut(0.4);
       } else {
         this.hologramScreenInstance.fadeIn(0.4);
+      }
+    });
+
+    // Starfield & Twinkling controls
+    const starCountSlider = document.getElementById('star-count-slider');
+    const twinkleSpeedSlider = document.getElementById('twinkle-speed-slider');
+    const twinkleRatioSlider = document.getElementById('twinkle-ratio-slider');
+    const twinkleDepthSlider = document.getElementById('twinkle-depth-slider');
+    const starSizeSlider = document.getElementById('star-size-slider');
+    const centroidSpaceSlider = document.getElementById('centroid-space-slider');
+    const warpSpeedSlider = document.getElementById('warp-speed-slider');
+    const copyStarBtn = document.getElementById('copy-star-btn');
+
+    const starCountVal = document.getElementById('star-count-val');
+    const twinkleSpeedVal = document.getElementById('twinkle-speed-val');
+    const twinkleRatioVal = document.getElementById('twinkle-ratio-val');
+    const twinkleDepthVal = document.getElementById('twinkle-depth-val');
+    const starSizeVal = document.getElementById('star-size-val');
+    const centroidSpaceVal = document.getElementById('centroid-space-val');
+    const warpSpeedVal = document.getElementById('warp-speed-val');
+
+    const getWarp = () => this.earthLandingManager?.warpSystem || window.warpSystem;
+
+    starCountSlider?.addEventListener('input', () => {
+      const val = parseInt(starCountSlider.value, 10);
+      const warp = getWarp();
+      if (warp) warp.setStarCount(val);
+      if (starCountVal) starCountVal.innerText = val.toString();
+    });
+
+    twinkleSpeedSlider?.addEventListener('input', () => {
+      const val = parseFloat(twinkleSpeedSlider.value);
+      const warp = getWarp();
+      if (warp) warp.setTwinkleSpeed(val);
+      if (twinkleSpeedVal) twinkleSpeedVal.innerText = val.toFixed(1);
+    });
+
+    twinkleRatioSlider?.addEventListener('input', () => {
+      const val = parseFloat(twinkleRatioSlider.value);
+      const warp = getWarp();
+      if (warp) warp.setTwinkleRatio(val);
+      if (twinkleRatioVal) twinkleRatioVal.innerText = `${Math.round(val * 100)}%`;
+    });
+
+    twinkleDepthSlider?.addEventListener('input', () => {
+      const val = parseFloat(twinkleDepthSlider.value);
+      const warp = getWarp();
+      if (warp) warp.setTwinkleDepth(val);
+      if (twinkleDepthVal) twinkleDepthVal.innerText = val.toFixed(2);
+    });
+
+    starSizeSlider?.addEventListener('input', () => {
+      const val = parseFloat(starSizeSlider.value);
+      const warp = getWarp();
+      if (warp) warp.setSizeMultiplier(val);
+      if (starSizeVal) starSizeVal.innerText = `${val.toFixed(1)}x`;
+    });
+
+    centroidSpaceSlider?.addEventListener('input', () => {
+      const val = parseFloat(centroidSpaceSlider.value);
+      const warp = getWarp();
+      if (warp) warp.setCentroidSpace(val);
+      if (centroidSpaceVal) centroidSpaceVal.innerText = val.toFixed(1);
+    });
+
+    warpSpeedSlider?.addEventListener('input', () => {
+      const val = parseFloat(warpSpeedSlider.value);
+      const warp = getWarp();
+      if (warp) warp.setWarpSpeed(val);
+      if (warpSpeedVal) warpSpeedVal.innerText = Math.round(val).toString();
+    });
+
+    copyStarBtn?.addEventListener('click', () => {
+      const warp = getWarp();
+      const count = starCountSlider?.value || 2000;
+      const speed = twinkleSpeedSlider?.value || 2.5;
+      const ratio = twinkleRatioSlider?.value || 0.70;
+      const depth = twinkleDepthSlider?.value || 0.85;
+      const size = starSizeSlider?.value || 1.0;
+      const centroid = centroidSpaceSlider?.value || 17.0;
+      const warpSpd = warpSpeedSlider?.value || 220;
+
+      const code = `// Tuned Starfield & Warp Speed Settings\nconst STARFIELD_CONFIG = {\n  totalStars: ${count},\n  twinkleSpeed: ${speed},\n  twinkleRatio: ${ratio},\n  twinkleDepth: ${depth},\n  sizeMultiplier: ${size},\n  centroidSpace: ${centroid},\n  warpSpeed: ${warpSpd}\n};`;
+      navigator.clipboard.writeText(code).then(() => {
+        console.log('[STARFIELD CONFIG COPIED]:\n' + code);
+      });
+
+      const copyToast = document.getElementById('copy-toast');
+      if (copyToast) {
+        copyToast.style.display = 'block';
+        setTimeout(() => { copyToast.style.display = 'none'; }, 2500);
       }
     });
   }

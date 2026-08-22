@@ -246,8 +246,17 @@ export class EarthLandingManager {
     this.isActive = true;
     this.spaceGroup.visible = true;
     this.hemisphereLight.visible = true;
-    this.scene.background = new THREE.Color(CONFIG.colors.bgSpace);
-    this.scene.fog = new THREE.FogExp2(CONFIG.colors.bgSpace, 0.0);
+    if (this.scene.background && this.scene.background.isColor) {
+      this.scene.background.setHex(CONFIG.colors.bgSpace);
+    } else {
+      this.scene.background = new THREE.Color(CONFIG.colors.bgSpace);
+    }
+    if (this.scene.fog) {
+      this.scene.fog.color.setHex(CONFIG.colors.bgSpace);
+      this.scene.fog.density = 0.0;
+    } else {
+      this.scene.fog = new THREE.FogExp2(CONFIG.colors.bgSpace, 0.0);
+    }
 
     if (this.rocketModel) {
       this.rocketModel.visible = true;
@@ -296,7 +305,12 @@ export class EarthLandingManager {
       }
     }
 
-    if (!this.isActive) return;
+    if (!this.isActive) {
+      if (this.warpSystem && (this.spaceGroup.visible || ENGINE_STATE.starsOpacity > 0.001)) {
+        this.warpSystem.update(elapsed, this.camera, delta);
+      }
+      return;
+    }
 
     const scaledDelta = delta * ENGINE_STATE.timeScale;
 
