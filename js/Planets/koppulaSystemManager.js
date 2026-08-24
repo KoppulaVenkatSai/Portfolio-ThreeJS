@@ -13,11 +13,21 @@ import {
   createOrbitRing, 
   buildPlanet1, 
   buildPlanet2, 
-  buildPlanet3 
+  buildPlanet3,
+  buildPlanet4,
+  buildPlanet5
 } from './planets.js';
 import { WarpSystem } from '../EarthLanding/warp.js';
 import { CAMERA_RIG } from '../EarthLanding/camera.js';
 import { buildPlanetsTimeline } from './timeline.js';
+
+const PLANET_COLORS = {
+  planet1: { hex: '#00e5ff', glow: 0x00c8ff },
+  planet2: { hex: '#ff6600', glow: 0xff5500 },
+  planet3: { hex: '#d044ff', glow: 0xaa22ff },
+  planet4: { hex: '#00ff88', glow: 0x00ff88 },
+  planet5: { hex: '#ffaa00', glow: 0xffaa00 }
+};
 
 export class KoppulaSystemManager {
   constructor(scene, camera, renderer, composer, bloomPass, loadingManager) {
@@ -89,7 +99,7 @@ export class KoppulaSystemManager {
     this.spaceAmbient = new THREE.AmbientLight(0xffffff, 0.0);
     this.solarSystemGroup.add(this.spaceAmbient);
 
-    this.sunLight = new THREE.PointLight(0xffecd9, 0.0, 250, 0.85);
+    this.sunLight = new THREE.PointLight(0xffecd9, 0.0, 300, 0.85);
     this.sunLight.name = "solarSunLight";
     this.sunLight.position.set(0, 0, 0);
     this.sunLight.castShadow = true;
@@ -105,7 +115,7 @@ export class KoppulaSystemManager {
     this.solarSystemGroup.add(this.rimLight);
 
     // Dynamic headlight mounted to camera
-    this.headlight = new THREE.PointLight(0xffffff, 0.0, 90, 0.5);
+    this.headlight = new THREE.PointLight(0xffffff, 0.0, 120, 0.5);
     this.headlight.position.set(2, 2, 2);
     this.camera.add(this.headlight);
     this.scene.add(this.camera);
@@ -216,16 +226,20 @@ export class KoppulaSystemManager {
     this.orbitRingsMap.planet1 = createOrbitRing(this.solarSystemGroup, CONFIG.orbits.p1.radius);
     this.orbitRingsMap.planet2 = createOrbitRing(this.solarSystemGroup, CONFIG.orbits.p2.radius);
     this.orbitRingsMap.planet3 = createOrbitRing(this.solarSystemGroup, CONFIG.orbits.p3.radius);
+    this.orbitRingsMap.planet4 = createOrbitRing(this.solarSystemGroup, CONFIG.orbits.p4.radius);
+    this.orbitRingsMap.planet5 = createOrbitRing(this.solarSystemGroup, CONFIG.orbits.p5.radius);
 
     this.planetObjects.planet1 = buildPlanet1(this.solarSystemGroup);
     this.planetObjects.planet2 = buildPlanet2(this.solarSystemGroup);
     this.planetObjects.planet3 = buildPlanet3(this.solarSystemGroup);
+    this.planetObjects.planet4 = buildPlanet4(this.solarSystemGroup);
+    this.planetObjects.planet5 = buildPlanet5(this.solarSystemGroup);
 
     Object.keys(this.planetObjects).forEach((key) => {
       const p = this.planetObjects[key];
       p.startAngleOffset = Math.random() * Math.PI * 2;
       const data = PROJECTS_DATA[key];
-      const colorHex = key === 'planet1' ? '#00e5ff' : (key === 'planet2' ? '#ff6600' : '#d044ff');
+      const colorInfo = PLANET_COLORS[key] || { hex: '#00e5ff', glow: 0x00c8ff };
 
       // Exosphere Fresnel Glow Mesh
       const glowGeo = new THREE.SphereGeometry(p.config.size * 1.06, 32, 32);
@@ -233,7 +247,7 @@ export class KoppulaSystemManager {
         vertexShader: FresnelShader.vertexShader,
         fragmentShader: FresnelShader.fragmentShader,
         uniforms: {
-          glowColor: { value: new THREE.Color(key === 'planet1' ? 0x00c8ff : (key === 'planet2' ? 0xff5500 : 0xaa22ff)) },
+          glowColor: { value: new THREE.Color(colorInfo.glow) },
           power: { value: 2.2 },
           opacity: { value: 0.0 }
         },
@@ -246,7 +260,7 @@ export class KoppulaSystemManager {
       p.glowMaterial = glowMat;
 
       // Curved Text Title Label Mesh along top rim of planet
-      const labelTex = createCurvedTextTexture(data.title, colorHex);
+      const labelTex = createCurvedTextTexture(data.title, colorInfo.hex);
       const labelGeo = new THREE.PlaneGeometry(p.config.size * 6.2, p.config.size * 3.1);
       const labelMat = new THREE.MeshBasicMaterial({
         map: labelTex,
@@ -269,9 +283,9 @@ export class KoppulaSystemManager {
       Object.keys(this.planetObjects).forEach((key) => {
         const p = this.planetObjects[key];
         const data = PROJECTS_DATA[key];
-        const colorHex = key === 'planet1' ? '#00e5ff' : (key === 'planet2' ? '#ff6600' : '#d044ff');
+        const colorInfo = PLANET_COLORS[key] || { hex: '#00e5ff', glow: 0x00c8ff };
         if (p.hoverLabelMesh) {
-          p.hoverLabelMesh.material.map = createCurvedTextTexture(data.title, colorHex);
+          p.hoverLabelMesh.material.map = createCurvedTextTexture(data.title, colorInfo.hex);
           p.hoverLabelMesh.material.map.needsUpdate = true;
         }
       });

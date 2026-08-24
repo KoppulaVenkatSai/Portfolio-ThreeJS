@@ -3,7 +3,9 @@ import { CONFIG } from './config.js';
 import { 
   createGasGiantRockTexture, 
   createIndustrialRockTexture, 
-  createCrystalRockTexture 
+  createCrystalRockTexture,
+  createCyberLatticeTexture,
+  createAmberRadarTexture
 } from './textures.js';
 
 // ==========================================
@@ -259,7 +261,7 @@ export function createOrbitRing(parentGroup, radius) {
 }
 
 // ------------------------------------------
-// PLANET 1: GAS GIANT (AI / REINFORCEMENT LEARNING)
+// PLANET 1: FAULT DIAGNOSTICS & RCA (AI / DEEP LEARNING)
 // ------------------------------------------
 export function buildPlanet1(parentGroup) {
   const group = new THREE.Group();
@@ -386,7 +388,7 @@ export function buildPlanet1(parentGroup) {
 }
 
 // ------------------------------------------
-// PLANET 2: INDUSTRIAL PLANET
+// PLANET 2: PHYSICS DIGITAL TWIN (THERMAL / RUST)
 // ------------------------------------------
 export function buildPlanet2(parentGroup) {
   const group = new THREE.Group();
@@ -513,7 +515,7 @@ export function buildPlanet2(parentGroup) {
 }
 
 // ------------------------------------------
-// PLANET 3: CRYSTAL PLANET
+// PLANET 3: ASSET HEALTH & RUL (CRYSTAL / VIOLET)
 // ------------------------------------------
 export function buildPlanet3(parentGroup) {
   const group = new THREE.Group();
@@ -636,5 +638,259 @@ export function buildPlanet3(parentGroup) {
     config,
     type: 'crystal',
     id: 'planet3'
+  };
+}
+
+// ------------------------------------------
+// PLANET 4: SEMANTIC ETL ENGINE (EMERALD / CYBER LATTICE)
+// ------------------------------------------
+export function buildPlanet4(parentGroup) {
+  const group = new THREE.Group();
+  const config = CONFIG.orbits.p4;
+  const cyberTexture = createCyberLatticeTexture();
+  
+  const coreMat = new THREE.MeshStandardMaterial({
+    color: 0x00cc66,
+    map: cyberTexture,
+    bumpMap: cyberTexture,
+    bumpScale: 0.14,
+    emissive: 0x00ff88,
+    emissiveIntensity: 2.5,
+    roughness: 0.8,
+    metalness: 0.1
+  });
+
+  const innerMantleMat = new THREE.MeshStandardMaterial({
+    color: 0x003318,
+    emissive: 0x001108,
+    emissiveIntensity: 0.2,
+    map: cyberTexture,
+    bumpMap: cyberTexture,
+    bumpScale: 0.1,
+    roughness: 0.75,
+    metalness: 0.15
+  });
+
+  const outerMantleMat = new THREE.MeshStandardMaterial({
+    color: 0x005528,
+    emissive: 0x002210,
+    emissiveIntensity: 0.15,
+    map: cyberTexture,
+    bumpMap: cyberTexture,
+    bumpScale: 0.12,
+    roughness: 0.75,
+    metalness: 0.15
+  });
+
+  const crustMat = new THREE.MeshStandardMaterial({
+    color: 0x008844,
+    emissive: 0x003318,
+    emissiveIntensity: 0.1,
+    map: cyberTexture,
+    bumpMap: cyberTexture,
+    bumpScale: 0.16,
+    roughness: 0.7,
+    metalness: 0.18
+  });
+  
+  const coreGeo = new THREE.SphereGeometry(config.size * 0.22, 32, 32);
+  const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+  coreMesh.castShadow = true;
+  coreMesh.receiveShadow = true;
+  group.add(coreMesh);
+
+  const innerMantlePlates = [];
+  const outerMantlePlates = [];
+  const crustPlates = [];
+
+  const divsPhi = 6;
+  const divsTheta = 2;
+  for(let i=0; i<divsPhi; i++) {
+    for(let j=0; j<divsTheta; j++) {
+      const phiStart = i * (Math.PI * 2 / divsPhi);
+      const phiLength = Math.PI * 2 / divsPhi;
+      const thetaStart = j * (Math.PI / 2);
+      const thetaLength = Math.PI / 2;
+
+      const phiMid = phiStart + phiLength / 2;
+      const ySign = (j === 0) ? 1.0 : -1.0;
+      const tiltAxis = new THREE.Vector3(Math.sin(phiMid), 0, Math.cos(phiMid));
+      const tiltAngle = -ySign * 0.2;
+
+      // Layer 2: Inner Mantle (Radius 0.27 to 0.49)
+      const imHelper = new THREE.Group();
+      group.add(imHelper);
+      const imGeo = createThickSphereSegment(config.size * 0.27, config.size * 0.49, phiStart, phiLength, thetaStart, thetaLength);
+      const normal = getGeometryCenterNormal(imGeo);
+      deformSphereToRock(imGeo, 0.07);
+      const imMesh = new THREE.Mesh(imGeo, innerMantleMat);
+      imMesh.castShadow = true;
+      imMesh.receiveShadow = true;
+      imHelper.add(imMesh);
+      innerMantlePlates.push({ helper: imHelper, normal, tiltAxis, tiltAngle });
+
+      // Layer 3: Outer Mantle (Radius 0.52 to 0.73)
+      const omHelper = new THREE.Group();
+      group.add(omHelper);
+      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.73, phiStart, phiLength, thetaStart, thetaLength);
+      deformSphereToRock(omGeo, 0.08);
+      const omMesh = new THREE.Mesh(omGeo, outerMantleMat);
+      omMesh.castShadow = true;
+      omMesh.receiveShadow = true;
+      omHelper.add(omMesh);
+      outerMantlePlates.push({ helper: omHelper, normal, tiltAxis, tiltAngle });
+
+      // Layer 4: Crust (Radius 0.76 to 1.0)
+      const cHelper = new THREE.Group();
+      group.add(cHelper);
+      const cGeo = createThickSphereSegment(config.size * 0.76, config.size * 1.0, phiStart, phiLength, thetaStart, thetaLength);
+      deformSphereToRock(cGeo, 0.16);
+      const cMesh = new THREE.Mesh(cGeo, crustMat);
+      cMesh.castShadow = true;
+      cMesh.receiveShadow = true;
+      cHelper.add(cMesh);
+      crustPlates.push({ helper: cHelper, normal, tiltAxis, tiltAngle });
+    }
+  }
+
+  parentGroup.add(group);
+  
+  return {
+    group,
+    coreMesh,
+    innerMantlePlates,
+    outerMantlePlates,
+    crustPlates,
+    glowMaterial: null,
+    config,
+    type: 'cyber',
+    id: 'planet4'
+  };
+}
+
+// ------------------------------------------
+// PLANET 5: REQUIREMENT SEEKER (GOLDEN AMBER / RADAR)
+// ------------------------------------------
+export function buildPlanet5(parentGroup) {
+  const group = new THREE.Group();
+  const config = CONFIG.orbits.p5;
+  const radarTexture = createAmberRadarTexture();
+  
+  const coreMat = new THREE.MeshStandardMaterial({
+    color: 0xdd8800,
+    map: radarTexture,
+    bumpMap: radarTexture,
+    bumpScale: 0.14,
+    emissive: 0xffaa00,
+    emissiveIntensity: 2.5,
+    roughness: 0.8,
+    metalness: 0.1
+  });
+
+  const innerMantleMat = new THREE.MeshStandardMaterial({
+    color: 0x552e00,
+    emissive: 0x221100,
+    emissiveIntensity: 0.2,
+    map: radarTexture,
+    bumpMap: radarTexture,
+    bumpScale: 0.1,
+    roughness: 0.75,
+    metalness: 0.15
+  });
+
+  const outerMantleMat = new THREE.MeshStandardMaterial({
+    color: 0x884900,
+    emissive: 0x331c00,
+    emissiveIntensity: 0.15,
+    map: radarTexture,
+    bumpMap: radarTexture,
+    bumpScale: 0.12,
+    roughness: 0.75,
+    metalness: 0.15
+  });
+
+  const crustMat = new THREE.MeshStandardMaterial({
+    color: 0xbb6600,
+    emissive: 0x552c00,
+    emissiveIntensity: 0.1,
+    map: radarTexture,
+    bumpMap: radarTexture,
+    bumpScale: 0.18,
+    roughness: 0.7,
+    metalness: 0.18
+  });
+  
+  const coreGeo = new THREE.SphereGeometry(config.size * 0.22, 32, 32);
+  const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+  coreMesh.castShadow = true;
+  coreMesh.receiveShadow = true;
+  group.add(coreMesh);
+
+  const innerMantlePlates = [];
+  const outerMantlePlates = [];
+  const crustPlates = [];
+
+  const divsPhi = 6;
+  const divsTheta = 2;
+  for(let i=0; i<divsPhi; i++) {
+    for(let j=0; j<divsTheta; j++) {
+      const phiStart = i * (Math.PI * 2 / divsPhi);
+      const phiLength = Math.PI * 2 / divsPhi;
+      const thetaStart = j * (Math.PI / 2);
+      const thetaLength = Math.PI / 2;
+
+      const phiMid = phiStart + phiLength / 2;
+      const ySign = (j === 0) ? 1.0 : -1.0;
+      const tiltAxis = new THREE.Vector3(Math.sin(phiMid), 0, Math.cos(phiMid));
+      const tiltAngle = -ySign * 0.2;
+
+      // Layer 2: Inner Mantle (Radius 0.27 to 0.49)
+      const imHelper = new THREE.Group();
+      group.add(imHelper);
+      const imGeo = createThickSphereSegment(config.size * 0.27, config.size * 0.49, phiStart, phiLength, thetaStart, thetaLength);
+      const normal = getGeometryCenterNormal(imGeo);
+      deformSphereToRock(imGeo, 0.07);
+      const imMesh = new THREE.Mesh(imGeo, innerMantleMat);
+      imMesh.castShadow = true;
+      imMesh.receiveShadow = true;
+      imHelper.add(imMesh);
+      innerMantlePlates.push({ helper: imHelper, normal, tiltAxis, tiltAngle });
+
+      // Layer 3: Outer Mantle (Radius 0.52 to 0.73)
+      const omHelper = new THREE.Group();
+      group.add(omHelper);
+      const omGeo = createThickSphereSegment(config.size * 0.52, config.size * 0.73, phiStart, phiLength, thetaStart, thetaLength);
+      deformSphereToRock(omGeo, 0.08);
+      const omMesh = new THREE.Mesh(omGeo, outerMantleMat);
+      omMesh.castShadow = true;
+      omMesh.receiveShadow = true;
+      omHelper.add(omMesh);
+      outerMantlePlates.push({ helper: omHelper, normal, tiltAxis, tiltAngle });
+
+      // Layer 4: Crust (Radius 0.76 to 1.0)
+      const cHelper = new THREE.Group();
+      group.add(cHelper);
+      const cGeo = createThickSphereSegment(config.size * 0.76, config.size * 1.0, phiStart, phiLength, thetaStart, thetaLength);
+      deformSphereToRock(cGeo, 0.17);
+      const cMesh = new THREE.Mesh(cGeo, crustMat);
+      cMesh.castShadow = true;
+      cMesh.receiveShadow = true;
+      cHelper.add(cMesh);
+      crustPlates.push({ helper: cHelper, normal, tiltAxis, tiltAngle });
+    }
+  }
+
+  parentGroup.add(group);
+  
+  return {
+    group,
+    coreMesh,
+    innerMantlePlates,
+    outerMantlePlates,
+    crustPlates,
+    glowMaterial: null,
+    config,
+    type: 'radar',
+    id: 'planet5'
   };
 }

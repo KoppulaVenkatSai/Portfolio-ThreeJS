@@ -290,10 +290,10 @@ export function buildPlanetsTimeline(
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxDistance = 100;
+    controls.maxDistance = 150;
     controls.minDistance = 6;
     controls.target.copy(targetCamLook);
-    controls.enabled = true;
+    controls.enabled = false;
     window.activeControls = controls;
 
     // Show star controls widget if present

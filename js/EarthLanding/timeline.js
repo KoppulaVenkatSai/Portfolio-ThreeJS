@@ -399,6 +399,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     controls.dampingFactor = 0.05;
     controls.maxPolarAngle = Math.PI / 2 - 0.05;
     controls.target.set(-0.74, 17.04, -74.29);
+    controls.enabled = false;
     window.activeControls = controls;
   }, CONFIG.timeline.manualControlTime);
 

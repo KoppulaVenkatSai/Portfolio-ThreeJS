@@ -54,7 +54,7 @@ class CameraRigController {
   }
   
   update(camera, rocket, elapsed, delta) {
-    if (window.activeControls) return;
+    if (window.activeControls && window.activeControls.enabled) return;
     if (window.koppulaSystemManager && window.koppulaSystemManager.isActive) return;
     
     const sc = ENGINE_STATE.currentScene;

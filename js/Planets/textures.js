@@ -117,6 +117,119 @@ export function createCrystalRockTexture() {
   return texture;
 }
 
+export function createCyberLatticeTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Deep obsidian/emerald background
+  ctx.fillStyle = '#021810';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Hexagonal and orthogonal semantic graph lattice lines
+  ctx.strokeStyle = '#006638';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 512; i += 48) {
+    ctx.beginPath();
+    ctx.moveTo(i, 0); ctx.lineTo(i, 512);
+    ctx.moveTo(0, i); ctx.lineTo(512, i);
+    ctx.stroke();
+  }
+
+  // Diagonal graph connection lines
+  ctx.strokeStyle = '#00aa55';
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 0.35;
+  for (let i = 0; i < 28; i++) {
+    const x1 = Math.random() * 512;
+    const y1 = Math.random() * 512;
+    const x2 = x1 + (Math.random() - 0.5) * 160;
+    const y2 = y1 + (Math.random() - 0.5) * 160;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Node dots at endpoints
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath();
+    ctx.arc(x1, y1, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Glowing cyber circuit clusters
+  ctx.globalAlpha = 0.45;
+  ctx.fillStyle = '#00ffaa';
+  for (let i = 0; i < 60; i++) {
+    ctx.fillRect(Math.random() * 512, Math.random() * 512, Math.random() * 4 + 1, Math.random() * 4 + 1);
+  }
+  ctx.globalAlpha = 1.0;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+export function createAmberRadarTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Dark solar bronze/amber base
+  ctx.fillStyle = '#1c1002';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Concentric radar sweep rings
+  ctx.strokeStyle = '#663b00';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.55;
+  for (let r = 30; r < 280; r += 36) {
+    ctx.beginPath();
+    ctx.arc(256, 256, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Radar radial azimuth lines
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+    ctx.beginPath();
+    ctx.moveTo(256, 256);
+    ctx.lineTo(256 + Math.cos(a) * 260, 256 + Math.sin(a) * 260);
+    ctx.stroke();
+  }
+
+  // Sensor telemetry pips and golden arcs
+  ctx.globalAlpha = 0.65;
+  ctx.fillStyle = '#ffaa00';
+  for (let i = 0; i < 80; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Math.random() * 240;
+    ctx.fillRect(256 + Math.cos(angle) * dist, 256 + Math.sin(angle) * dist, Math.random() * 3 + 1, Math.random() * 3 + 1);
+  }
+
+  // Subtle telemetry crosshair markers
+  ctx.strokeStyle = '#ffd500';
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.7;
+  for (let i = 0; i < 6; i++) {
+    const cx = Math.random() * 400 + 56;
+    const cy = Math.random() * 400 + 56;
+    ctx.beginPath();
+    ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 8, cy);
+    ctx.moveTo(cx, cy - 8); ctx.lineTo(cx, cy + 8);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1.0;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
 export function createNebulaTexture(color1, color2) {
   const canvas = document.createElement('canvas');
   canvas.width = 1024;

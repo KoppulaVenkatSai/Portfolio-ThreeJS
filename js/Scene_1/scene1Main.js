@@ -1039,7 +1039,7 @@ export function initScene1() {
         camera.lookAt(currentLookTarget);
       }
     } else {
-      if (window.activeControls) {
+      if (window.activeControls && window.activeControls.enabled) {
         window.activeControls.update();
       }
     }

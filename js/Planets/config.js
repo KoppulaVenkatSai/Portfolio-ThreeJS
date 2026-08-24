@@ -2,25 +2,39 @@ import * as THREE from 'three';
 
 export const PROJECTS_DATA = {
   planet1: {
-    title: "NEURAL CORE",
-    classification: "AI & REINFORCEMENT LEARNING",
-    usecase: "Developing autonomous learning agents, deep Q-networks (DQN) for complex path navigation, and policy models optimized for high-dimensional decision spaces.",
-    build: "Built using PyTorch and OpenAI Gym. Designed custom reward functions, state encoders, and neural networks capable of training agents in chaotic non-linear environments.",
-    tech: ["Python", "PyTorch", "OpenAI Gym", "NumPy", "TensorBoard", "Ray/RLlib"]
+    title: "FAULT DIAGNOSTICS & RCA",
+    classification: "DEEP LEARNING & GRAPH RCA",
+    usecase: "Complete 3-tier industrial predictive maintenance and causal diagnosis platform: real-time multi-variate SCADA telemetry anomaly detection, LangGraph agentic reasoning with domain RAG, and Neo4j graph traversal for alarm suppression and true root-cause isolation.",
+    build: "Multi-variate SCADA telemetry is processed by PyTorch Autoencoders & Attention models to detect anomalies and operational drift. Anomaly signals trigger stateful LangGraph agentic reasoning with domain RAG, while Neo4j plant topology graphs suppress cascading secondary alarms to isolate root-cause failing assets.",
+    tech: ["PyTorch", "LangGraph", "FastAPI", "Neo4j", "Qdrant", "GPT-4o", "WebSockets"]
   },
   planet2: {
-    title: "REFINERY AI",
-    classification: "THERMAL SIMULATIONS & PYTHON",
-    usecase: "Building high-performance thermodynamic simulation engines for gas turbines and heat-exchangers, predicting fouling rates and optimizing thermal efficiency.",
-    build: "Created multi-threaded physical equation solvers using SciPy. Engineered procedural metadata importers that parse CAD blueprints and map them directly into structural meshes.",
-    tech: ["Python", "SciPy", "NumPy", "Matplotlib", "FluidSolver", "Pandas", "Docker"]
+    title: "PHYSICS DIGITAL TWIN",
+    classification: "THERMAL SIMULATIONS & RUST",
+    usecase: "Real-time closed-loop setpoint optimization for heavy industrial machinery and gas turbines under strict thermodynamic boundaries.",
+    build: "Bridges Python numerical optimization with a high-performance compiled Rust Digital Twin physics engine to minimize fuel consumption and maximize net power output under operational constraints.",
+    tech: ["Python", "Rust", "FastAPI", "SciPy", "WebSockets", "Docker"]
   },
   planet3: {
-    title: "ONTOLOGY CORE",
-    classification: "KNOWLEDGE GRAPHS & ONTOLOGY",
-    usecase: "Representing semantic web architectures and dependency graphs, mapping relations between mechanical systems, parts catalogs, and engineering metadata.",
-    build: "Designed hierarchical ontologies and RDF structures. Integrated graph databases (Neo4j) with SPARQL query endpoints and designed custom mapping algorithms compiled to Rust.",
-    tech: ["Rust", "Python", "Neo4j", "RDF / SPARQL", "Owlready2", "gRPC", "WebAssembly"]
+    title: "ASSET HEALTH & RUL",
+    classification: "RELIABILITY SCORING & RUL",
+    usecase: "Continuous reliability scoring and degradation tracking for mission-critical industrial assets, calculating real-time Health Index and Remaining Useful Life.",
+    build: "Models multi-sensor run-to-failure curves to compute a real-time Health Index (0–100) and quantitative Remaining Useful Life (RUL) projections trained on the NASA CMAPSS dataset.",
+    tech: ["Python", "Pandas", "NumPy", "NASA CMAPSS", "REST APIs", "Scikit-Learn"]
+  },
+  planet4: {
+    title: "SEMANTIC ETL ENGINE",
+    classification: "AGENTIC ETL & ONTOLOGY",
+    usecase: "24-stage Agentic Human-in-the-Loop ETL pipeline that automates the ingestion and standardization of messy legacy industrial plant data into unified digital twin schemas.",
+    build: "Combines BERT semantic embeddings with OpenAI GPT-4o to decode cryptic plant acronyms, discover measurement units, resolve digital states, and build clean Neo4j asset hierarchies.",
+    tech: ["Neo4j", "Python", "GPT-4o", "BERT", "SCADA / XML", "FastAPI"]
+  },
+  planet5: {
+    title: "REQUIREMENT SEEKER",
+    classification: "WEB INTELLIGENCE & LLM",
+    usecase: "High-throughput, credential-less job market intelligence tool for scraping and analyzing role requirements from public endpoints without login requirements.",
+    build: "Built-in self-healing rotating proxy pool to bypass rate limits, combined with hybrid heuristic and Google Gemini LLM parsing to extract structured skill demands and market insights.",
+    tech: ["Python", "Gemini API", "Rotating Proxies", "Beautiful Soup", "REST APIs"]
   }
 };
 
@@ -29,19 +43,23 @@ export const CONFIG = {
     bgSpace: 0x010204, // Deepest space black-blue
     sunCore: 0xffffff,
     sunGlow: 0xff8800, // Moody solar orange
-    cyan: 0x00c8ff,   // Less saturated cyan, more technical
-    orange: 0xcc3b00, // Rust-red orange
-    crystal: 0x8811bb, // Deep amethyst violet
+    cyan: 0x00c8ff,   // Electric cyan for AI & DL
+    orange: 0xcc3b00, // Rust-red orange for Physics/Thermal
+    crystal: 0x8811bb, // Deep amethyst violet for RUL/Health
+    emerald: 0x00cc77, // Emerald cyber green for Semantic ETL
+    amber: 0xffaa00,   // Golden amber for Web Intelligence
     ambient: 0x010102 // Barely-there ambient light for high contrast
   },
   orbits: {
-    p1: { radius: 14, speed: 0.08, swayAmplitude: 0.15, size: 2.2 },
-    p2: { radius: 24, speed: 0.05, swayAmplitude: 0.10, size: 2.6 },
-    p3: { radius: 34, speed: 0.03, swayAmplitude: 0.07, size: 2.4 }
+    p1: { radius: 13.0, speed: 0.075, swayAmplitude: 0.14, size: 2.1 },
+    p2: { radius: 20.5, speed: 0.052, swayAmplitude: 0.11, size: 2.5 },
+    p3: { radius: 28.0, speed: 0.038, swayAmplitude: 0.09, size: 2.3 },
+    p4: { radius: 35.5, speed: 0.027, swayAmplitude: 0.07, size: 2.4 },
+    p5: { radius: 43.0, speed: 0.019, swayAmplitude: 0.05, size: 2.2 }
   },
   camera: {
     overview: {
-      pos: new THREE.Vector3(-5.78, 18.20, 56.75),
+      pos: new THREE.Vector3(-7.50, 24.00, 74.00),
       target: new THREE.Vector3(0, 0, 0)
     }
   }
