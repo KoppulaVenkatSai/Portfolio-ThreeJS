@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <title>Portfolio - Scene 1 & Scene 2</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Share+Tech+Mono&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/assets/index-qMJfmN-W.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DkOcrisV.css">
+  <script type="module" crossorigin src="/assets/index-CirjkJqn.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DvZD_IDa.css">
 </head>
 <body>
   <canvas id="webgl-canvas"></canvas>
@@ -403,6 +404,103 @@
         <circle cx="135" cy="90" r="5" class="rot-node-dot" />
       </svg>
     </button>
+  </div>
+
+  <!-- Custom Sci-Fi Cursor Tooltip -->
+  <div id="custom-tooltip">
+    <span class="tooltip-text">CLICK TO FOCUS</span>
+    <div class="tooltip-arrow"></div>
+  </div>
+
+  <!-- 4-Corner Emerging HUD Data Screen Panels Overlay -->
+  <div id="data-hud-overlay" class="hud-overlay closed">
+    <!-- Panel 1: Top-Left (Title & Classification) -->
+    <div id="panel-top-left" class="hud-panel-card top-left">
+      <div class="panel-header">
+        <span class="system-tag">PROJECTS_CORE // PORTFOLIO</span>
+        <span class="panel-corner-tag">NODE_01</span>
+      </div>
+      <h2 id="project-title" class="hud-project-title">PROJECT TITLE</h2>
+      <div class="data-block">
+        <span class="data-label">SYSTEM CLASSIFICATION</span>
+        <div id="project-classification" class="data-value">AI & REINFORCEMENT LEARNING</div>
+      </div>
+    </div>
+
+    <!-- Panel 2: Top-Right (Core Mission / Use Case) -->
+    <div id="panel-top-right" class="hud-panel-card top-right">
+      <div class="panel-header">
+        <span class="system-tag">MISSION_BRIEF</span>
+        <span class="panel-corner-tag">NODE_02</span>
+      </div>
+      <div class="data-block">
+        <span class="data-label">CORE MISSION / USE CASE</span>
+        <p id="project-usecase" class="data-text">Detailed description of what the project does, its mission and primary business use case.</p>
+      </div>
+    </div>
+
+    <!-- Panel 3: Bottom-Left (Technical Anatomy / Build) -->
+    <div id="panel-bottom-left" class="hud-panel-card bottom-left">
+      <div class="panel-header">
+        <span class="system-tag">SYSTEM_ANATOMY</span>
+        <span class="panel-corner-tag">NODE_03</span>
+      </div>
+      <div class="data-block">
+        <span class="data-label">TECHNICAL ANATOMY / SYSTEM BUILD</span>
+        <p id="project-build" class="data-text">Technical solutions, architectures, models and algorithms utilized during engineering.</p>
+      </div>
+    </div>
+
+    <!-- Panel 4: Bottom-Right (Stack & Rewind Session) -->
+    <div id="panel-bottom-right" class="hud-panel-card bottom-right">
+      <div class="panel-header">
+        <span class="system-tag">TECH_STACK</span>
+        <span class="panel-corner-tag">NODE_04</span>
+      </div>
+      <div class="data-block">
+        <span class="data-label">SYSTEM CORE STACK</span>
+        <div id="project-tech-badges" class="tech-grid">
+          <span class="tech-badge">Python</span>
+          <span class="tech-badge">TensorFlow</span>
+          <span class="tech-badge">PyTorch</span>
+        </div>
+      </div>
+      <button id="close-blade-btn" class="close-btn">&lt;&lt; REWIND_SESSION</button>
+    </div>
+  </div>
+
+  <!-- Floating Starfield Controls for Planets Screen -->
+  <div id="stars-control-widget" class="stars-control-widget">
+    <div class="star-widget-header" id="star-widget-header">
+      <div>
+        <span class="star-icon">✦</span>
+        <span class="star-title">STARFIELD_CALIBRATOR</span>
+      </div>
+      <button id="star-widget-toggle-btn" class="star-toggle-btn">−</button>
+    </div>
+    <div class="star-widget-body" id="star-widget-body">
+      <div class="star-slider-row">
+        <div class="star-label-group">
+          <span class="star-label">BRIGHTNESS:</span>
+          <span class="star-val" id="star-brightness-val">50%</span>
+        </div>
+        <input type="range" id="star-brightness-slider" min="0.0" max="1.0" step="0.02" value="0.50">
+      </div>
+      <div class="star-slider-row">
+        <div class="star-label-group">
+          <span class="star-label">STAR SIZE:</span>
+          <span class="star-val" id="star-size-val">1.5x</span>
+        </div>
+        <input type="range" id="star-size-slider" min="0.2" max="5.0" step="0.1" value="1.5">
+      </div>
+      <div class="star-slider-row">
+        <div class="star-label-group">
+          <span class="star-label">STAR COUNT:</span>
+          <span class="star-val" id="star-density-val">750</span>
+        </div>
+        <input type="range" id="star-density-slider" min="100" max="5000" step="50" value="750">
+      </div>
+    </div>
   </div>
 
 </body>

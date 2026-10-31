@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>Portfolio - Scene 1 & Scene 2</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Share+Tech+Mono&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="/assets/index-CirjkJqn.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DvZD_IDa.css">
+</head>
+<body>
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Preloader Screen -->
+  <div id="loader-screen">
+    <div class="loader-matrix">
+      <div class="loader-title">SYSTEM INITIALIZATION // SCENE 01</div>
+      <div class="loader-bar-bg">
+        <div id="loader-bar"></div>
+      </div>
+      <div id="loader-status">Preloading WebGL and assets...</div>
+    </div>
+  </div>
+
+  <!-- HUD Overlay -->
+  <div id="hud-container">
+    <div class="hud-header">
+      <div class="hud-tag">STATION INTERIOR // MODULE 01</div>
+      <div class="hud-right-actions">
+        <div class="hud-status"><span class="pulse-dot"></span> SYSTEMS READY</div>
+        <button id="settings-toggle-btn" class="icon-btn" title="Toggle Inspector Controls">⚙️</button>
+      </div>
+    </div>
+
+    <!-- Inspector Controls Accordion Panel -->
+    <div id="camera-inspector" class="inspector-hidden">
+      
+      <!-- Accordion 1: Camera & Bloom Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>CAMERA_&_BLOOM_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="info-row">
+            <span class="label">CAM POS:</span>
+            <span class="value" id="cam-pos-val">0.00, 0.00, 0.00</span>
+          </div>
+          <div class="info-row">
+            <span class="label">LOOK TARGET:</span>
+            <span class="value" id="cam-target-val">0.00, 0.00, 0.00</span>
+          </div>
+
+          <div class="slider-row" style="margin-top: 8px;">
+            <label>BLOOM STRENGTH: <span id="bloom-strength-val">0.40</span></label>
+            <input type="range" id="bloom-strength-slider" min="0.0" max="4.0" step="0.05" value="0.40">
+          </div>
+          <div class="slider-row">
+            <label>BLOOM THRESHOLD: <span id="bloom-threshold-val">0.96</span></label>
+            <input type="range" id="bloom-threshold-slider" min="0.0" max="1.0" step="0.01" value="0.96">
+          </div>
+
+          <div class="inspector-controls">
+            <button class="control-btn" id="toggle-orbit-btn">ENABLE FREE CAM</button>
+            <button class="control-btn copy-btn" id="copy-cam-btn">📋 COPY CAM POS & TARGET</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 2: 3D Text Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>3D_NAME_TEXT_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SIZE / SCALE: <span id="text-scale-val">1.45</span></label>
+            <input type="range" id="text-scale-slider" min="0.2" max="3.0" step="0.05" value="1.45">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="text-x-val">35.10</span></label>
+            <input type="range" id="text-x-slider" min="20" max="50" step="0.1" value="35.10">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="text-y-val">0.40</span></label>
+            <input type="range" id="text-y-slider" min="-3" max="3" step="0.05" value="0.40">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="text-z-val">9.40</span></label>
+            <input type="range" id="text-z-slider" min="-10" max="20" step="0.1" value="9.40">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="text-roty-val">3.05</span></label>
+            <input type="range" id="text-roty-slider" min="0" max="6.28" step="0.05" value="3.05">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-text-btn">📋 COPY TEXT POS & ROTATION</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 3: BLAST OFF Lid Text Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>BLAST_OFF_LID_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SIZE / SCALE: <span id="lid-scale-val">1.60</span></label>
+            <input type="range" id="lid-scale-slider" min="0.2" max="3.0" step="0.05" value="1.60">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="lid-x-val">37.50</span></label>
+            <input type="range" id="lid-x-slider" min="30.0" max="45.0" step="0.05" value="37.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="lid-y-val">-2.55</span></label>
+            <input type="range" id="lid-y-slider" min="-5.0" max="2.0" step="0.05" value="-2.55">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="lid-z-val">7.35</span></label>
+            <input type="range" id="lid-z-slider" min="0.0" max="15.0" step="0.05" value="7.35">
+          </div>
+          <div class="slider-row">
+            <label>ROT X: <span id="lid-rotx-val">-0.04</span></label>
+            <input type="range" id="lid-rotx-slider" min="-3.14" max="3.14" step="0.02" value="-0.04">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="lid-roty-val">3.15</span></label>
+            <input type="range" id="lid-roty-slider" min="0.0" max="6.28" step="0.05" value="3.15">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-lid-btn">📋 COPY LID TEXT TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 4: AVATAR Model Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>AVATAR_MODEL_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SCALE: <span id="avatar-scale-val">7.70</span></label>
+            <input type="range" id="avatar-scale-slider" min="0.5" max="15.0" step="0.05" value="7.70">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="avatar-x-val">32.95</span></label>
+            <input type="range" id="avatar-x-slider" min="20.0" max="50.0" step="0.05" value="32.95">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="avatar-y-val">-5.50</span></label>
+            <input type="range" id="avatar-y-slider" min="-10.0" max="5.0" step="0.05" value="-5.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="avatar-z-val">1.10</span></label>
+            <input type="range" id="avatar-z-slider" min="-10.0" max="20.0" step="0.05" value="1.10">
+          </div>
+          <div class="slider-row">
+            <label>ROT X: <span id="avatar-rotx-val">0.00</span></label>
+            <input type="range" id="avatar-rotx-slider" min="-3.14" max="3.14" step="0.02" value="0.00">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y: <span id="avatar-roty-val">2.04</span></label>
+            <input type="range" id="avatar-roty-slider" min="-3.14" max="6.28" step="0.02" value="2.04">
+          </div>
+          <div class="slider-row">
+            <label>ROT Z: <span id="avatar-rotz-val">0.00</span></label>
+            <input type="range" id="avatar-rotz-slider" min="-3.14" max="3.14" step="0.02" value="0.00">
+          </div>
+          <div class="slider-row" style="margin-top: 6px;">
+            <label>SKIN / FACE COLOR:</label>
+            <input type="color" id="avatar-skin-picker" value="#ffdbac" style="width: 100%; height: 28px; border: none; cursor: pointer; background: transparent;">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-avatar-btn">📋 COPY AVATAR TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 5: HOLOGRAM Screen Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>HOLOGRAM_SCREEN_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>SCALE: <span id="hologram-scale-val">0.25</span></label>
+            <input type="range" id="hologram-scale-slider" min="0.05" max="3.0" step="0.01" value="0.25">
+          </div>
+          <div class="slider-row">
+            <label>POS X: <span id="hologram-x-val">-11.50</span></label>
+            <input type="range" id="hologram-x-slider" min="-30.0" max="30.0" step="0.1" value="-11.50">
+          </div>
+          <div class="slider-row">
+            <label>POS Y: <span id="hologram-y-val">30.60</span></label>
+            <input type="range" id="hologram-y-slider" min="-10.0" max="60.0" step="0.1" value="30.60">
+          </div>
+          <div class="slider-row">
+            <label>POS Z: <span id="hologram-z-val">70.30</span></label>
+            <input type="range" id="hologram-z-slider" min="-20.0" max="100.0" step="0.1" value="70.30">
+          </div>
+          <div class="slider-row">
+            <label>ROT X (TILT): <span id="hologram-rotx-val">0.10</span></label>
+            <input type="range" id="hologram-rotx-slider" min="-3.14" max="3.14" step="0.02" value="0.10">
+          </div>
+          <div class="slider-row">
+            <label>ROT Y (PAN): <span id="hologram-roty-val">-0.30</span></label>
+            <input type="range" id="hologram-roty-slider" min="-3.14" max="6.28" step="0.02" value="-0.30">
+          </div>
+          <div class="slider-row">
+            <label>ROT Z (ROLL): <span id="hologram-rotz-val">0.02</span></label>
+            <input type="range" id="hologram-rotz-slider" min="-3.14" max="3.14" step="0.02" value="0.02">
+          </div>
+          <div class="slider-row">
+            <label>HOVER GLOW BRIGHTNESS: <span id="hologram-hoverbright-val">0.00</span></label>
+            <input type="range" id="hologram-hoverbright-slider" min="0.0" max="3.0" step="0.1" value="0.00">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn" id="toggle-hologram-vis-btn">TOGGLE HOLOGRAM VISIBILITY</button>
+            <button class="control-btn copy-btn" id="copy-hologram-btn">📋 COPY HOLOGRAM TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 6: PROJECTOR CONE Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>PROJECTOR_CONE_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>CONE LENGTH (SCALE Y): <span id="cone-scaley-val">0.70</span></label>
+            <input type="range" id="cone-scaley-slider" min="0.1" max="3.0" step="0.05" value="0.70">
+          </div>
+          <div class="slider-row">
+            <label>CONE WIDTH (SCALE XZ): <span id="cone-scalexz-val">1.00</span></label>
+            <input type="range" id="cone-scalexz-slider" min="0.1" max="3.0" step="0.05" value="1.00">
+          </div>
+          <div class="slider-row">
+            <label>CONE OFFSET Y: <span id="cone-posy-val">-2.20</span></label>
+            <input type="range" id="cone-posy-slider" min="-15.0" max="10.0" step="0.2" value="-2.20">
+          </div>
+          <div class="slider-row">
+            <label>CONE TILT (ROT X): <span id="cone-rotx-val">0.21</span></label>
+            <input type="range" id="cone-rotx-slider" min="-1.57" max="1.57" step="0.01" value="0.21">
+          </div>
+          <div class="slider-row">
+            <label>BEAM OPACITY: <span id="cone-opacity-val">0.28</span></label>
+            <input type="range" id="cone-opacity-slider" min="0.0" max="1.0" step="0.02" value="0.28">
+          </div>
+          <div class="slider-row">
+            <label>RAY DENSITY: <span id="cone-density-val">60</span></label>
+            <input type="range" id="cone-density-slider" min="10" max="150" step="5" value="60">
+          </div>
+          <div class="slider-row">
+            <label>RAY SPEED: <span id="cone-speed-val">0.50</span></label>
+            <input type="range" id="cone-speed-slider" min="0.0" max="2.0" step="0.05" value="0.50">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-cone-btn">📋 COPY CONE TRANSFORM</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accordion 7: STARFIELD & TWINKLE Controls Section -->
+      <div class="accordion-item">
+        <div class="accordion-header">
+          <span>STARFIELD_&_TWINKLE_INSPECTOR</span>
+          <span class="accordion-arrow">▼</span>
+        </div>
+        <div class="accordion-content">
+          <div class="slider-row">
+            <label>NO. OF STARS: <span id="star-count-val">2000</span></label>
+            <input type="range" id="star-count-slider" min="500" max="10000" step="100" value="2000">
+          </div>
+          <div class="slider-row">
+            <label>TWINKLE SPEED: <span id="twinkle-speed-val">2.5</span></label>
+            <input type="range" id="twinkle-speed-slider" min="0.2" max="10.0" step="0.1" value="2.5">
+          </div>
+          <div class="slider-row">
+            <label>TWINKLING STARS RATIO: <span id="twinkle-ratio-val">70%</span></label>
+            <input type="range" id="twinkle-ratio-slider" min="0.0" max="1.0" step="0.05" value="0.70">
+          </div>
+          <div class="slider-row">
+            <label>TWINKLE DEPTH: <span id="twinkle-depth-val">0.85</span></label>
+            <input type="range" id="twinkle-depth-slider" min="0.0" max="1.0" step="0.05" value="0.85">
+          </div>
+          <div class="slider-row">
+            <label>STAR SIZE MULTIPLIER: <span id="star-size-val">1.0x</span></label>
+            <input type="range" id="star-size-slider" min="0.5" max="3.0" step="0.1" value="1.0">
+          </div>
+          <div class="slider-row">
+            <label>CENTROID CLEARANCE (CORE SPACE): <span id="centroid-space-val">17.0</span></label>
+            <input type="range" id="centroid-space-slider" min="0.0" max="50.0" step="0.5" value="17.0">
+          </div>
+          <div class="slider-row">
+            <label>WARP STREAK SPEED: <span id="warp-speed-val">220</span></label>
+            <input type="range" id="warp-speed-slider" min="20" max="600" step="10" value="220">
+          </div>
+          <div class="inspector-controls">
+            <button class="control-btn copy-btn" id="copy-star-btn">📋 COPY STAR CONFIG</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="copy-toast">COPIED TO CLIPBOARD & CONSOLE!</div>
+    </div>
+
+    <!-- Navigation / Debug Controls -->
+    <div class="hud-footer">
+      <div class="hud-info">STATUS: <span id="cam-status">INTERIOR_VIEW</span></div>
+    </div>
+  </div>
+
+  <!-- Rocket Base Free Cam & Warp Action Overlay -->
+  <div id="warp-action-container" class="warp-action-hidden">
+    <div class="warp-action-card">
+      <div class="warp-action-header">
+        <span class="pulse-dot"></span>
+        <span class="warp-action-title">ROCKET BASE REACHED // FREE CAM ACTIVE</span>
+      </div>
+      <div class="warp-action-desc">
+        You can now freely orbit, pan, and zoom around the rocket with your mouse to inspect angles.
+      </div>
+      <div class="warp-action-btns">
+        <button id="ignite-warp-btn" class="warp-btn ignite-warp-btn">🚀 IGNITE WARP SEQUENCE</button>
+        <button id="toggle-align-guide-btn" class="warp-btn align-guide-btn">🎯 ALIGNMENT GUIDES: OFF</button>
+        <button id="reset-base-cam-btn" class="warp-btn reset-cam-btn">🎯 RESET 50/50 FRAMING</button>
+        <button id="copy-base-cam-btn" class="warp-btn copy-cam-btn">📋 COPY CAMERA COORDS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen Center Reticle & Rocket Alignment Overlay -->
+  <div id="alignment-reticle-overlay" class="alignment-reticle-hidden">
+    <div class="reticle-crosshair-h"></div>
+    <div class="reticle-crosshair-v"></div>
+    <div class="reticle-target-ring">
+      <div class="reticle-inner-ring"></div>
+      <div class="reticle-center-dot"></div>
+      <div class="reticle-label">SCREEN CENTER (0, 0)</div>
+    </div>
+    <div id="alignment-telemetry-card">
+      <div class="telemetry-header">
+        <span class="telemetry-dot"></span>
+        <span class="telemetry-title">ALIGNMENT TELEMETRY</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">ROCKET TIP (NDC):</span>
+        <span id="telemetry-tip-coords" class="telemetry-val">0.000, 0.000</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">OFFSET TO CENTER:</span>
+        <span id="telemetry-delta" class="telemetry-val">0.000</span>
+      </div>
+      <div class="telemetry-row">
+        <span class="telemetry-label">ALIGNMENT STATE:</span>
+        <span id="telemetry-status-badge" class="badge-aligning">ALIGNING...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storm lightning overlay -->
+  <div id="storm-overlay"></div>
+
+  <!-- Sci-Fi Monolith 3D Curved Rotation Controls Overlay -->
+  <div id="monolith-rotation-controls">
+    <button id="monolith-rotate-left" class="monolith-rot-btn rot-btn-left" title="Rotate Monolith 90° Left">
+      <svg class="rot-arc-svg" viewBox="0 0 160 120">
+        <defs>
+          <linearGradient id="rotGradLeft" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#00f7ff" stop-opacity="0.2" />
+            <stop offset="50%" stop-color="#00b0ff" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#00f7ff" stop-opacity="1" />
+          </linearGradient>
+        </defs>
+        <path d="M 25 90 A 65 48 0 0 1 135 35" class="rot-arc-bg" />
+        <path d="M 25 90 A 65 48 0 0 1 135 35" class="rot-arc-path rot-arc-left" />
+        <path d="M 152 24 L 126 16 L 134 34 L 120 44 Z" class="rot-head-poly rot-head-left" />
+        <circle cx="25" cy="90" r="5" class="rot-node-dot" />
+      </svg>
+    </button>
+
+    <button id="monolith-rotate-right" class="monolith-rot-btn rot-btn-right" title="Rotate Monolith 90° Right">
+      <svg class="rot-arc-svg" viewBox="0 0 160 120">
+        <defs>
+          <linearGradient id="rotGradRight" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#ffe033" stop-opacity="0.2" />
+            <stop offset="50%" stop-color="#ff9d00" stop-opacity="0.85" />
+            <stop offset="100%" stop-color="#ffe033" stop-opacity="1" />
+          </linearGradient>
+        </defs>
+        <path d="M 135 90 A 65 48 0 0 0 25 35" class="rot-arc-bg" />
+        <path d="M 135 90 A 65 48 0 0 0 25 35" class="rot-arc-path rot-arc-right" />
+        <path d="M 8 24 L 34 16 L 26 34 L 40 44 Z" class="rot-head-poly rot-head-right" />
+        <circle cx="135" cy="90" r="5" class="rot-node-dot" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Custom Sci-Fi Cursor Tooltip -->
+  <div id="custom-tooltip">
+    <span class="tooltip-text">CLICK TO FOCUS</span>
+    <div class="tooltip-arrow"></div>
+  </div>
+
+  <!-- 4-Corner Emerging HUD Data Screen Panels Overlay -->
+  <div id="data-hud-overlay" class="hud-overlay closed">
+    <!-- Panel 1: Top-Left (Title & Classification) -->
+    <div id="panel-top-left" class="hud-panel-card top-left">
+      <div class="panel-header">
+        <span class="system-tag">PROJECTS_CORE // PORTFOLIO</span>
+        <span class="panel-corner-tag">NODE_01</span>
+      </div>
+      <h2 id="project-title" class="hud-project-title">PROJECT TITLE</h2>
+      <div class="data-block">
+        <span class="data-label">SYSTEM CLASSIFICATION</span>
+        <div id="project-classification" class="data-value">AI & REINFORCEMENT LEARNING</div>
+      </div>
+    </div>
+
+    <!-- Panel 2: Top-Right (Core Mission / Use Case) -->
+    <div id="panel-top-right" class="hud-panel-card top-right">
+      <div class="panel-header">
+        <span class="system-tag">MISSION_BRIEF</span>
+        <span class="panel-corner-tag">NODE_02</span>
+      </div>
+      <div class="data-block">
+        <span class="data-label">CORE MISSION / USE CASE</span>
+        <p id="project-usecase" class="data-text">Detailed description of what the project does, its mission and primary business use case.</p>
+      </div>
+    </div>
+
+    <!-- Panel 3: Bottom-Left (Technical Anatomy / Build) -->
+    <div id="panel-bottom-left" class="hud-panel-card bottom-left">
+      <div class="panel-header">
+        <span class="system-tag">SYSTEM_ANATOMY</span>
+        <span class="panel-corner-tag">NODE_03</span>
+      </div>
+      <div class="data-block">
+        <span class="data-label">TECHNICAL ANATOMY / SYSTEM BUILD</span>
+        <p id="project-build" class="data-text">Technical solutions, architectures, models and algorithms utilized during engineering.</p>
+      </div>
+    </div>
+
+    <!-- Panel 4: Bottom-Right (Stack & Rewind Session) -->
+    <div id="panel-bottom-right" class="hud-panel-card bottom-right">
+      <div class="panel-header">
+        <span class="system-tag">TECH_STACK</span>
+        <span class="panel-corner-tag">NODE_04</span>
+      </div>
+      <div class="data-block">
+        <span class="data-label">SYSTEM CORE STACK</span>
+        <div id="project-tech-badges" class="tech-grid">
+          <span class="tech-badge">Python</span>
+          <span class="tech-badge">TensorFlow</span>
+          <span class="tech-badge">PyTorch</span>
+        </div>
+      </div>
+      <button id="close-blade-btn" class="close-btn">&lt;&lt; REWIND_SESSION</button>
+    </div>
+  </div>
+
+  <!-- Floating Starfield Controls for Planets Screen -->
+  <div id="stars-control-widget" class="stars-control-widget">
+    <div class="star-widget-header" id="star-widget-header">
+      <div>
+        <span class="star-icon">✦</span>
+        <span class="star-title">STARFIELD_CALIBRATOR</span>
+      </div>
+      <button id="star-widget-toggle-btn" class="star-toggle-btn">−</button>
+    </div>
+    <div class="star-widget-body" id="star-widget-body">
+      <div class="star-slider-row">
+        <div class="star-label-group">
+          <span class="star-label">BRIGHTNESS:</span>
+          <span class="star-val" id="star-brightness-val">50%</span>
+        </div>
+        <input type="range" id="star-brightness-slider" min="0.0" max="1.0" step="0.02" value="0.50">
+      </div>
+      <div class="star-slider-row">
+        <div class="star-label-group">
+          <span class="star-label">STAR SIZE:</span>
+          <span class="star-val" id="star-size-val">1.5x</span>
+        </div>
+        <input type="range" id="star-size-slider" min="0.2" max="5.0" step="0.1" value="1.5">
+      </div>
+      <div class="star-slider-row">
+        <div class="star-label-group">
+          <span class="star-label">STAR COUNT:</span>
+          <span class="star-val" id="star-density-val">750</span>
+        </div>
+        <input type="range" id="star-density-slider" min="100" max="5000" step="50" value="750">
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

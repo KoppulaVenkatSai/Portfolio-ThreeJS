@@ -3,7 +3,7 @@ import { FontLoader } from 'three/examples/jsm/loaders/FontLoader';
 import { TextGeometry } from 'three/examples/jsm/geometries/TextGeometry';
 
 export class CursiveNeonText {
-  constructor(onLoaded) {
+  constructor(onLoaded, loadingManager = null) {
     this.group = new THREE.Group();
     this.group.name = "CursiveNeonTextMasterGroup";
 
@@ -13,6 +13,7 @@ export class CursiveNeonText {
     this.group.add(this.floatGroup);
 
     this.onLoaded = onLoaded;
+    this.loadingManager = loadingManager;
 
     // HDR Metallic Cyan Chrome Material
     this.textMaterial = new THREE.MeshStandardMaterial({
@@ -30,7 +31,7 @@ export class CursiveNeonText {
   }
 
   buildText() {
-    const loader = new FontLoader();
+    const loader = new FontLoader(this.loadingManager);
     loader.load('/fonts/GreatVibes_Regular.json', (font) => {
       // Line 1: "Hi, I am"
       const geom1 = new TextGeometry('Hi, I am', {

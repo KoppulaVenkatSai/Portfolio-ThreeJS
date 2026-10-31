@@ -89,13 +89,20 @@ export function initScene1() {
   loadingManager.onLoad = () => {
     if (isLoaderDismissed) return;
     isLoaderDismissed = true;
+
+    // Pre-compile all shaders and materials on GPU before unveiling
+    if (renderer && scene && camera) {
+      console.log('[SCENE 1] Pre-compiling shaders on GPU...');
+      renderer.compile(scene, camera);
+    }
+
     gsap.to(progressState, {
       pct: 100,
       duration: 0.35,
       ease: 'power1.out',
       onUpdate: () => {
         if (loaderBar) loaderBar.style.width = '100%';
-        if (loaderStatus) loaderStatus.innerText = 'Initialization Complete (100%)';
+        if (loaderStatus) loaderStatus.innerText = 'Systems Ready (100%)';
       },
       onComplete: () => {
         if (loaderScreen) {
@@ -107,7 +114,7 @@ export function initScene1() {
         }
       }
     });
-    console.log('[SCENE 1] Loading Manager complete.');
+    console.log('[SCENE 1] Loading Manager complete & GPU shaders pre-warmed.');
   };
 
   loadingManager.onError = (url) => {
@@ -481,7 +488,7 @@ export function initScene1() {
     cursiveTextInstance.group.position.set(35.10, 0.40, 9.40);
     cursiveTextInstance.group.rotation.set(0, 3.05, 0);
     cursiveTextInstance.group.scale.set(1.45, 1.45, 1.45);
-  });
+  }, loadingManager);
   scene.add(cursiveTextInstance.group);
 
   // gsap.to(cursiveTextInstance.floatGroup.position, {
@@ -495,7 +502,7 @@ export function initScene1() {
   // ==========================================
   // 8.5 3D AVATAR ("Venky Avatar")
   // ==========================================
-  const techAvatarInstance = new TechAvatar('/Tests/AvatarPOC/Assets/Venky-Avatar-optimized.glb', null, loadingManager);
+  const techAvatarInstance = new TechAvatar('/assets/Venky-Avatar-optimized.glb', null, loadingManager);
   techAvatarInstance.group.position.set(32.95, -5.50, 1.10);
   techAvatarInstance.group.rotation.set(0.00, 2.04, 0.00);
   techAvatarInstance.group.scale.set(7.70, 7.70, 7.70);

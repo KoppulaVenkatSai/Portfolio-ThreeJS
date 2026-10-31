@@ -7,7 +7,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
  * Loads and manages the Draco-compressed 3D Character Model ("Venky-Avatar-optimized.glb").
  */
 export class TechAvatar {
-  constructor(modelPath = '/Tests/AvatarPOC/Assets/Venky-Avatar-optimized.glb', onLoad = null, loadingManager = null) {
+  constructor(modelPath = '/assets/Venky-Avatar-optimized.glb', onLoad = null, loadingManager = null) {
     this.group = new THREE.Group();
     this.group.name = "VenkatAvatarGroup";
     this.model = null;
@@ -19,7 +19,7 @@ export class TechAvatar {
 
   loadModel(modelPath, onLoad, loadingManager = null) {
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+    dracoLoader.setDecoderPath('/draco/');
 
     const gltfLoader = new GLTFLoader(loadingManager);
     gltfLoader.setDRACOLoader(dracoLoader);
