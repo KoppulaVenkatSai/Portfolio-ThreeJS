@@ -16,6 +16,8 @@ import { KoppulaSystemManager } from '../Planets/koppulaSystemManager.js';
 import { ENGINE_STATE } from '../EarthLanding/state.js';
 import { RocketAlignmentHelper } from '../helpers/alignmentHelper.js';
 import { SceneInspectorHelper } from '../helpers/inspectorHelper.js';
+import { navigationState, NAV_PHASES } from '../navigation/navigationState.js';
+import { initRewindController, isRewinding, setRewindDisabled } from '../navigation/rewindController.js';
 
 export function initScene1() {
   // ==========================================
@@ -572,12 +574,12 @@ export function initScene1() {
   });
 
   window.addEventListener('click', (event) => {
-    if (event.target.closest('#hud-container') || event.target.closest('#camera-inspector') || event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT') return;
+    if (event.target.closest('#hud-container') || event.target.closest('#camera-inspector') || event.target.closest('#rewind-back-btn') || event.target.tagName === 'BUTTON' || event.target.tagName === 'INPUT') return;
 
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-    if (hologramScreenInstance && hologramScreenInstance.isVisible && !isTransitioning) {
+    if (hologramScreenInstance && hologramScreenInstance.isVisible && !isTransitioning && !isRewinding()) {
       raycaster.setFromCamera(mouse, camera);
       const holoIntersects = raycaster.intersectObject(hologramScreenInstance.screenMesh);
       if (holoIntersects.length > 0) {
@@ -593,7 +595,7 @@ export function initScene1() {
       }
     }
 
-    if (isTransitioning || clickableObjects.length === 0) return;
+    if (isTransitioning || isRewinding() || clickableObjects.length === 0) return;
 
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(clickableObjects, true);
@@ -626,6 +628,7 @@ export function initScene1() {
     window.isTransitioning = true;
 
     controls.enabled = false;
+    setRewindDisabled(true, 'LAUNCH IN PROGRESS // REWIND LOCKED');
     const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
     if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'ENABLE FREE CAM';
 
@@ -636,8 +639,10 @@ export function initScene1() {
       onComplete: () => {
         isTransitioning = false;
         window.isTransitioning = false;
+        setRewindDisabled(false);
         if (camStatus) camStatus.innerText = 'EXTERIOR_VIEW // DESTINATION_SELECTION_READY';
         console.log('[SCENE 1] Blast Off pullout complete! Projecting Hologram Screen...');
+        navigationState.push(NAV_PHASES.EXTERIOR_SELECTION);
         if (hologramScreenInstance) {
           hologramScreenInstance.fadeIn(1.2);
         }
@@ -715,6 +720,7 @@ export function initScene1() {
     const isTargetA = targetName.includes('KOPPULA SYSTEM') || targetName.includes('TARGET A');
 
     controls.enabled = false;
+    setRewindDisabled(true, 'WARP IN PROGRESS // REWIND LOCKED');
     const toggleOrbitBtn = document.getElementById('toggle-orbit-btn');
     if (toggleOrbitBtn) toggleOrbitBtn.innerText = 'ENABLE FREE CAM';
 
@@ -751,11 +757,13 @@ export function initScene1() {
 
         if (isTargetA) {
           console.log('[DESTINATION SELECTION] Starting Koppula System Warp sequence...');
+          navigationState.push(NAV_PHASES.KOPPULA_SYSTEM);
           if (koppulaSystemManager) {
             koppulaSystemManager.startSequence(activeRocket);
           }
         } else {
           console.log('[DESTINATION SELECTION] Starting Earth Landing Warp sequence...');
+          navigationState.push(NAV_PHASES.EARTH_LANDING);
           if (earthLandingManager) {
             earthLandingManager.startSequence();
           }
@@ -763,26 +771,35 @@ export function initScene1() {
       }
     });
 
-    // Step 1: Projection fades out after 0.25s so button press animation is visible, while station lights dim (t = 0 to 1.5s)
+    // Step 1: Projection fades out after 0.25s so button press animation is visible
     if (hologramScreenInstance) {
       tl.add(() => {
         hologramScreenInstance.fadeOut(1.25);
       }, 0.25);
     }
-    if (ambientLight) tl.to(ambientLight, { intensity: 0.45, duration: 1.5, ease: 'power2.inOut' }, 0);
-    if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.15, duration: 1.5, ease: 'power2.inOut' }, 0);
-    if (sunLight) tl.to(sunLight, { intensity: 0.55, duration: 1.5, ease: 'power2.inOut' }, 0);
-    if (cabinLight) tl.to(cabinLight, { intensity: 0.35, duration: 1.5, ease: 'power2.inOut' }, 0);
-    if (buttonRedLight) tl.to(buttonRedLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 0);
-    if (rocketLight) tl.to(rocketLight, { intensity: 1.2, duration: 1.5, ease: 'power2.inOut' }, 0);
-    if (avatarLight) tl.to(avatarLight, { intensity: 0.2, duration: 1.5, ease: 'power2.inOut' }, 0);
 
-    // Extinguish Table & Console Glows (t = 0 to 1.5s)
+    // Dim cockpit room interior lights while preserving illumination on the rocket
+    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 2.0, ease: 'power2.inOut' }, 0.2);
+    if (buttonRedLight) tl.to(buttonRedLight, { intensity: 0.0, duration: 1.0, ease: 'power2.inOut' }, 0.2);
+    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 0.2);
+
+    // Maintain rocket illumination and exterior sun during the flight to the rocket
+    if (rocketLight) tl.to(rocketLight, { intensity: 1.4, duration: 1.5, ease: 'power2.inOut' }, 0.2);
+    if (ambientLight) tl.to(ambientLight, { intensity: 0.35, duration: 2.0, ease: 'power2.inOut' }, 0.2);
+    if (sunLight) tl.to(sunLight, { intensity: 0.5, duration: 2.0, ease: 'power2.inOut' }, 0.2);
+    if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.15, duration: 2.0, ease: 'power2.inOut' }, 0.2);
+
+    // Extinguish Table & Console Glows (t = 0.2 to 2.0s)
     stationEmissiveMaterials.forEach((mat) => {
-      tl.to(mat, { emissiveIntensity: 0.0, duration: 1.5, ease: 'power2.inOut' }, 0);
+      tl.to(mat, { emissiveIntensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 0.2);
     });
 
-    // Hide pad ring when lights dim
+    // Smoothly turn off station cosmos background (stars & nebulas) as camera swoops toward rocket (t = 1.0s to 4.2s)
+    if (cosmosBackground && cosmosBackground.fadeOut) {
+      cosmosBackground.fadeOut(3.2, tl, 1.0);
+    }
+
+    // Hide pad ring as camera approaches
     tl.add(() => {
       if (rocketDockingPadInstance && rocketDockingPadInstance.padRingGroup) {
         rocketDockingPadInstance.padRingGroup.visible = false;
@@ -790,7 +807,7 @@ export function initScene1() {
       allRocketPadNodes.forEach((node) => {
         node.visible = false;
       });
-    }, 1.5);
+    }, 2.5);
 
     // Step 2: Camera flies along a unified 3D curved arc bulging smoothly under the rocket
     const pStart = camera.position.clone();
@@ -846,7 +863,7 @@ export function initScene1() {
         camera.lookAt(currentLookTarget);
         if (controls) controls.target.copy(currentLookTarget);
 
-        // Keep rocket in its natural upright launchpad stance
+        // Keep rocket clearly visible in its upright launchpad stance
         const activeRocket = earthLandingManager && earthLandingManager.rocketModel;
         if (activeRocket) {
           activeRocket.visible = true;
@@ -858,34 +875,21 @@ export function initScene1() {
       }
     }, 1.5);
 
-    // Step 3: Procedural background crossfade & space transition as camera nests on the hull (t = 4.5s to 6.3s)
-    if (cosmosBackground && cosmosBackground.fadeOut) {
-      cosmosBackground.fadeOut(1.8, tl, 4.5);
-    }
+    // Step 3: Fade scene background to deep space black as we approach rocket (t = 2.0s to 4.8s)
     tl.to(scene.background, {
       r: 2 / 255,
       g: 2 / 255,
       b: 5 / 255,
-      duration: 1.8,
+      duration: 2.8,
       ease: 'power2.inOut'
-    }, 4.5);
+    }, 2.0);
 
-    tl.add(() => {
-      if (isTargetA) {
-        if (koppulaSystemManager) koppulaSystemManager.spaceGroup.visible = true;
-      } else {
-        if (earthLandingManager) earthLandingManager.spaceGroup.visible = true;
-      }
-    }, 4.5);
-    ENGINE_STATE.starsOpacity = 0.0;
-    tl.to(ENGINE_STATE, { starsOpacity: 1.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-
-    // Smoothly dissolve station body + gantry (t = 4.5s to 6.3s)
+    // Smoothly dissolve station body + gantry so only the rocket remains (t = 2.0s to 4.5s)
     if (stationModel) {
       stationModel.traverse((node) => {
         if (node.isMesh && node.material) {
           node.material.transparent = true;
-          tl.to(node.material, { opacity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+          tl.to(node.material, { opacity: 0.0, duration: 2.5, ease: 'power2.inOut' }, 2.0);
         }
       });
     }
@@ -898,25 +902,25 @@ export function initScene1() {
       if (cursiveTextInstance && cursiveTextInstance.group) cursiveTextInstance.group.visible = false;
       if (lidOverlayMesh) lidOverlayMesh.visible = false;
       if (cosmosBackground && cosmosBackground.group) cosmosBackground.group.visible = false;
-    }, 6.3);
+    }, 4.8);
 
-    // Fade out partial station lights smoothly
-    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-    if (cabinLight) tl.to(cabinLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-    if (avatarLight) tl.to(avatarLight, { intensity: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+    // Seamless handoff from rocketLight to destination flight lights at the end of the approach (t = 4.8s to 6.5s)
+    if (rocketLight) tl.to(rocketLight, { intensity: 0.0, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+    if (ambientLight) tl.to(ambientLight, { intensity: 0.0, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+    if (sunLight) tl.to(sunLight, { intensity: 0.0, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+    if (hemisphereLight) tl.to(hemisphereLight, { intensity: 0.0, duration: 1.7, ease: 'power2.inOut' }, 4.8);
 
+    // Ignite destination flight lighting right as camera nests on the rocket base (t = 4.8s to 6.5s)
     if (!isTargetA && earthLandingManager) {
-      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-      tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-      if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(earthLandingManager.spaceAmbient, { intensity: 0.6, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+      tl.to(earthLandingManager.spaceSun, { intensity: 1.5, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+      tl.to(earthLandingManager.hemisphereLight, { intensity: 1.2, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+      tl.to(renderer, { toneMappingExposure: 0.9, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+      if (bloomPass) tl.to(bloomPass, { strength: 0.0, duration: 1.7, ease: 'power2.inOut' }, 4.8);
     } else if (isTargetA && koppulaSystemManager) {
-      tl.to(koppulaSystemManager.flightAmbient, { intensity: 0.7, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-      tl.to(koppulaSystemManager.flightSun, { intensity: 1.8, duration: 1.8, ease: 'power2.inOut' }, 4.5);
-      tl.to(koppulaSystemManager.flightHemi, { intensity: 1.3, duration: 1.8, ease: 'power2.inOut' }, 4.5);
+      tl.to(koppulaSystemManager.flightAmbient, { intensity: 0.7, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+      tl.to(koppulaSystemManager.flightSun, { intensity: 1.8, duration: 1.7, ease: 'power2.inOut' }, 4.8);
+      tl.to(koppulaSystemManager.flightHemi, { intensity: 1.3, duration: 1.7, ease: 'power2.inOut' }, 4.8);
     }
   }
 
@@ -937,6 +941,53 @@ export function initScene1() {
   if (earthLandingManager) {
     window.warpSystem = earthLandingManager.warpSystem;
   }
+
+  // ==========================================
+  // 11.5 REWIND / BACK NAVIGATION CONTROLLER
+  // ==========================================
+  initRewindController({
+    camera,
+    controls,
+    scene,
+    renderer,
+    composer,
+    bloomPass,
+    currentLookTarget,
+    stationModel: null,
+    cosmosBackground,
+    cursiveTextInstance,
+    techAvatarInstance,
+    lidOverlayMesh: null,
+    avatarLight,
+    hologramScreenInstance,
+    rocketDockingPadInstance,
+    earthLandingManager,
+    koppulaSystemManager,
+    INTERIOR_CAM_POS,
+    INTERIOR_LOOK_TARGET,
+    EXTERIOR_CAM_POS,
+    EXTERIOR_LOOK_TARGET,
+    ambientLight,
+    hemisphereLight,
+    sunLight,
+    cabinLight,
+    buttonRedLight,
+    rocketLight,
+    stationEmissiveMaterials,
+    allRocketPadNodes
+  });
+
+  const _patchRewindCtxInterval = setInterval(() => {
+    if (stationModel && lidOverlayMesh) {
+      const ctx = window._rewindCtx;
+      if (ctx) {
+        ctx.stationModel = stationModel;
+        ctx.lidOverlayMesh = lidOverlayMesh;
+        ctx.rocketLight = rocketLight;
+      }
+      clearInterval(_patchRewindCtxInterval);
+    }
+  }, 500);
 
   // Warp Action Buttons (Rocket Base Free Cam & Warp Sequence)
   const igniteWarpBtn = document.getElementById('ignite-warp-btn');

@@ -60,6 +60,17 @@ export class HologramScreen {
     this.ctx = this.canvas.getContext('2d');
   }
 
+  resetState() {
+    this.lockedTarget = 0;
+    this.hoverTarget = 0;
+    this.btnAScale = 1.0;
+    this.btnBScale = 1.0;
+    gsap.killTweensOf(this, 'btnAScale');
+    gsap.killTweensOf(this, 'btnBScale');
+    this.renderCanvasUI();
+    if (this.texture) this.texture.needsUpdate = true;
+  }
+
   triggerClickFeedback(targetId) {
     this.lockedTarget = targetId;
     this.hoverTarget = targetId;
@@ -384,6 +395,7 @@ export class HologramScreen {
   fadeIn(duration = 1.2) {
     this.isVisible = true;
     this.group.visible = true;
+    this.resetState();
 
     gsap.to(this, {
       opacity: 1.0,

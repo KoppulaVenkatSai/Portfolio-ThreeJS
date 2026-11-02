@@ -4,6 +4,8 @@ import { CONFIG } from "./config.js";
 import { ENGINE_STATE } from "./state.js";
 import { CAMERA_RIG } from "./camera.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
+import { navigationState, NAV_PHASES } from '../navigation/navigationState.js';
+import { setRewindDisabled } from '../navigation/rewindController.js';
 
 export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGroup, renderer, camera, landingLegs, bloomPass) {
   const tl = gsap.timeline({ paused: true });
@@ -54,7 +56,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     ENGINE_STATE.warpProgress = 0.0;
     ENGINE_STATE.warpBankProgress = 0.0;
     ENGINE_STATE.starBatchProgress = 0.0;
-    ENGINE_STATE.starsOpacity = 1.0;
+    ENGINE_STATE.starsOpacity = 0.0;
     if (bloomPass) bloomPass.strength = 0.0;
     CAMERA_RIG.localYOffset = -8.0;
     if (rocket) {
@@ -69,11 +71,18 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     if (spaceAmbient) spaceAmbient.intensity = ENGINE_STATE.ambientIntensity;
   }, 0.0);
   
+  // Progressive star brightness emergence from 0.0 to 1.0 (t = 0.0s to 3.5s)
+  tl.to(ENGINE_STATE, {
+    starsOpacity: 1.0,
+    duration: 3.5,
+    ease: "power2.inOut"
+  }, 0.0);
+
   // Progressive batch-wise star emergence: 5 batches with 1.0s delay between batches (t = 0.0s to 5.0s)
   tl.to(ENGINE_STATE, {
     starBatchProgress: 1.0,
     duration: 5.0,
-    ease: "none"
+    ease: "power1.inOut"
   }, 0.0);
 
   // Vertical warp streaks ignition (t = 0.0s to 3.0s)
@@ -309,6 +318,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
   // Switch scene at peak dark transition
   tl.add(() => {
     ENGINE_STATE.setScene("LANDING");
+    navigationState.push(NAV_PHASES.EARTH_LANDING);
     CAMERA_RIG.instantSnapNextFrame = true;
     ENGINE_STATE.globalFogDensity = 0.045;
     ENGINE_STATE.landingFadeInProgress = 0.0;
@@ -401,6 +411,7 @@ export function buildCinematicTimeline(rocket, earthGroup, spaceGroup, oceanGrou
     controls.target.set(-0.74, 17.04, -74.29);
     controls.enabled = false;
     window.activeControls = controls;
+    setRewindDisabled(false);
   }, CONFIG.timeline.manualControlTime);
 
   return tl;

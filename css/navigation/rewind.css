@@ -1,0 +1,299 @@
+/* ============================================================
+   CRT Rewind Effect Overlay
+   High-energy 90s VCR tape rewind & cathode-ray tube filter
+   ============================================================ */
+
+.crt-rewind-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  mix-blend-mode: screen;
+}
+
+.crt-rewind-overlay.crt-hidden {
+  display: none;
+}
+
+.crt-rewind-overlay.crt-active {
+  display: block;
+}
+
+/* ---- Static Noise Grain ---- */
+.crt-noise-grain {
+  position: absolute;
+  inset: -100%;
+  width: 300%;
+  height: 300%;
+  background-image: repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08) 0, rgba(0, 0, 0, 0.12) 1px, transparent 2px);
+  background-size: 4px 4px;
+  pointer-events: none;
+  animation: crt-noise-shift 0.08s steps(4) infinite;
+  opacity: 0.65;
+}
+
+@keyframes crt-noise-shift {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3%, -2%); }
+  50% { transform: translate(2%, 3%); }
+  75% { transform: translate(-1%, 2%); }
+  100% { transform: translate(1%, -1%); }
+}
+
+/* ---- Scan Lines with rolling frequency ---- */
+.crt-scanlines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.45) 2px,
+    rgba(0, 0, 0, 0.45) 4px
+  );
+  pointer-events: none;
+  animation: crt-scanline-roll 0.07s linear infinite;
+  opacity: 0.85;
+}
+
+@keyframes crt-scanline-roll {
+  0%   { background-position-y: 0px; }
+  100% { background-position-y: 8px; }
+}
+
+/* ---- Chromatic Aberration (RGB Sync-Slip) ---- */
+.crt-chromatic {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 0, 60, 0.22) 0%, transparent 6%, transparent 94%, rgba(0, 220, 255, 0.22) 100%),
+    linear-gradient(180deg, rgba(0, 255, 120, 0.10) 0%, transparent 8%, transparent 92%, rgba(255, 0, 220, 0.10) 100%);
+  mix-blend-mode: screen;
+  filter: contrast(140%) brightness(120%);
+}
+
+/* ---- Primary & Secondary VHS Tracking Distortion Bars ---- */
+.crt-tracking-bar {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.crt-tracking-bar.bar-primary {
+  height: 10%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 15%,
+    rgba(200, 240, 255, 0.35) 45%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(200, 240, 255, 0.35) 55%,
+    rgba(255, 255, 255, 0.1) 85%,
+    transparent 100%
+  );
+  filter: blur(1.5px);
+}
+
+.crt-tracking-bar.bar-secondary {
+  height: 6%;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.3) 0px,
+    rgba(255, 255, 255, 0.3) 8px,
+    transparent 8px,
+    transparent 16px
+  );
+  opacity: 0.45;
+  filter: blur(0.8px);
+}
+
+/* ---- Vignette / Barrel Tube Edge ---- */
+.crt-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0, 0, 0, 0.55) 80%,
+    rgba(0, 0, 0, 0.90) 100%
+  );
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.85);
+  border-radius: 10px;
+}
+
+/* ============================================================
+   HUD Header Left Group (Rewind Button + Status Chip)
+   ============================================================ */
+
+.hud-left-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+/* Status Chip */
+.hud-status-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  padding: 8px 16px;
+  border-radius: 6px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.hud-status-chip .status-prefix {
+  color: #64748b;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+}
+
+#cam-status {
+  color: #38bdf8;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  transition: color 0.25s ease;
+}
+
+/* Status Chip when in Rewinding state */
+.hud-status-chip.is-rewinding {
+  border-color: rgba(251, 191, 36, 0.7);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.35);
+  background: rgba(30, 20, 5, 0.75);
+}
+
+.hud-status-chip.is-rewinding #cam-status {
+  color: #fbbf24;
+  animation: rewind-status-flash 0.25s infinite alternate;
+}
+
+.hud-status-chip.is-rewinding .pulse-dot {
+  background-color: #fbbf24 !important;
+  box-shadow: 0 0 10px #fbbf24 !important;
+  animation: rewind-dot-fast 0.3s infinite !important;
+}
+
+@keyframes rewind-status-flash {
+  from { opacity: 0.55; }
+  to { opacity: 1.0; }
+}
+
+@keyframes rewind-dot-fast {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(0.8); opacity: 0.5; }
+}
+
+/* ============================================================
+   Rewind Back Button (Left of Status Chip)
+   ============================================================ */
+
+#rewind-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  color: rgba(0, 240, 255, 0.9);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  user-select: none;
+  white-space: nowrap;
+  pointer-events: auto;
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease,
+    max-width 0.35s ease,
+    padding 0.35s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+  overflow: hidden;
+  max-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  opacity: 0;
+  border-width: 0;
+  transform: translateX(-12px);
+  pointer-events: none;
+}
+
+#rewind-back-btn.visible {
+  max-width: 160px;
+  padding: 8px 14px;
+  opacity: 1;
+  border-width: 1px;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+#rewind-back-btn:hover:not(.is-disabled):not([disabled]) {
+  border-color: rgba(0, 240, 255, 0.75);
+  background: rgba(0, 45, 90, 0.55);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.25), inset 0 0 14px rgba(0, 240, 255, 0.08);
+}
+
+#rewind-back-btn:hover:not(.is-disabled):not([disabled]) .rewind-icon {
+  transform: translateX(-3px);
+}
+
+#rewind-back-btn:active:not(.is-disabled):not([disabled]) {
+  transform: scale(0.96);
+  border-color: rgba(0, 240, 255, 0.95);
+}
+
+.rewind-icon {
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.rewind-label {
+  line-height: 1;
+}
+
+/* Disabled during animation / transitions */
+#rewind-back-btn.is-disabled,
+#rewind-back-btn[disabled] {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  border-color: rgba(148, 163, 184, 0.25) !important;
+  color: rgba(148, 163, 184, 0.55) !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  box-shadow: none !important;
+  transform: none !important;
+  pointer-events: none !important;
+}
+
+#rewind-back-btn.is-disabled .rewind-label::after {
+  content: " // LOCKED";
+  font-size: 0.72em;
+  color: #ef4444;
+  letter-spacing: 0.06em;
+}

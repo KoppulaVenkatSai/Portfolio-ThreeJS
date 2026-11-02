@@ -348,4 +348,28 @@ export class SpaceCosmosBackground {
       }
     }
   }
+
+  fadeIn(duration = 1.0, tl = null, startTime = 0) {
+    if (this.group) this.group.visible = true;
+    const targetNebulaOpacity = this.nebulaOpacity !== undefined ? this.nebulaOpacity : 0.3;
+    if (tl) {
+      if (this.starMat && this.starMat.uniforms.uOpacity) {
+        tl.to(this.starMat.uniforms.uOpacity, { value: 1.0, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+      if (this.clusterMat && this.clusterMat.uniforms.uOpacity) {
+        tl.to(this.clusterMat.uniforms.uOpacity, { value: 1.0, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+      if (this.nebMat1) {
+        tl.to(this.nebMat1, { opacity: targetNebulaOpacity, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+      if (this.nebMat2) {
+        tl.to(this.nebMat2, { opacity: targetNebulaOpacity, duration: duration, ease: 'power2.inOut' }, startTime);
+      }
+    } else {
+      if (this.starMat && this.starMat.uniforms.uOpacity) this.starMat.uniforms.uOpacity.value = 1.0;
+      if (this.clusterMat && this.clusterMat.uniforms.uOpacity) this.clusterMat.uniforms.uOpacity.value = 1.0;
+      if (this.nebMat1) this.nebMat1.opacity = targetNebulaOpacity;
+      if (this.nebMat2) this.nebMat2.opacity = targetNebulaOpacity;
+    }
+  }
 }

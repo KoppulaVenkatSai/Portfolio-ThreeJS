@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./css/Scene_1/scene1.css">
   <link rel="stylesheet" href="./css/EarthLanding/earthLanding.css">
   <link rel="stylesheet" href="./css/Planets/planets.css">
+  <link rel="stylesheet" href="./css/navigation/rewind.css">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&family=Share+Tech+Mono&family=Bebas+Neue&family=Oswald:wght@700&family=Anton&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -27,7 +28,20 @@
   <!-- HUD Overlay -->
   <div id="hud-container">
     <div class="hud-header">
-      <div class="hud-tag">STATION INTERIOR // MODULE 01</div>
+      <div class="hud-left-group">
+        <!-- Rewind / Back Button (top-left) -->
+        <button id="rewind-back-btn" class="rewind-back-btn" aria-label="Go back one step" title="Rewind back one step">
+          <span class="rewind-icon">&#x00AB;</span>
+          <span class="rewind-label">REWIND</span>
+        </button>
+
+        <!-- Status Chip (top-left, next to rewind button) -->
+        <div class="hud-status-chip" id="hud-status-chip">
+          <span class="pulse-dot" id="status-dot"></span>
+          <span class="status-prefix">STATUS:</span>
+          <span id="cam-status">INTERIOR_VIEW</span>
+        </div>
+      </div>
       <div class="hud-right-actions">
         <div class="hud-status"><span class="pulse-dot"></span> SYSTEMS READY</div>
         <button id="settings-toggle-btn" class="icon-btn" title="Toggle Inspector Controls">⚙️</button>
@@ -313,11 +327,6 @@
       </div>
 
       <div id="copy-toast">COPIED TO CLIPBOARD & CONSOLE!</div>
-    </div>
-
-    <!-- Navigation / Debug Controls -->
-    <div class="hud-footer">
-      <div class="hud-info">STATUS: <span id="cam-status">INTERIOR_VIEW</span></div>
     </div>
   </div>
 

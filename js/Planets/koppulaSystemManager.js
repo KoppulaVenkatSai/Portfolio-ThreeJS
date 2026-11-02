@@ -20,6 +20,8 @@ import {
 import { WarpSystem } from '../EarthLanding/warp.js';
 import { CAMERA_RIG } from '../EarthLanding/camera.js';
 import { buildPlanetsTimeline } from './timeline.js';
+import { navigationState, NAV_PHASES } from '../navigation/navigationState.js';
+import { setRewindDisabled } from '../navigation/rewindController.js';
 
 const PLANET_COLORS = {
   planet1: { hex: '#00e5ff', glow: 0x00c8ff },
@@ -96,7 +98,7 @@ export class KoppulaSystemManager {
     this.spaceGroup.add(this.flightHemi);
 
     // Solar system specific lights (ignited at solar system reveal)
-    this.spaceAmbient = new THREE.AmbientLight(0xffffff, 0.0);
+    this.spaceAmbient = new THREE.AmbientLight(0xffffff, 0.45);
     this.solarSystemGroup.add(this.spaceAmbient);
 
     this.sunLight = new THREE.PointLight(0xffecd9, 0.0, 300, 0.85);
@@ -443,9 +445,50 @@ export class KoppulaSystemManager {
   startSequence(rocket) {
     this.isActive = true;
     this.spaceGroup.visible = true;
+    this.solarSystemGroup.visible = false;
     this.isHoverEnabled = false;
     this.nebulaMasterOpacity.value = 0.0;
     this.sunMasterOpacity.value = 0.0;
+
+    // Reset solar system and flight lights to their initial sequence state
+    if (this.flightAmbient) this.flightAmbient.intensity = 0.7;
+    if (this.flightSun) this.flightSun.intensity = 1.8;
+    if (this.flightHemi) this.flightHemi.intensity = 1.3;
+    if (this.spaceAmbient) this.spaceAmbient.intensity = 0.0;
+    if (this.sunLight) this.sunLight.intensity = 0.0;
+    if (this.rimLight) this.rimLight.intensity = 0.0;
+    if (this.headlight) {
+      this.headlight.intensity = 0.0;
+      this.headlight.visible = true;
+    }
+
+    // Ensure Sun group and sub-elements are visible and ready
+    if (this.sunGroup) {
+      this.sunGroup.visible = true;
+    }
+    if (this.sunCoreMesh) {
+      this.sunCoreMesh.visible = true;
+    }
+    if (this.corona1) {
+      this.corona1.visible = true;
+    }
+    if (this.corona2) {
+      this.corona2.visible = true;
+    }
+    if (this.binaryRings) {
+      this.binaryRings.forEach((r) => {
+        if (r.mesh) r.mesh.visible = true;
+      });
+    }
+    if (this.nebulaGroup) {
+      this.nebulaGroup.visible = true;
+    }
+    if (this.nebulaeList) {
+      this.nebulaeList.forEach((neb) => {
+        if (neb.mesh) neb.mesh.visible = true;
+      });
+    }
+
     if (this.warpSystem) this.warpSystem.setStarCount(2000);
 
     if (this.dataHudOverlayEl) {
@@ -478,6 +521,8 @@ export class KoppulaSystemManager {
       (controls) => {
         this.controls = controls;
         console.log("[KOPPULA SYSTEM] Arrived at Solar System! Waiting 1s before enabling hover...");
+        navigationState.push(NAV_PHASES.KOPPULA_SYSTEM);
+        setRewindDisabled(false);
         setTimeout(() => {
           this.isHoverEnabled = true;
           console.log("[KOPPULA SYSTEM] Planet Hover & Click Interactions ACTIVE!");
@@ -588,6 +633,7 @@ export class KoppulaSystemManager {
 
     this.activeFocusPlanetId = planetId;
     const planet = this.planetObjects[planetId];
+    navigationState.push(NAV_PHASES.PLANET_FOCUS);
 
     const data = PROJECTS_DATA[planetId];
     if (this.dataTitle) this.dataTitle.innerText = data.title;
@@ -687,10 +733,19 @@ export class KoppulaSystemManager {
   triggerReset() {
     if (!this.activeFocusPlanetId) return;
 
+    if (navigationState.current === NAV_PHASES.PLANET_FOCUS) {
+      navigationState.pop();
+    }
+
     const planetId = this.activeFocusPlanetId;
     const planet = this.planetObjects[planetId];
     this.activeFocusPlanetId = null;
     this.isTransitioningFocus = false;
+
+    // Ensure solar system ambient light and sun lighting remain active
+    if (this.spaceAmbient) this.spaceAmbient.intensity = 0.45;
+    if (this.sunLight && this.sunLight.intensity === 0) this.sunLight.intensity = 10.0;
+    if (this.headlight && this.headlight.intensity === 0) this.headlight.intensity = 2.5;
 
     if (this.hudOpenTimer) clearTimeout(this.hudOpenTimer);
     if (this.dataHudOverlayEl) this.dataHudOverlayEl.classList.add('closed');

@@ -33,7 +33,7 @@ export function buildPlanetsTimeline(
     ENGINE_STATE.warpProgress = 0.0;
     ENGINE_STATE.warpBankProgress = 0.0;
     ENGINE_STATE.starBatchProgress = 0.0;
-    ENGINE_STATE.starsOpacity = 1.0;
+    ENGINE_STATE.starsOpacity = 0.0;
     ENGINE_STATE.starDriftSpeed = 25.0; // Cruising drift speed
     if (nebulaMasterOpacity) nebulaMasterOpacity.value = 0.0;
     if (sunMasterOpacity) sunMasterOpacity.value = 0.0;
@@ -73,11 +73,18 @@ export function buildPlanetsTimeline(
     }
   }, 0.0);
 
+  // Progressive star brightness emergence from 0.0 to 1.0 (t = 0.0s to 3.5s)
+  tl.to(ENGINE_STATE, {
+    starsOpacity: 1.0,
+    duration: 3.5,
+    ease: "power2.inOut"
+  }, 0.0);
+
   // Progressive batch-wise star emergence (t = 0.0s to 4.5s)
   tl.to(ENGINE_STATE, {
     starBatchProgress: 1.0,
     duration: 4.5,
-    ease: "none"
+    ease: "power1.inOut"
   }, 0.0);
 
   // Vertical warp streaks ignition (t = 0.0s to 2.5s)
@@ -186,6 +193,13 @@ export function buildPlanetsTimeline(
       solarSystemGroup.position.set(0, 0, 0);
       solarSystemGroup.scale.set(0.04, 0.04, 0.04);
       solarSystemGroup.visible = true;
+
+      // Ensure all child groups (sun, nebulae, planets) are visible
+      solarSystemGroup.traverse((child) => {
+        if (child.isGroup || child.isMesh) {
+          child.visible = true;
+        }
+      });
     }
 
     // Keep all solar lights and Sun brightness strictly at 0 during scale-up
@@ -257,7 +271,7 @@ export function buildPlanetsTimeline(
 
   if (spaceAmbient) {
     tl.to(spaceAmbient, {
-      intensity: 0.10,
+      intensity: 0.45,
       duration: 2.6,
       ease: "power2.inOut"
     }, 13.2);
@@ -273,7 +287,7 @@ export function buildPlanetsTimeline(
 
   if (renderer) {
     tl.to(renderer, {
-      toneMappingExposure: 0.95,
+      toneMappingExposure: 1.25,
       duration: 2.6,
       ease: "power2.inOut"
     }, 13.2);
